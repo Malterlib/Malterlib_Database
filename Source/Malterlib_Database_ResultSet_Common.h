@@ -167,7 +167,7 @@ namespace NMib
 //				static_assert( false, "The type you pass in must be one of: CStr, int32, int64, fp32, fp64, TCVector<uin8> or convertible to one.");
 
 //				typedef _OutType CDataType;
-//				static const EResultDataType mc_Type = <DataTypeEnum>; 
+//				static constexpr EResultDataType mc_Type = <DataTypeEnum>; 
 //				static _OutType fs_Convert(_InType _V) { return _OutType (_V); }
 			};
 

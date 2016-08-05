@@ -134,7 +134,7 @@ namespace NMib
 		{
 			using NResultSet::TCTypeToDataType;
 
-			static const EResultDataType Type = TCTypeToDataType<t_CType>::mc_Type;
+			static constexpr EResultDataType Type = TCTypeToDataType<t_CType>::mc_Type;
 
 			DMibCheck( mp_pBuilder)("Adding a column value to an invalid row." );
 			DMibCheck( mp_iCurKeyPart == mp_nKeyParts)("A column value is being specified before all key parts have been." );
@@ -177,7 +177,7 @@ namespace NMib
 		{
 			using NResultSet::TCTypeToDataType;
 
-			static const EResultDataType Type = TCTypeToDataType<t_CType>::mc_Type;
+			static constexpr EResultDataType Type = TCTypeToDataType<t_CType>::mc_Type;
 
 			DMibCheck(mp_pBuilder)("Adding a key part value to an invalid column.");
 			DMibCheck( mp_iColumn < mp_pBuilder->mp_ColumnInfos.f_GetLen())("Invalid column");
@@ -253,7 +253,7 @@ namespace NMib
 		{
 			using NResultSet::TCTypeToDataType;
 
-			static const EResultDataType Type = TCTypeToDataType<t_CType>::mc_Type;
+			static constexpr EResultDataType Type = TCTypeToDataType<t_CType>::mc_Type;
 
 			DMibCheck( _iKeyPart < mp_KeyPartInfos.f_GetLen())("Values for too many key parts are being specified!" );
 			DMibCheck( mp_KeyPartInfos[_iKeyPart].m_Type ==  Type)("Invalid type used for key part values");
@@ -272,7 +272,7 @@ namespace NMib
 		{
 			using NResultSet::TCTypeToDataType;
 
-			static const EResultDataType Type = TCTypeToDataType<t_CType>::mc_Type;
+			static constexpr EResultDataType Type = TCTypeToDataType<t_CType>::mc_Type;
 
 			DMibCheck( _iKeyPart < mp_KeyPartInfos.f_GetLen())("Values for too many key parts are being specified!" );
 			DMibCheck( mp_KeyPartInfos[_iKeyPart].m_Type ==  Type)("Invalid type used for key part values");

@@ -18,7 +18,7 @@ namespace NMib
 			auto const& KeyPartRowValueIndices = mp_pResultSet->mp_KeyPartRowValueIndices;
 			auto const& KeyPartValues = mp_pResultSet->mp_KeyPartValues;
 
-			static const EResultDataType KeyPartType = NResultSet::TCTypeToDataType< t_CType >::mc_Type;
+			static constexpr EResultDataType KeyPartType = NResultSet::TCTypeToDataType< t_CType >::mc_Type;
 
 			mint iValue = KeyPartRowValueIndices[mp_iKeyPart][mp_iRow];
 
@@ -61,7 +61,7 @@ namespace NMib
 
 			mint iCurColPos = mp_ColumnValueIterators[mp_iColumn];
 
-			static const EResultDataType ColumnType = NResultSet::TCTypeToDataType< t_CType >::mc_Type;
+			static constexpr EResultDataType ColumnType = NResultSet::TCTypeToDataType< t_CType >::mc_Type;
 
 			auto const& lValueArray = Columns[mp_iColumn].f_Get<ColumnType>();
 
@@ -94,7 +94,7 @@ namespace NMib
 		template <typename t_CType>
 		t_CType const& CResultSet::CRowIterator::f_GetKeyPart(mint _iKeyPart) const
 		{
-			static const EResultDataType KeyPartType = NResultSet::TCTypeToDataType<t_CType>::mc_Type;
+			static constexpr EResultDataType KeyPartType = NResultSet::TCTypeToDataType<t_CType>::mc_Type;
 
 			mint iValue = mp_pResultSet->mp_KeyPartRowValueIndices[_iKeyPart][mp_iCurRow];
 			
@@ -113,7 +113,7 @@ namespace NMib
 
 			mint iCurColPos = mp_ColumnValueIterators[_iColumn];
 
-			static const EResultDataType ColumnType = NResultSet::TCTypeToDataType<t_CType>::mc_Type;
+			static constexpr EResultDataType ColumnType = NResultSet::TCTypeToDataType<t_CType>::mc_Type;
 
 			auto const& lValueArray = Columns[_iColumn].f_Get<ColumnType>();
 
@@ -143,7 +143,7 @@ namespace NMib
 		{
 			auto const& KeyPartValues = mp_KeyPartValues;
 
-			static const EResultDataType KeyPartType = NResultSet::TCTypeToDataType< t_CType >::mc_Type;
+			static constexpr EResultDataType KeyPartType = NResultSet::TCTypeToDataType< t_CType >::mc_Type;
 
 			auto const& lValueArray = KeyPartValues[_iKeyPart].f_Get<KeyPartType>();
 

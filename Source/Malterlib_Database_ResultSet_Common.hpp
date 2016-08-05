@@ -99,7 +99,7 @@ namespace NMib
 				struct TCTypeToDataType< _InType >	\
 				{	\
 					typedef _OutType CDataType; \
-					static const EResultDataType mc_Type = _Enum; \
+					static constexpr EResultDataType mc_Type = _Enum; \
 					static _OutType fs_Convert(_InType _V) { return _OutType (_V); } \
 				}
 
@@ -113,7 +113,7 @@ namespace NMib
 			struct TCTypeToDataType< NContainer::TCVector<uint8> >
 			{
 				typedef NContainer::TCVector<uint8> CDataType;
-				static const EResultDataType mc_Type = EResultDataType_Binary;
+				static constexpr EResultDataType mc_Type = EResultDataType_Binary;
 				static NContainer::TCVector<uint8> fs_Convert(NContainer::TCVector<uint8>&& _V) { return fg_Move(_V); }
 			};
 
@@ -122,7 +122,7 @@ namespace NMib
 			struct TCTypeToDataType< NContainer::TCVector<uint8>& >
 			{
 				typedef NContainer::TCVector<uint8> CDataType;
-				static const EResultDataType mc_Type = EResultDataType_Binary;
+				static constexpr EResultDataType mc_Type = EResultDataType_Binary;
 				static NContainer::TCVector<uint8> fs_Convert(NContainer::TCVector<uint8> const& _V) { return _V; }
 			};
 
@@ -130,7 +130,7 @@ namespace NMib
 			struct TCTypeToDataType< NContainer::TCVector<uint8> const& >
 			{
 				typedef NContainer::TCVector<uint8> CDataType;
-				static const EResultDataType mc_Type = EResultDataType_Binary;
+				static constexpr EResultDataType mc_Type = EResultDataType_Binary;
 				static NContainer::TCVector<uint8> fs_Convert(NContainer::TCVector<uint8> const& _V) { return _V; }
 			};
 
@@ -138,7 +138,7 @@ namespace NMib
 			struct TCTypeToDataType< char const (&)[t_Len] >
 			{
 				typedef NStr::CStr CDataType;
-				static const EResultDataType mc_Type = EResultDataType_CStr;
+				static constexpr EResultDataType mc_Type = EResultDataType_CStr;
 				static NStr::CStr fs_Convert(char const _V[t_Len]) { return NStr::CStr(_V); }
 			};
 
