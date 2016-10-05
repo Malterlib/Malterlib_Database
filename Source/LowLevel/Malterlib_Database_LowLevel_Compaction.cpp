@@ -32,62 +32,74 @@
 
 #include "Malterlib_Database_LowLevel.h"
 #include "Malterlib_Database_LowLevel_Internal.h"
+#include <Mib/Concurrency/ConcurrencyManager>
 
-namespace NMib
+namespace NMib::NDatabase
 {
-	struct NDatabase::NPrivate::CCompactingCopyState
+	using namespace NConcurrency;
+	namespace NPrivate
 	{
-		pthread_mutex_t mc_mutex;
-		pthread_cond_t mc_cond;
-		char *mc_wbuf[2];
-		char *mc_over[2];
-		MDB_env *mc_env;
-		MDB_txn *mc_txn;
-		int mc_wlen[2];
-		int mc_olen[2];
-		pgno_t mc_next_pgno;
-		HANDLE mc_fd;
-		int mc_status;
-		volatile int mc_new;
-		int mc_toggle;
-	};
-
-	/** Dedicated writer thread for compacting copy. */
-	THREAD_RET DMibDatabaseInfrequentSection CALL_CONV NDatabase::NPrivate::mdb_env_copythr(void *arg)
-	{
-		CCompactingCopyState *my = (CCompactingCopyState *)arg;
-		char *ptr;
-		int toggle = 0, wsize, rc;
-	#ifdef DPlatformFamily_Windows
-		DWORD len;
-	#define DO_WRITE(rc, fd, ptr, w2, len)	rc = WriteFile(fd, ptr, w2, &len, nullptr)
-	#else
-		int len;
-	#define DO_WRITE(rc, fd, ptr, w2, len)	len = write(fd, ptr, w2); rc = (len >= 0)
-	#endif
-
-		pthread_mutex_lock(&my->mc_mutex);
-		my->mc_new = 0;
-		pthread_cond_signal(&my->mc_cond);
-		for(;;) {
-			while (!my->mc_new)
-				pthread_cond_wait(&my->mc_cond, &my->mc_mutex);
-			if (my->mc_new < 0) {
-				my->mc_new = 0;
-				break;
+		static constexpr mint gc_CopyBufferSize = 1024*1024;
+		
+		struct CCompactingCopyState
+		{
+			CCompactingCopyState(MDB_env *_pEnvironment, HANDLE _DestinationFile)
+				: m_pEnvironment{_pEnvironment}
+				, m_OutputFileHandle{_DestinationFile}
+			{
 			}
-			my->mc_new = 0;
-			wsize = my->mc_wlen[toggle];
-			ptr = my->mc_wbuf[toggle];
+			
+			~CCompactingCopyState()
+			{
+				if (m_WriteBuffers[0])
+					NMem::fg_Free(m_WriteBuffers[0]);
+			}
+			void f_Init(mint _PageSize)
+			{
+				m_ProcessingActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Low level DB Copy"));
+				mint Size = gc_CopyBufferSize*2;
+				m_WriteBuffers[0] = (uint8 *)NMem::fg_AllocAligned(Size, _PageSize);
+				NMem::fg_MemClear(m_WriteBuffers[0], gc_CopyBufferSize*2);
+				m_WriteBuffers[1] = m_WriteBuffers[0] + gc_CopyBufferSize;
+			}
+
+			TCActor<CSeparateThreadActor> m_ProcessingActor;
+			uint8 *m_WriteBuffers[2] = {nullptr, nullptr};
+			uint8 *m_OverflowPages[2] = {nullptr, nullptr};
+			mint m_WriteBuffersLength[2] = {0, 0};
+			mint m_OverflowPagesLength[2] = {0, 0};
+			MDB_env *m_pEnvironment = nullptr;
+			MDB_txn *m_pInternalTransaction = nullptr;
+			pgno_t m_NextPageNo = NUM_METAS;
+			HANDLE m_OutputFileHandle = INVALID_HANDLE_VALUE;
+			int m_Status = 0;
+			int m_iBuffer = 0;
+		};
+		
+		/** Dedicated writer thread for compacting copy. */
+		void DMibDatabaseInfrequentSection fg_DoBufferWrite(CCompactingCopyState &_CopyState, mint _iBuffer)
+		{
+			CCompactingCopyState &CopyState = _CopyState;
+			int wsize, rc;
+		#ifdef DPlatformFamily_Windows
+			DWORD len;
+		#define DO_WRITE(rc, fd, ptr, w2, len)	rc = WriteFile(fd, ptr, w2, &len, nullptr)
+		#else
+			int len;
+		#define DO_WRITE(rc, fd, ptr, w2, len)	len = write(fd, ptr, w2); rc = (len >= 0)
+		#endif
+
+			wsize = CopyState.m_WriteBuffersLength[_iBuffer];
+			uint8 *pWriteBuffer = CopyState.m_WriteBuffers[_iBuffer];
 	again:
 			while (wsize > 0) {
-				DO_WRITE(rc, my->mc_fd, ptr, wsize, len);
+				DO_WRITE(rc, CopyState.m_OutputFileHandle, pWriteBuffer, wsize, len);
 				if (!rc) {
 					rc = ErrCode();
 					break;
 				} else if (len > 0) {
 					rc = MDB_SUCCESS;
-					ptr += len;
+					pWriteBuffer += len;
 					wsize -= len;
 					continue;
 				} else {
@@ -96,252 +108,220 @@ namespace NMib
 				}
 			}
 			if (rc) {
-				my->mc_status = rc;
-				break;
+				CopyState.m_Status = rc;
+				return;
 			}
 			/* If there's an overflow page tail, write it too */
-			if (my->mc_olen[toggle]) {
-				wsize = my->mc_olen[toggle];
-				ptr = my->mc_over[toggle];
-				my->mc_olen[toggle] = 0;
+			if (CopyState.m_OverflowPagesLength[_iBuffer]) {
+				wsize = CopyState.m_OverflowPagesLength[_iBuffer];
+				pWriteBuffer = CopyState.m_OverflowPages[_iBuffer];
+				CopyState.m_OverflowPagesLength[_iBuffer] = 0;
 				goto again;
 			}
-			my->mc_wlen[toggle] = 0;
-			toggle ^= 1;
-			pthread_cond_signal(&my->mc_cond);
-		}
-		pthread_cond_signal(&my->mc_cond);
-		pthread_mutex_unlock(&my->mc_mutex);
-		return (THREAD_RET)0;
-	#undef DO_WRITE
-	}
-
-	/** Tell the writer thread there's a buffer ready to write */
-	int DMibDatabaseInfrequentSection NDatabase::NPrivate::mdb_env_cthr_toggle(CCompactingCopyState *my, int st)
-	{
-		int toggle = my->mc_toggle ^ 1;
-		pthread_mutex_lock(&my->mc_mutex);
-		if (my->mc_status) {
-			pthread_mutex_unlock(&my->mc_mutex);
-			return my->mc_status;
-		}
-		while (my->mc_new == 1)
-			pthread_cond_wait(&my->mc_cond, &my->mc_mutex);
-		my->mc_new = st;
-		my->mc_toggle = toggle;
-		pthread_cond_signal(&my->mc_cond);
-		pthread_mutex_unlock(&my->mc_mutex);
-		return 0;
-	}
-
-	static constexpr mint gc_CopyBufferSize = 1024*1024;
-	
-	/** Depth-first tree traversal for compacting copy. */
-	int DMibDatabaseInfrequentSection NDatabase::NPrivate::mdb_env_cwalk(CCompactingCopyState *my, pgno_t *pg, int flags)
-	{
-		
-		MDB_cursor mc = {0};
-		MDB_node *ni;
-		MDB_page *mo, *mp, *leaf;
-		char *buf, *ptr;
-		int rc, toggle;
-		uint32 i;
-
-		/* Empty DB, nothing to do */
-		if (*pg == P_INVALID)
-			return MDB_SUCCESS;
-
-		mc.mc_snum = 1;
-		mc.mc_txn = my->mc_txn;
-		mc.mc_flags = my->mc_txn->mt_flags & (C_ORIG_RDONLY|C_WRITEMAP);
-
-		rc = mdb_page_get(&mc, *pg, &mc.mc_pg[0], nullptr);
-		if (rc)
-			return rc;
-		rc = mdb_page_search_root(&mc, nullptr, MDB_PS_FIRST);
-		if (rc)
-			return rc;
-
-		/* Make cursor pages writable */
-		buf = ptr = (char *)NMem::fg_AllocNoSize(my->mc_env->me_psize * mc.mc_snum);
-
-		for (i=0; i<mc.mc_top; i++) {
-			mdb_page_copy((MDB_page *)ptr, mc.mc_pg[i], my->mc_env->me_psize);
-			mc.mc_pg[i] = (MDB_page *)ptr;
-			ptr += my->mc_env->me_psize;
+			CopyState.m_WriteBuffersLength[_iBuffer] = 0;
 		}
 
-		/* This is writable space for a leaf page. Usually not needed. */
-		leaf = (MDB_page *)ptr;
+		/** Tell the writer thread there's a buffer ready to write */
+		int DMibDatabaseInfrequentSection fg_DispatchCopyBuffer(CCompactingCopyState &_CopyState)
+		{
+			auto &CopyState = _CopyState;
+			mint iBuffer = CopyState.m_iBuffer;
+			// Block on last write finishing
+			fg_Dispatch(CopyState.m_ProcessingActor, []{}).f_CallSync();
+			
+			if (CopyState.m_Status)
+				return CopyState.m_Status;
 
-		toggle = my->mc_toggle;
-		while (mc.mc_snum > 0) {
-			unsigned n;
-			mp = mc.mc_pg[mc.mc_top];
-			n = NUMKEYS(mp);
+			fg_Dispatch
+				(
+					CopyState.m_ProcessingActor
+					, [pCopyState = &_CopyState, iBuffer]()
+					{
+						fg_DoBufferWrite(*pCopyState, iBuffer);
+					}
+				)
+				> fg_DiscardResult()
+			;
+			
+			CopyState.m_iBuffer = iBuffer ^ 1;
+			return 0;
+		}
 
-			if (IS_LEAF(mp)) {
-				if (!IS_LEAF2(mp) && !(flags & F_DUPDATA)) {
-					for (i=0; i<n; i++) {
-						ni = NODEPTR(mp, i);
-						if (ni->mn_flags & F_BIGDATA) {
-							MDB_page *omp;
-							pgno_t pg;
+		/** Depth-first tree traversal for compacting copy. */
+		int DMibDatabaseInfrequentSection fg_TraverseTreeCopyRecursive(CCompactingCopyState &_CopyState, pgno_t *pg, int flags)
+		{
+			MDB_cursor mc = {0};
+			MDB_node *ni;
+			MDB_page *mo, *mp, *leaf;
+			char *buf, *ptr;
+			int rc;
+			uint32 i;
 
-							/* Need writable leaf */
-							if (mp != leaf) {
-								mc.mc_pg[mc.mc_top] = leaf;
-								mdb_page_copy(leaf, mp, my->mc_env->me_psize);
-								mp = leaf;
-								ni = NODEPTR(mp, i);
-							}
+			/* Empty DB, nothing to do */
+			if (*pg == P_INVALID)
+				return MDB_SUCCESS;
+			
+			auto &CopyState = _CopyState; 
 
-							memcpy(&pg, NODEDATA(ni), sizeof(pg));
-							rc = mdb_page_get(&mc, pg, &omp, nullptr);
-							if (rc)
-								goto done;
-							if (my->mc_wlen[toggle] >= gc_CopyBufferSize) 
-							{
-								rc = mdb_env_cthr_toggle(my, 1);
+			mc.mc_snum = 1;
+			mc.mc_txn = CopyState.m_pInternalTransaction;
+			mc.mc_flags = CopyState.m_pInternalTransaction->mt_flags & (C_ORIG_RDONLY|C_WRITEMAP);
+
+			rc = mdb_page_get(&mc, *pg, &mc.mc_pg[0], nullptr);
+			if (rc)
+				return rc;
+			rc = mdb_page_search_root(&mc, nullptr, MDB_PS_FIRST);
+			if (rc)
+				return rc;
+
+			/* Make cursor pages writable */
+			buf = ptr = (char *)NMem::fg_AllocNoSize(CopyState.m_pEnvironment->me_psize * mc.mc_snum);
+
+			for (i=0; i<mc.mc_top; i++) {
+				mdb_page_copy((MDB_page *)ptr, mc.mc_pg[i], CopyState.m_pEnvironment->me_psize);
+				mc.mc_pg[i] = (MDB_page *)ptr;
+				ptr += CopyState.m_pEnvironment->me_psize;
+			}
+
+			/* This is writable space for a leaf page. Usually not needed. */
+			leaf = (MDB_page *)ptr;
+
+			auto iBuffer = CopyState.m_iBuffer;
+			while (mc.mc_snum > 0) {
+				unsigned n;
+				mp = mc.mc_pg[mc.mc_top];
+				n = NUMKEYS(mp);
+
+				if (IS_LEAF(mp)) {
+					if (!IS_LEAF2(mp) && !(flags & F_DUPDATA)) {
+						for (i=0; i<n; i++) {
+							ni = NODEPTR(mp, i);
+							if (ni->mn_flags & F_BIGDATA) {
+								MDB_page *omp;
+								pgno_t pg;
+
+								/* Need writable leaf */
+								if (mp != leaf) {
+									mc.mc_pg[mc.mc_top] = leaf;
+									mdb_page_copy(leaf, mp, CopyState.m_pEnvironment->me_psize);
+									mp = leaf;
+									ni = NODEPTR(mp, i);
+								}
+
+								memcpy(&pg, NODEDATA(ni), sizeof(pg));
+								rc = mdb_page_get(&mc, pg, &omp, nullptr);
 								if (rc)
 									goto done;
-								toggle = my->mc_toggle;
-							}
-							mo = (MDB_page *)(my->mc_wbuf[toggle] + my->mc_wlen[toggle]);
-							memcpy(mo, omp, my->mc_env->me_psize);
-							mo->mp_p.p_pgno = my->mc_next_pgno;
-							my->mc_next_pgno += omp->mp_pages;
-							my->mc_wlen[toggle] += my->mc_env->me_psize;
-							if (omp->mp_pages > 1) {
-								my->mc_olen[toggle] = my->mc_env->me_psize * (omp->mp_pages - 1);
-								my->mc_over[toggle] = (char *)omp + my->mc_env->me_psize;
-								rc = mdb_env_cthr_toggle(my, 1);
+								if (CopyState.m_WriteBuffersLength[iBuffer] >= gc_CopyBufferSize) 
+								{
+									rc = fg_DispatchCopyBuffer(CopyState);
+									if (rc)
+										goto done;
+									iBuffer = CopyState.m_iBuffer;
+								}
+								mo = (MDB_page *)(CopyState.m_WriteBuffers[iBuffer] + CopyState.m_WriteBuffersLength[iBuffer]);
+								memcpy(mo, omp, CopyState.m_pEnvironment->me_psize);
+								mo->mp_p.p_pgno = CopyState.m_NextPageNo;
+								CopyState.m_NextPageNo += omp->mp_pages;
+								CopyState.m_WriteBuffersLength[iBuffer] += CopyState.m_pEnvironment->me_psize;
+								if (omp->mp_pages > 1) {
+									CopyState.m_OverflowPagesLength[iBuffer] = CopyState.m_pEnvironment->me_psize * (omp->mp_pages - 1);
+									CopyState.m_OverflowPages[iBuffer] = (uint8 *)omp + CopyState.m_pEnvironment->me_psize;
+									rc = fg_DispatchCopyBuffer(CopyState);
+									if (rc)
+										goto done;
+									iBuffer = CopyState.m_iBuffer;
+								}
+								memcpy(NODEDATA(ni), &mo->mp_p.p_pgno, sizeof(pgno_t));
+							} else if (ni->mn_flags & F_SUBDATA) {
+								MDB_db db;
+
+								/* Need writable leaf */
+								if (mp != leaf) {
+									mc.mc_pg[mc.mc_top] = leaf;
+									mdb_page_copy(leaf, mp, CopyState.m_pEnvironment->me_psize);
+									mp = leaf;
+									ni = NODEPTR(mp, i);
+								}
+
+								memcpy(&db, NODEDATA(ni), sizeof(db));
+								CopyState.m_iBuffer = iBuffer;
+								rc = fg_TraverseTreeCopyRecursive(CopyState, &db.md_root, ni->mn_flags & F_DUPDATA);
 								if (rc)
 									goto done;
-								toggle = my->mc_toggle;
+								iBuffer = CopyState.m_iBuffer;
+								memcpy(NODEDATA(ni), &db, sizeof(db));
 							}
-							memcpy(NODEDATA(ni), &mo->mp_p.p_pgno, sizeof(pgno_t));
-						} else if (ni->mn_flags & F_SUBDATA) {
-							MDB_db db;
-
-							/* Need writable leaf */
-							if (mp != leaf) {
-								mc.mc_pg[mc.mc_top] = leaf;
-								mdb_page_copy(leaf, mp, my->mc_env->me_psize);
-								mp = leaf;
-								ni = NODEPTR(mp, i);
-							}
-
-							memcpy(&db, NODEDATA(ni), sizeof(db));
-							my->mc_toggle = toggle;
-							rc = mdb_env_cwalk(my, &db.md_root, ni->mn_flags & F_DUPDATA);
-							if (rc)
-								goto done;
-							toggle = my->mc_toggle;
-							memcpy(NODEDATA(ni), &db, sizeof(db));
 						}
 					}
+				} else {
+					mc.mc_ki[mc.mc_top]++;
+					if (mc.mc_ki[mc.mc_top] < n) {
+						pgno_t pg;
+		again:
+						ni = NODEPTR(mp, mc.mc_ki[mc.mc_top]);
+						pg = NODEPGNO(ni);
+						rc = mdb_page_get(&mc, pg, &mp, nullptr);
+						if (rc)
+							goto done;
+						mc.mc_top++;
+						mc.mc_snum++;
+						mc.mc_ki[mc.mc_top] = 0;
+						if (IS_BRANCH(mp)) 
+						{
+							/* Whenever we advance to a sibling branch page,
+							 * we must proceed all the way down to its first leaf.
+							 */
+							mdb_page_copy(mc.mc_pg[mc.mc_top], mp, CopyState.m_pEnvironment->me_psize);
+							goto again;
+						} else
+							mc.mc_pg[mc.mc_top] = mp;
+						continue;
+					}
 				}
-			} else {
-				mc.mc_ki[mc.mc_top]++;
-				if (mc.mc_ki[mc.mc_top] < n) {
-					pgno_t pg;
-	again:
-					ni = NODEPTR(mp, mc.mc_ki[mc.mc_top]);
-					pg = NODEPGNO(ni);
-					rc = mdb_page_get(&mc, pg, &mp, nullptr);
+				if (CopyState.m_WriteBuffersLength[iBuffer] >= gc_CopyBufferSize) 
+				{
+					rc = fg_DispatchCopyBuffer(CopyState);
 					if (rc)
 						goto done;
-					mc.mc_top++;
-					mc.mc_snum++;
-					mc.mc_ki[mc.mc_top] = 0;
-					if (IS_BRANCH(mp)) 
-					{
-						/* Whenever we advance to a sibling branch page,
-						 * we must proceed all the way down to its first leaf.
-						 */
-						mdb_page_copy(mc.mc_pg[mc.mc_top], mp, my->mc_env->me_psize);
-						goto again;
-					} else
-						mc.mc_pg[mc.mc_top] = mp;
-					continue;
+					iBuffer = CopyState.m_iBuffer;
+				}
+				mo = (MDB_page *)(CopyState.m_WriteBuffers[iBuffer] + CopyState.m_WriteBuffersLength[iBuffer]);
+				mdb_page_copy(mo, mp, CopyState.m_pEnvironment->me_psize);
+				mo->mp_p.p_pgno = CopyState.m_NextPageNo++;
+				CopyState.m_WriteBuffersLength[iBuffer] += CopyState.m_pEnvironment->me_psize;
+				if (mc.mc_top) {
+					/* Update parent if there is one */
+					ni = NODEPTR(mc.mc_pg[mc.mc_top-1], mc.mc_ki[mc.mc_top-1]);
+					SETPGNO(ni, mo->mp_p.p_pgno);
+					mdb_cursor_pop(&mc);
+				} else {
+					/* Otherwise we're done */
+					*pg = mo->mp_p.p_pgno;
+					break;
 				}
 			}
-			if (my->mc_wlen[toggle] >= gc_CopyBufferSize) 
-			{
-				rc = mdb_env_cthr_toggle(my, 1);
-				if (rc)
-					goto done;
-				toggle = my->mc_toggle;
-			}
-			mo = (MDB_page *)(my->mc_wbuf[toggle] + my->mc_wlen[toggle]);
-			mdb_page_copy(mo, mp, my->mc_env->me_psize);
-			mo->mp_p.p_pgno = my->mc_next_pgno++;
-			my->mc_wlen[toggle] += my->mc_env->me_psize;
-			if (mc.mc_top) {
-				/* Update parent if there is one */
-				ni = NODEPTR(mc.mc_pg[mc.mc_top-1], mc.mc_ki[mc.mc_top-1]);
-				SETPGNO(ni, mo->mp_p.p_pgno);
-				mdb_cursor_pop(&mc);
-			} else {
-				/* Otherwise we're done */
-				*pg = mo->mp_p.p_pgno;
-				break;
-			}
+		done:
+			NMem::fg_Free(buf);
+			return rc;
 		}
-	done:
-		NMem::fg_Free(buf);
-		return rc;
 	}
 
 	/** Copy environment with compaction. */
-	void DMibDatabaseInfrequentSection NDatabase::CLowLevelEnvironment_Internal::f_CopyCompact(HANDLE fd)
+	void DMibDatabaseInfrequentSection CLowLevelEnvironment_Internal::f_CopyCompact(HANDLE fd)
 	{
 		using namespace NPrivate;
 		MDB_meta *mm;
 		MDB_page *mp;
-		CCompactingCopyState my;
-		pthread_t thr;
+		CCompactingCopyState CopyState{this, fd};
 		int rc;
-
-	#ifdef DPlatformFamily_Windows
-		my.mc_mutex = CreateMutex(nullptr, FALSE, nullptr);
-		my.mc_cond = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 		
-	#else
-		pthread_mutex_init(&my.mc_mutex, nullptr);
-		pthread_cond_init(&my.mc_cond, nullptr);
-	#endif
-
-		{
-			mint Size = gc_CopyBufferSize*2;
-			my.mc_wbuf[0] = (char *)NMem::fg_AllocAligned(Size, me_os_psize);
-		}
+		CopyState.f_Init(me_os_psize);
 		
-		auto Cleanup = g_OnScopeExit > [&]
-			{
-				NMem::fg_Free(my.mc_wbuf[0]);
-			}
-		;
-		
-		memset(my.mc_wbuf[0], 0, gc_CopyBufferSize*2);
-		my.mc_wbuf[1] = my.mc_wbuf[0] + gc_CopyBufferSize;
-		my.mc_wlen[0] = 0;
-		my.mc_wlen[1] = 0;
-		my.mc_olen[0] = 0;
-		my.mc_olen[1] = 0;
-		my.mc_next_pgno = NUM_METAS;
-		my.mc_status = 0;
-		my.mc_new = 1;
-		my.mc_toggle = 0;
-		my.mc_env = this;
-		my.mc_fd = fd;
-		THREAD_CREATE(thr, mdb_env_copythr, &my);
-
 		auto Transaction = mdb_txn_begin(nullptr, ELowLevelEnvironmentFlag_ReadOnly);
 		auto pInternalTransaction = Transaction.fp_GetInternal();
 
-		mp = (MDB_page *)my.mc_wbuf[0];
+		mp = (MDB_page *)CopyState.m_WriteBuffers[0];
 		memset(mp, 0, NUM_METAS * me_psize);
 		mp->mp_p.p_pgno = 0;
 		mp->mp_flags = P_META;
@@ -349,13 +329,13 @@ namespace NMib
 		mdb_env_init_meta0(mm);
 		mm->mm_address = me_metas[0]->mm_address;
 
-		mp = (MDB_page *)(my.mc_wbuf[0] + me_psize);
+		mp = (MDB_page *)(CopyState.m_WriteBuffers[0] + me_psize);
 		mp->mp_p.p_pgno = 1;
 		mp->mp_flags = P_META;
 		*(MDB_meta *)METADATA(mp) = *mm;
 		mm = (MDB_meta *)METADATA(mp);
 
-		/* Count the number of NMem::fg_Free pages, subtract from lastpg to find
+		/* Count the number of free pages, subtract from lastpg to find
 		 * number of active pages
 		 */
 		{
@@ -379,28 +359,19 @@ namespace NMib
 				mm->mm_dbs[MAIN_DBI].md_root = P_INVALID;
 			}
 		}
-		my.mc_wlen[0] = me_psize * NUM_METAS;
-		my.mc_txn = pInternalTransaction;
-		pthread_mutex_lock(&my.mc_mutex);
-		while(my.mc_new)
-			pthread_cond_wait(&my.mc_cond, &my.mc_mutex);
-		pthread_mutex_unlock(&my.mc_mutex);
-		rc = mdb_env_cwalk(&my, &pInternalTransaction->mt_dbs[MAIN_DBI].md_root, 0);
-		if (rc == MDB_SUCCESS && my.mc_wlen[my.mc_toggle])
-			rc = mdb_env_cthr_toggle(&my, 1);
-		mdb_env_cthr_toggle(&my, -1);
-		pthread_mutex_lock(&my.mc_mutex);
-		while(my.mc_new)
-			pthread_cond_wait(&my.mc_cond, &my.mc_mutex);
-		pthread_mutex_unlock(&my.mc_mutex);
-		THREAD_FINISH(thr);
-
-	#ifdef DPlatformFamily_Windows
-		CloseHandle(my.mc_cond);
-		CloseHandle(my.mc_mutex);
-	#else
-		pthread_cond_destroy(&my.mc_cond);
-		pthread_mutex_destroy(&my.mc_mutex);
-	#endif
+		CopyState.m_WriteBuffersLength[0] = me_psize * NUM_METAS;
+		CopyState.m_pInternalTransaction = pInternalTransaction;
+		fg_DispatchCopyBuffer(CopyState);
+		fg_Dispatch(CopyState.m_ProcessingActor, []{}).f_CallSync();
+		rc = fg_TraverseTreeCopyRecursive(CopyState, &pInternalTransaction->mt_dbs[MAIN_DBI].md_root, 0);
+		if (rc)
+			DMibError(NStr::fg_Format("Error compacting database: {}", mdb_strerror(rc)));
+		if (rc == MDB_SUCCESS && CopyState.m_WriteBuffersLength[CopyState.m_iBuffer])
+			rc = fg_DispatchCopyBuffer(CopyState);
+		// Block
+		fg_Dispatch(CopyState.m_ProcessingActor, []{}).f_CallSync();
+		rc = fg_DispatchCopyBuffer(CopyState); // Get status
+		if (rc)
+			DMibError(NStr::fg_Format("Error compacting database: {}", mdb_strerror(rc)));
 	}
 }

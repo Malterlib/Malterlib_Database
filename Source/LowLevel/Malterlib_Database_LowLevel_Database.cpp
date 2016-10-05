@@ -398,6 +398,25 @@ namespace NMib
 		}
 		return Databases;
 	}
+	
+	NContainer::TCSet<NStr::CStr> NDatabase::CLowLevelWriteTransaction::f_EnumDatabases()
+	{
+		auto DatabaseTransaction = f_OpenDatabase().f_Transaction(*this);
+		auto iCursor = DatabaseTransaction.f_ReadCursor();
+		iCursor.f_First();
+		NContainer::TCSet<NStr::CStr> Databases;
+		while (iCursor)
+		{
+			auto &Key = iCursor.f_Key();
+			
+			NStr::CStr DatabaseName;
+			DatabaseName.f_AddStr((ch8 const *)Key.m_pData, Key.m_Size);
+			Databases[DatabaseName];
+			
+			++iCursor;
+		}
+		return Databases;
+	}
 
 	NDatabase::CLowLevelDatabase NDatabase::CLowLevelWriteTransaction::f_OpenDatabase(ch8 const *_pName, ELowLevelDatabaseFlag _Flags, CDatabaseProperties const &_Properties)
 	{

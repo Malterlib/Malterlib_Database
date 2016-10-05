@@ -205,6 +205,26 @@ namespace NMib
 {
 	namespace NDatabase
 	{
+		///	\enum Write Flags
+		enum ELowLevelWriteFlag : uint32
+		{
+			ELowLevelWriteFlag_None = 0
+			, ELowLevelWriteFlag_NoOverwrite = 0x10					///< For put: Don't write if the key already exists.
+			, ELowLevelWriteFlag_OverwriteAtCurrentCursorPos = 0x40	/// For mdb_cursor_put: overwrite the current key/data pair
+			, ELowLevelWriteFlag_ReserveSpace = 0x10000				/**< For put: Just reserve space for data, don't copy it. Return a
+																		pointer to the reserved space.
+																		*/
+			, ELowLevelWriteFlag_Append = 0x20000					///< Data is being appended, don't split full pages.
+			
+			// Dup data options			
+			, ELowLevelWriteFlag_NoDuplicateData = 0x20				/**< Only for #ELowLevelDatabaseFlag_SortedDuplicates<br>
+																		For put: Don't write if the key and data pair already exist.<br>
+																		For mdb_cursor_del: Remove all duplicate data items.
+																		*/
+			, ELowLevelWriteFlag_AppendDuplicateData = 0x40000		///< Duplicate data is being appended, don't split full pages.
+			, ELowLevelWriteFlag_BatchDuplicateData = 0x80000		///< Store multiple data items in one call. Only for #ELowLevelDatabaseFlag_SortedDuplicatesFixedSize.
+		};
+		
 		namespace NPrivate
 		{
 			
@@ -368,7 +388,6 @@ namespace NMib
 			#ifdef DPlatformFamily_Windows
 			#define MDB_USE_HASH	1
 			#define MDB_PIDLOCK	0
-			#define THREAD_RET	DWORD
 			#define pthread_t	HANDLE
 			#define pthread_mutex_t	HANDLE
 			#define pthread_cond_t	HANDLE
@@ -384,8 +403,6 @@ namespace NMib
 			#define pthread_mutex_lock(x)	WaitForSingleObject(*x, INFINITE)
 			#define pthread_cond_signal(x)	SetEvent(*x)
 			#define pthread_cond_wait(cond,mutex)	do{SignalObjectAndWait(*mutex, *cond, INFINITE, FALSE); WaitForSingleObject(*mutex, INFINITE);}while(0)
-			#define THREAD_CREATE(thr,start,arg)	thr=CreateThread(nullptr,0,start,arg,0,nullptr)
-			#define THREAD_FINISH(thr)	WaitForSingleObject(thr, INFINITE)
 			#define LOCK_MUTEX0(mutex)		WaitForSingleObject(mutex, INFINITE)
 			#define UNLOCK_MUTEX(mutex)		ReleaseMutex(mutex)
 			#define mdb_mutex_consistent(mutex)	0
@@ -402,9 +419,6 @@ namespace NMib
 			#define MDB_PROCESS_QUERY_LIMITED_INFORMATION 0x1000
 			#endif
 			#else
-			#define THREAD_RET	void *
-			#define THREAD_CREATE(thr,start,arg)	pthread_create(&thr,nullptr,start,arg)
-			#define THREAD_FINISH(thr)	pthread_join(thr,nullptr)
 
 				/** For MDB_LOCK_FORMAT: True if readers take a pid lock in the lockfile */
 			#define MDB_PIDLOCK			1
@@ -1345,6 +1359,9 @@ namespace NMib
 		#ifdef DMibDatabaseLowLevel_Always64BitSupport
 			NPrivate::MDB_page	*mc_ovpg;		/**< a referenced overflow page */
 		#endif
+			void f_Put(CLowLevelValue *key, CLowLevelValue *data, ELowLevelWriteFlag _WriteFlags);
+			void f_Delete(ELowLevelWriteFlag _WriteFlags);
+			CLowLevelSize f_CountDuplicates();
 		};
 		
 		namespace NPrivate
@@ -1540,10 +1557,8 @@ namespace NMib
 			/** State needed for a compacting copy. */
 			struct CCompactingCopyState;
 
-			THREAD_RET CALL_CONV mdb_env_copythr(void *arg);
-
-			int mdb_env_cthr_toggle(CCompactingCopyState *my, int st);
-			int mdb_env_cwalk(CCompactingCopyState *my, pgno_t *pg, int flags);
+			int mdb_env_cthr_toggle(CCompactingCopyState &_CopyState);
+			int mdb_env_cwalk(CCompactingCopyState &_CopyState, pgno_t *pg, int flags);
 			int mdb_pid_insert(CProcessID *ids, CProcessID pid);
 			
 			#define MDB_END_NAMES {"committed", "empty-commit", "abort", "reset", \

@@ -130,26 +130,6 @@ namespace NMib
 			, ELowLevelDatabaseFlag_Create = 0x40000					///< Create DB if not already existing
 		};
 
-		///	\enum Write Flags
-		enum ELowLevelWriteFlag : uint32
-		{
-			ELowLevelWriteFlag_None = 0
-			, ELowLevelWriteFlag_NoOverwrite = 0x10					///< For put: Don't write if the key already exists.
-			, ELowLevelWriteFlag_OverwriteAtCurrentCursorPos = 0x40	/// For mdb_cursor_put: overwrite the current key/data pair
-			, ELowLevelWriteFlag_ReserveSpace = 0x10000				/**< For put: Just reserve space for data, don't copy it. Return a
-																		pointer to the reserved space.
-																		*/
-			, ELowLevelWriteFlag_Append = 0x20000					///< Data is being appended, don't split full pages.
-			
-			// Dup data options			
-			, ELowLevelWriteFlag_NoDuplicateData = 0x20				/**< Only for #ELowLevelDatabaseFlag_SortedDuplicates<br>
-																		For put: Don't write if the key and data pair already exist.<br>
-																		For mdb_cursor_del: Remove all duplicate data items.
-																		*/
-			, ELowLevelWriteFlag_AppendDuplicateData = 0x40000		///< Duplicate data is being appended, don't split full pages.
-			, ELowLevelWriteFlag_BatchDuplicateData = 0x80000		///< Store multiple data items in one call. Only for #ELowLevelDatabaseFlag_SortedDuplicatesFixedSize.
-		};
-
 		///	\enum Copy Flags
 		enum ELowLevelEnvironmentCopyFlag
 		{
@@ -276,6 +256,8 @@ namespace NMib
 					, CDatabaseProperties const &_Properties = CDatabaseProperties()				 
 				)
 			;
+
+			NContainer::TCSet<NStr::CStr> f_EnumDatabases();
 			
 			CLowLevelWriteTransaction f_BeginChildTransaction();
 		private:
@@ -395,18 +377,20 @@ namespace NMib
 			
 			CLowLevelValue const &f_Key() const;
 			
-			bool f_First(); // MDB_FIRST
-			bool f_Last(); // MDB_LAST
+			bool f_First();
+			bool f_Last();
 			
-			bool f_FindEqual(CLowLevelValue const &_Key); // MDB_SET, MDB_SET_KEY
-			bool f_FindLowerBound(CLowLevelValue const &_Key); // MDB_SET_RANGE
+			bool f_FindEqual(CLowLevelValue const &_Key);
+			bool f_FindLowerBound(CLowLevelValue const &_Key);
 			
-			void operator ++(); // MDB_NEXT_NODUP
-			void operator --(); // MDB_PREV_NODUP
+			void operator ++();
+			void operator --();
 			
 		protected:
 			
 			CLowLevelCursorCommon(NPtr::TCUniquePointer<CInternal> &&_pInternal);
+			
+			void fp_SetToCurrent();
 			
 			CLowLevelValue mp_Key;
 			CLowLevelValue mp_Value;
@@ -426,34 +410,19 @@ namespace NMib
 			CLowLevelCursor(NPtr::TCUniquePointer<CInternal> &&_pInternal);
 		};
 		
-#if 0
-			ELowLevelWriteFlag_None = 0
-			, ELowLevelWriteFlag_NoOverwrite = 0x10					///< For put: Don't write if the key already exists.
-			, ELowLevelWriteFlag_OverwriteAtCurrentCursorPos = 0x40	/// For mdb_cursor_put: overwrite the current key/data pair
-			, ELowLevelWriteFlag_ReserveSpace = 0x10000				/**< For put: Just reserve space for data, don't copy it. Return a
-																		pointer to the reserved space.
-																		*/
-			, ELowLevelWriteFlag_Append = 0x20000					///< Data is being appended, don't split full pages.
-#endif
-		
 		struct CLowLevelCursorWrite : public CLowLevelCursor
 		{
-			void f_SetValue(CLowLevelValue const &_Value, bool _bAppend = false); // ELowLevelWriteFlag_OverwriteAtCurrentCursorPos
-			CLowLevelValue f_SetValue(mint _DataSize, bool _bAppend = false); // ELowLevelWriteFlag_OverwriteAtCurrentCursorPos, ELowLevelWriteFlag_ReserveSpace 
+			void f_SetValue(CLowLevelValue const &_Value, bool _bAppend = false);
+			CLowLevelValue f_SetValue(mint _DataSize, bool _bAppend = false); 
 			
-			void f_Insert(CLowLevelValue const &_Key, CLowLevelValue const &_Value, bool _bAppend = false); // ELowLevelWriteFlag_NoOverwrite
-			CLowLevelValue f_Insert(CLowLevelValue const &_Key, mint _DataSize, bool _bAppend = false); // ELowLevelWriteFlag_NoOverwrite, ELowLevelWriteFlag_ReserveSpace
+			void f_Insert(CLowLevelValue const &_Key, CLowLevelValue const &_Value, bool _bAppend = false);
+			CLowLevelValue f_Insert(CLowLevelValue const &_Key, mint _DataSize, bool _bAppend = false);
 			
-			void f_Upsert(CLowLevelValue const &_Key, CLowLevelValue const &_Value, bool _bAppend = false); // ELowLevelWriteFlag_None
-			CLowLevelValue f_Upsert(CLowLevelValue const &_Key, mint _DataSize, bool _bAppend = false); // ELowLevelWriteFlag_ReserveSpace
+			void f_Upsert(CLowLevelValue const &_Key, CLowLevelValue const &_Value, bool _bAppend = false);
+			CLowLevelValue f_Upsert(CLowLevelValue const &_Key, mint _DataSize, bool _bAppend = false);
 			
 			void f_Delete();
-#if 0
-			ELowLevelWriteFlag_NoOverwrite					// Fail if key exists
-			ELowLevelWriteFlag_OverwriteAtCurrentCursorPos	// Key still needed
-			ELowLevelWriteFlag_ReserveSpace					// Return pointer to reserved space
-			ELowLevelWriteFlag_Append						// Append optimization
-#endif
+			
 		protected:
 			friend struct CLowLevelDatabaseWriteTransaction;
 			
@@ -463,14 +432,14 @@ namespace NMib
 		struct CLowLevelCursorDuplicateData : public CLowLevelCursorCommon
 		{
 			CLowLevelSize f_DataCount();
-			bool f_NextData(); // Returns 'true' if new data is available MDB_NEXT_DUP
-			bool f_PrevData(); // MDB_PREV_DUP 
+			bool f_NextData(); // Returns 'true' if new data is available
+			bool f_PrevData(); 
 			
-			bool f_FirstData(); // MDB_FIRST_DUP
-			bool f_LastData(); // MDB_LAST_DUP
+			bool f_FirstData();
+			bool f_LastData();
 			
-			bool f_FindEqual(CLowLevelValue const &_Key, CLowLevelValue const &_Data); // MDB_GET_BOTH
-			bool f_FindLowerBound(CLowLevelValue const &_Key, CLowLevelValue const &_Data); // MDB_GET_BOTH_RANGE
+			bool f_FindEqual(CLowLevelValue const &_Key, CLowLevelValue const &_Data);
+			bool f_FindLowerBound(CLowLevelValue const &_Key, CLowLevelValue const &_Data);
 
 		protected:
 			friend struct CLowLevelDatabaseReadTransaction;
@@ -478,32 +447,15 @@ namespace NMib
 			CLowLevelCursorDuplicateData(NPtr::TCUniquePointer<CInternal> &&_pInternal);
 		};
 
-#if 0
-			, ELowLevelWriteFlag_NoDuplicateData = 0x20				/**< Only for #ELowLevelDatabaseFlag_SortedDuplicates<br>
-																		For put: Don't write if the key and data pair already exist.<br>
-																		For mdb_cursor_del: Remove all duplicate data items.
-																		*/
-			, ELowLevelWriteFlag_AppendDuplicateData = 0x40000		///< Duplicate data is being appended, don't split full pages.
-			, ELowLevelWriteFlag_BatchDuplicateData = 0x80000		///< Store multiple data items in one call. Only for #ELowLevelDatabaseFlag_SortedDuplicatesFixedSize.
-#endif
 		struct CLowLevelCursorDuplicateDataWrite : public CLowLevelCursorDuplicateData
 		{
-//			void f_Put(CLowLevelValue *key, CLowLevelValue *data, ELowLevelWriteFlag _WriteFlags = ELowLevelWriteFlag_None);
-#if 0
-				ELowLevelWriteFlag_NoDuplicateData
-				ELowLevelWriteFlag_AppendDuplicateData	// Append optimization
-#endif
-			void f_SetValue(CLowLevelValue const &_Value, bool _bAppend = false); // ELowLevelWriteFlag_OverwriteAtCurrentCursorPos
-			CLowLevelValue f_SetValue(mint _DataSize, bool _bAppend = false); // ELowLevelWriteFlag_OverwriteAtCurrentCursorPos, ELowLevelWriteFlag_ReserveSpace
-			
-			void f_Insert(CLowLevelValue const &_Key, CLowLevelValue const &_Value, bool _bAppend = false); // ELowLevelWriteFlag_NoOverwrite, ELowLevelWriteFlag_NoDuplicateData
-			CLowLevelValue f_Insert(CLowLevelValue const &_Key, mint _DataSize, bool _bAppend = false); // ELowLevelWriteFlag_NoOverwrite, ELowLevelWriteFlag_NoDuplicateData, ELowLevelWriteFlag_ReserveSpace
-			
-			void f_Upsert(CLowLevelValue const &_Key, CLowLevelValue const &_Value, bool _bAppend = false); // ELowLevelWriteFlag_None
-			CLowLevelValue f_Upsert(CLowLevelValue const &_Key, mint _DataSize, bool _bAppend = false); // ELowLevelWriteFlag_ReserveSpace
+			void f_SetValue(CLowLevelValue const &_Value, bool _bAppend = false);
+			void f_Insert(CLowLevelValue const &_Key, CLowLevelValue const &_Value, bool _bAppend = false);
+			void f_Upsert(CLowLevelValue const &_Key, CLowLevelValue const &_Value, bool _bAppend = false);
 
 			void f_DeleteKey();
 			void f_DeleteData();
+			
 		protected:
 			friend struct CLowLevelDatabaseWriteTransaction;
 			

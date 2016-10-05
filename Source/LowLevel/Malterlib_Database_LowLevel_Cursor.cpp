@@ -69,10 +69,174 @@ namespace NMib
 		{
 		}
 		
+		void CLowLevelCursorCommon::CInternal::f_Put(CLowLevelValue *key, CLowLevelValue *data, ELowLevelWriteFlag _WriteFlags)
+		{
+			DMibRequire(key);
+			DMibRequire(data);
+			using namespace NPrivate;
+
+			if (_WriteFlags & ~(ELowLevelWriteFlag_NoOverwrite|ELowLevelWriteFlag_NoDuplicateData|ELowLevelWriteFlag_ReserveSpace|ELowLevelWriteFlag_Append|ELowLevelWriteFlag_AppendDuplicateData))
+				DMibError("Invalid flags");
+
+			if (mc_txn->mt_flags & (MDB_TXN_RDONLY))
+				DMibError("Trying to write to read only transaction");
+			
+			int rc = mdb_cursor_put(this, key, data, _WriteFlags);
+			if (rc)
+				DMibError(NStr::fg_Format("Error putting data: {}", mdb_strerror(rc)));
+		}
+		
+		void CLowLevelCursorCommon::CInternal::f_Delete(ELowLevelWriteFlag _WriteFlags)
+		{
+			using namespace NPrivate;
+
+			if (_WriteFlags & ~(ELowLevelWriteFlag_NoDuplicateData))
+				DMibError("Invalid flags");
+
+			if (mc_txn->mt_flags & (MDB_TXN_RDONLY))
+				DMibError("Trying to delete in read only transaction");
+			
+			int rc = mdb_cursor_del(this, _WriteFlags);
+			if (rc)
+				DMibError(NStr::fg_Format("Error deleting data: {}", mdb_strerror(rc)));
+		}
+		
+		CLowLevelSize CLowLevelCursorCommon::CInternal::f_CountDuplicates()
+		{
+			using namespace NPrivate;
+
+			CLowLevelSize Ret;
+			int rc = mdb_cursor_count(this, &Ret);
+			if (rc)
+				DMibError(NStr::fg_Format("Error counting duplicates: {}", mdb_strerror(rc)));
+			return Ret;
+		}
+		
+		void CLowLevelCursorWrite::f_SetValue(CLowLevelValue const &_Value, bool _bAppend)
+		{
+			auto &Cursor = *mp_pInternal;
+			CLowLevelValue Value = _Value;
+			auto Flags = (_bAppend ? ELowLevelWriteFlag_Append : ELowLevelWriteFlag_None) | ELowLevelWriteFlag_OverwriteAtCurrentCursorPos;
+			Cursor.f_Put(&mp_Key, &Value, Flags);
+			mp_Value = Value;
+		}
+		
+		
+		CLowLevelValue CLowLevelCursorWrite::f_SetValue(mint _DataSize, bool _bAppend)
+		{
+			auto &Cursor = *mp_pInternal;
+			CLowLevelValue Value;
+			Value.m_Size = _DataSize;
+			auto Flags = (_bAppend ? ELowLevelWriteFlag_Append : ELowLevelWriteFlag_None) | ELowLevelWriteFlag_OverwriteAtCurrentCursorPos | ELowLevelWriteFlag_ReserveSpace;
+			Cursor.f_Put(&mp_Key, &Value, Flags);
+			mp_Value = Value;
+			return Value;
+		}
+		
+		void CLowLevelCursorWrite::f_Insert(CLowLevelValue const &_Key, CLowLevelValue const &_Value, bool _bAppend)
+		{
+			auto &Cursor = *mp_pInternal;
+			CLowLevelValue Value = _Value;
+			auto Flags = (_bAppend ? ELowLevelWriteFlag_Append : ELowLevelWriteFlag_None) | ELowLevelWriteFlag_NoOverwrite;
+			auto Key = _Key;
+			Cursor.f_Put(&Key, &Value, Flags);
+			mp_Key = Key; 
+			mp_Value = Value;
+		}
+		
+		CLowLevelValue CLowLevelCursorWrite::f_Insert(CLowLevelValue const &_Key, mint _DataSize, bool _bAppend)
+		{
+			auto &Cursor = *mp_pInternal;
+			CLowLevelValue Value;
+			Value.m_Size = _DataSize;
+			auto Flags = (_bAppend ? ELowLevelWriteFlag_Append : ELowLevelWriteFlag_None) | ELowLevelWriteFlag_NoOverwrite | ELowLevelWriteFlag_ReserveSpace;
+			auto Key = _Key;
+			Cursor.f_Put(&Key, &Value, Flags);
+			mp_Key = Key; 
+			mp_Value = Value;
+			return Value; 
+		}
+		
+		void CLowLevelCursorWrite::f_Upsert(CLowLevelValue const &_Key, CLowLevelValue const &_Value, bool _bAppend)
+		{
+			auto &Cursor = *mp_pInternal;
+			CLowLevelValue Value = _Value;
+			auto Flags = (_bAppend ? ELowLevelWriteFlag_Append : ELowLevelWriteFlag_None);
+			auto Key = _Key;
+			Cursor.f_Put(&Key, &Value, Flags);
+			mp_Key = Key; 
+			mp_Value = Value;
+		}
+		
+		CLowLevelValue CLowLevelCursorWrite::f_Upsert(CLowLevelValue const &_Key, mint _DataSize, bool _bAppend)
+		{
+			auto &Cursor = *mp_pInternal;
+			CLowLevelValue Value;
+			Value.m_Size = _DataSize;
+			auto Flags = (_bAppend ? ELowLevelWriteFlag_Append : ELowLevelWriteFlag_None) | ELowLevelWriteFlag_ReserveSpace;
+			auto Key = _Key;
+			Cursor.f_Put(&Key, &Value, Flags);
+			mp_Key = Key; 
+			mp_Value = Value;
+			return Value; 
+		}
+		
+		void CLowLevelCursorWrite::f_Delete()
+		{
+			auto &Cursor = *mp_pInternal;
+			Cursor.f_Delete(ELowLevelWriteFlag_None);
+			fp_SetToCurrent();
+		}		
+		
 		CLowLevelCursorDuplicateDataWrite::CLowLevelCursorDuplicateDataWrite(NPtr::TCUniquePointer<CInternal> &&_pInternal)
 			: CLowLevelCursorDuplicateData(fg_Move(_pInternal))
 		{
 		}	
+		
+		void CLowLevelCursorDuplicateDataWrite::f_SetValue(CLowLevelValue const &_Value, bool _bAppend)
+		{
+			auto &Cursor = *mp_pInternal;
+			CLowLevelValue Value = _Value;
+			auto Flags = (_bAppend ? ELowLevelWriteFlag_Append : ELowLevelWriteFlag_None) | ELowLevelWriteFlag_OverwriteAtCurrentCursorPos;
+			Cursor.f_Put(&mp_Key, &Value, Flags);
+			mp_Value = Value;
+		}
+		
+		void CLowLevelCursorDuplicateDataWrite::f_Insert(CLowLevelValue const &_Key, CLowLevelValue const &_Value, bool _bAppend)
+		{
+			auto &Cursor = *mp_pInternal;
+			CLowLevelValue Value = _Value;
+			auto Flags = (_bAppend ? ELowLevelWriteFlag_Append : ELowLevelWriteFlag_None) | ELowLevelWriteFlag_NoOverwrite | ELowLevelWriteFlag_NoDuplicateData;
+			auto Key = _Key;
+			Cursor.f_Put(&Key, &Value, Flags);
+			mp_Key = Key; 
+			mp_Value = Value;
+		}
+		
+		void CLowLevelCursorDuplicateDataWrite::f_Upsert(CLowLevelValue const &_Key, CLowLevelValue const &_Value, bool _bAppend)
+		{
+			auto &Cursor = *mp_pInternal;
+			CLowLevelValue Value = _Value;
+			auto Flags = (_bAppend ? ELowLevelWriteFlag_Append : ELowLevelWriteFlag_None);
+			auto Key = _Key;
+			Cursor.f_Put(&Key, &Value, Flags);
+			mp_Key = Key; 
+			mp_Value = Value;
+		}
+		
+		void CLowLevelCursorDuplicateDataWrite::f_DeleteKey()
+		{
+			auto &Cursor = *mp_pInternal;
+			Cursor.f_Delete(ELowLevelWriteFlag_NoDuplicateData);
+			fp_SetToCurrent();
+		}
+		
+		void CLowLevelCursorDuplicateDataWrite::f_DeleteData()
+		{
+			auto &Cursor = *mp_pInternal;
+			Cursor.f_Delete(ELowLevelWriteFlag_None);
+			fp_SetToCurrent();
+		}
 		
 		CLowLevelCursorCommon::operator bool() const
 		{
@@ -84,6 +248,17 @@ namespace NMib
 			return mp_Key;
 		}
 		
+		void CLowLevelCursorCommon::fp_SetToCurrent()
+		{
+			int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_GET_CURRENT);
+			if (Result == MDB_NOTFOUND)
+				mp_bValid = false;
+			else if (Result)
+				DMibError(NStr::fg_Format("Error setting cursor to first: {}", NPrivate::mdb_strerror(Result)));
+			else
+				mp_bValid = true;
+		}
+
 		bool CLowLevelCursorCommon::f_First()
 		{
 			int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_FIRST);
@@ -131,7 +306,7 @@ namespace NMib
 				DMibError(NStr::fg_Format("Error setting cursor to lower bound: {}", NPrivate::mdb_strerror(Result)));
 			else
 				mp_bValid = true;
-			return fg_Move(*this);			
+			return mp_bValid;			
 		}		
 		
 		void CLowLevelCursorCommon::operator ++()
@@ -159,6 +334,80 @@ namespace NMib
 		CLowLevelValue const &CLowLevelCursor::f_Value() const
 		{
 			return mp_Value;
+		}
+		
+		CLowLevelSize CLowLevelCursorDuplicateData::f_DataCount()
+		{
+			auto &Cursor = *mp_pInternal;
+			return Cursor.f_CountDuplicates();
+		}
+		
+		bool CLowLevelCursorDuplicateData::f_NextData()
+		{
+			int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_NEXT_DUP);
+			if (Result == MDB_NOTFOUND)
+				return false;
+			else if (Result)
+				DMibError(NStr::fg_Format("Error setting cursor to next data: {}", NPrivate::mdb_strerror(Result)));
+			return true;
+		}
+		
+		bool CLowLevelCursorDuplicateData::f_PrevData()
+		{
+			int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_PREV_DUP);
+			if (Result == MDB_NOTFOUND)
+				return false;
+			else if (Result)
+				DMibError(NStr::fg_Format("Error setting cursor to prev data: {}", NPrivate::mdb_strerror(Result)));
+			return true;
+		}
+		
+		bool CLowLevelCursorDuplicateData::f_FirstData()
+		{
+			int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_FIRST_DUP);
+			if (Result == MDB_NOTFOUND)
+				return false;
+			else if (Result)
+				DMibError(NStr::fg_Format("Error setting cursor to first data: {}", NPrivate::mdb_strerror(Result)));
+			return true;
+		}
+		
+		bool CLowLevelCursorDuplicateData::f_LastData()
+		{
+			int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_LAST_DUP);
+			if (Result == MDB_NOTFOUND)
+				return false;
+			else if (Result)
+				DMibError(NStr::fg_Format("Error setting cursor to last data: {}", NPrivate::mdb_strerror(Result)));
+			return true;
+		}
+		
+		bool CLowLevelCursorDuplicateData::f_FindEqual(CLowLevelValue const &_Key, CLowLevelValue const &_Data)
+		{
+			mp_Key = _Key;
+			mp_Value = _Data;
+			int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_GET_BOTH);
+			if (Result == MDB_NOTFOUND)
+				mp_bValid = false;
+			else if (Result)
+				DMibError(NStr::fg_Format("Error setting cursor to key and data: {}", NPrivate::mdb_strerror(Result)));
+			else
+				mp_bValid = true;
+			return mp_bValid;
+		}
+		
+		bool CLowLevelCursorDuplicateData::f_FindLowerBound(CLowLevelValue const &_Key, CLowLevelValue const &_Data)
+		{
+			mp_Key = _Key;
+			mp_Value = _Data;
+			int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_GET_BOTH_RANGE);
+			if (Result == MDB_NOTFOUND)
+				mp_bValid = false;
+			else if (Result)
+				DMibError(NStr::fg_Format("Error setting cursor to lower bound key and data: {}", NPrivate::mdb_strerror(Result)));
+			else
+				mp_bValid = true;
+			return mp_bValid;			
 		}
 	}
 	

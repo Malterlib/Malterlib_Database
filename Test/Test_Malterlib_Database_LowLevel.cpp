@@ -81,6 +81,32 @@ namespace
 			}
 			Transaction.f_Commit();
 		}
+
+		void fp_DeleteEverySecond(CLowLevelEnvironment &_Environment)
+		{
+			auto Transaction = _Environment.f_BeginWriteTransaction();
+			auto Databases = Transaction.f_EnumDatabases();
+			
+			for (auto &DatabaseName : Databases)
+			{
+				auto Database = Transaction.f_OpenDatabase(DatabaseName);
+				auto DatabaseTransaction = Database.f_Transaction(Transaction);
+				auto iCursor = DatabaseTransaction.f_WriteCursor();
+				for (iCursor.f_First(); iCursor; ++iCursor)
+				{
+					++iCursor;
+					if (!iCursor)
+						break;
+					auto Decoded = fg_DecodeValue<CStr, uint32, uint32>(iCursor.f_Key());
+					iCursor.f_Delete();
+					if (iCursor)
+					{
+						Decoded = fg_DecodeValue<CStr, uint32, uint32>(iCursor.f_Key());
+					}
+				}
+			}
+			Transaction.f_Commit();
+		}
 		
 		bool fp_EnvironmentsSame(CLowLevelEnvironment &_Environment0, CLowLevelEnvironment &_Environment1)
 		{
@@ -171,8 +197,8 @@ namespace
 					auto Environment = fg_GetTestEnvironment("TestDatabase");
 					fp_PopulateEnvironment(Environment.m_Environment);
 					fp_DoCopy("Copy", ELowLevelEnvironmentCopyFlag_None, Environment);
+					fp_DeleteEverySecond(Environment.m_Environment);
 					fp_DoCopy("CopyCompact", ELowLevelEnvironmentCopyFlag_Compact, Environment);
-					
 				};
 				DMibTestSuite("Stats")
 				{
