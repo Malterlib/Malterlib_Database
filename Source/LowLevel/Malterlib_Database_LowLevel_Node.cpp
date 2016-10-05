@@ -56,7 +56,7 @@ namespace NMib
 
 		nkeys = NUMKEYS(mp);
 
-		DMibDatabaseLowLevelTrace("searching {} keys in {} %spage {}", nkeys, IS_LEAF(mp) ? "leaf" : "branch", IS_SUBP(mp) ? "sub-" : "", mdb_dbg_pgno(mp));
+		DMibDatabaseLowLevelTrace("searching {} keys in {} {}page {}", nkeys, IS_LEAF(mp) ? "leaf" : "branch", IS_SUBP(mp) ? "sub-" : "", mdb_dbg_pgno(mp));
 
 		low = IS_LEAF(mp) ? 0 : 1;
 		high = nkeys - 1;

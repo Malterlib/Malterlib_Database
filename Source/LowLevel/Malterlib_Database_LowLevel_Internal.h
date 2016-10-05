@@ -614,14 +614,14 @@ namespace NMib
 				 *	Requires double parenthesis around 2 or more args.
 				 */
 			#	define DMibDatabaseLowLevelTrace(...) { if (NPrivate::mdb_debug) DMibDatabaseLowLevelTrace0(__VA_ARGS__); }
-			#	define DMibDatabaseLowLevelTrace0(d_Format, ...) DMibTrace2(d_Format "{}:{}{\n}", __VA_ARGS__, DMibPFunctionSignature, DMibPLine)
+			#	define DMibDatabaseLowLevelTrace0(d_Format, ...) DMibTrace2(DMibPFileLineFormat "{\n}" d_Format "{\n}", DMibPFile, DMibPLine, __VA_ARGS__)
 			#else
 			# define DMibDatabaseLowLevelTrace(...)	((void) 0)
 			#endif
 				/**	Print a debug string.
 				 *	The string is printed literally, with no format processing.
 				 */
-			#define DPUTS(arg)	DMibDatabaseLowLevelTrace("%s", arg)
+			#define DPUTS(arg)	DMibDatabaseLowLevelTrace("{}", arg)
 				/** Debuging output value of a cursor DBI: Negative in a sub-cursor. */
 			#define DDBI(mc) \
 				(((mc)->mc_flags & C_SUB) ? -(int)(mc)->mc_dbi : (int)(mc)->mc_dbi)
