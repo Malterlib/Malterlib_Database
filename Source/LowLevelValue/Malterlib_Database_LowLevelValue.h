@@ -25,37 +25,43 @@ namespace NMib
 		template <typename tf_CValue>
 		TCDescending<tf_CValue> fg_Descending(tf_CValue &_Value);
 		
-		template <typename ...tfp_CValue>
-		NContainer::TCVector<uint8> fg_EncodeOrderedByteArray(tfp_CValue const &...p_Value);
-		
-		template <typename ...tfp_CValue>
-		NContainer::TCTuple<tfp_CValue...> fg_DecodeOrderedByteArray(CLowLevelValue const &_Value);
-
 		struct CLowLevelValueDynamic : public CLowLevelValue
 		{
-			CLowLevelValueDynamic(NContainer::TCVector<uint8> &&_Value)
-				: mp_Value(fg_Move(_Value)) 
+			CLowLevelValueDynamic(NContainer::TCGrowingVector<uint8> const &_Value)
 			{
-				m_Size = mp_Value.f_GetLen();
-				m_pData = mp_Value.f_GetArray();
+				m_Size = _Value.f_GetLen();
+				m_pData = _Value.f_GetArray();
 			}
-			
-		private:
-			NContainer::TCVector<uint8> mp_Value;
 		};
 		
-		template <typename ...tfp_CValue>
-		CLowLevelValueDynamic fg_EncodeValue(tfp_CValue const &...p_Value)
-		{
-			return CLowLevelValueDynamic{fg_EncodeOrderedByteArray(p_Value...)};
-		}
+		using CLowLevelValueCache = NContainer::TCGrowingVector<uint8>;
+		
+		template <typename tf_CStream, typename tf_CValue>
+		void fg_Encode(tf_CStream &_Stream, tf_CValue const &_Value);
+
+		template <typename tf_CStream, typename tf_CValue>
+		void fg_Decode(tf_CStream &_Stream, tf_CValue &o_Value);
 		
 		template <typename ...tfp_CValue>
-		auto fg_DecodeValue(CLowLevelValue const &_Value)
-		{
-			return fg_DecodeOrderedByteArray<tfp_CValue...>(_Value);
-		}
+		CLowLevelValueDynamic fg_EncodeValue(CLowLevelValueCache &o_StreamCache, tfp_CValue const &...p_Value);
+		
+		template <typename ...tfp_CValue>
+		NContainer::TCTuple<tfp_CValue...> fg_DecodeValue(CLowLevelValue const &_Value);
+
+		template <typename tf_CValue>
+		void fg_DecodeValue(CLowLevelValue const &_Value, tf_CValue &o_Value);
+		
+		template <typename tf_CValue>
+		CLowLevelValue fg_RawValue(tf_CValue const &_Value);
+		
+		template <typename tf_CValue>
+		tf_CValue const &fg_RawValue(CLowLevelValue const &_Value);
+		
 	}
 }
 
 #include "Malterlib_Database_LowLevelValue.hpp"
+
+#ifndef DMibPNoShortCuts
+using namespace NMib::NDatabase;
+#endif

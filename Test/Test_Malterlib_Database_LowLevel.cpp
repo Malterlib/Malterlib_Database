@@ -69,6 +69,8 @@ namespace
 		void fp_PopulateEnvironment(CLowLevelEnvironment &_Environment, mint _nDatabases = 16, mint _nValuesPerDatabase = 4*1024)
 		{
 			_Environment.f_SetMapSize(_nDatabases * _nValuesPerDatabase * 128);
+			CLowLevelValueCache KeyCache;
+			CLowLevelValueCache ValueCache;
 			auto Transaction = _Environment.f_BeginWriteTransaction();
 			for (uint32 iDatabase = 0; iDatabase < _nDatabases; ++iDatabase)
 			{
@@ -76,7 +78,7 @@ namespace
 				for (uint32 iValue = 0; iValue < _nValuesPerDatabase; ++iValue)
 				{
 					auto DatabaseTransaction = Database.f_Transaction(Transaction);
-					DatabaseTransaction.f_Insert(fg_EncodeValue("TestKey", iDatabase, iValue), fg_EncodeValue("TestValue", iDatabase, iValue, iValue, iValue, iValue));
+					DatabaseTransaction.f_Insert(fg_EncodeValue(KeyCache, "TestKey", iDatabase, iValue), fg_EncodeValue(ValueCache, "TestValue", iDatabase, iValue, iValue, iValue, iValue));
 				}
 			}
 			Transaction.f_Commit();
@@ -175,7 +177,9 @@ namespace
 				auto WriteTransaction = Environment.m_Environment.f_BeginWriteTransaction();
 				auto MainDatabase = WriteTransaction.f_OpenDatabase();
 				auto DatabaseTransaction = MainDatabase.f_Transaction(WriteTransaction);
-				DatabaseTransaction.f_Insert(fg_EncodeValue("TestKey"), fg_EncodeValue("TestValue"));
+				CLowLevelValueCache KeyCache;				
+				CLowLevelValueCache ValueCache;
+				DatabaseTransaction.f_Insert(fg_EncodeValue(KeyCache, "TestKey"), fg_EncodeValue(ValueCache, "TestValue"));
 				auto iData = DatabaseTransaction.f_ReadCursor();
 				iData.f_First();
 				{

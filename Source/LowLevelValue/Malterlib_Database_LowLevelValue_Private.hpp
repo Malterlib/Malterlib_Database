@@ -30,13 +30,13 @@ namespace NMib::NDatabase
 				{
 					[&]
 					{
-						using CDecodedDescending = NPrivate::TCGetDescending<tfp_CValue>;
-						TCOrderedByteArrayCoder<tfp_CValue, CDecodedDescending::mc_bDescending>::fs_Decode(Stream, NContainer::fg_Get<tfp_Indices>(Values));
+						fg_Decode(Stream, NContainer::fg_Get<tfp_Indices>(Values));
 						return true;
 					}
 					()...
 				}
 			;
+			(void)Dummy;
 			
 			return Values;
 		}

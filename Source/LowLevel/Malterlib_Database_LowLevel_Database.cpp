@@ -38,6 +38,11 @@ namespace NMib
 {
 	namespace NDatabase
 	{
+		CLowLevelDatabase::CLowLevelDatabase()
+			: mp_DatabaseID(TCLimitsInt<uint32>::mc_Max)
+		{
+		}
+
 		CLowLevelDatabase::CLowLevelDatabase(CLowLevelDatabaseID _DatabaseID)
 			: mp_DatabaseID(_DatabaseID)
 		{
@@ -45,11 +50,15 @@ namespace NMib
 		
 		CLowLevelDatabaseReadTransaction CLowLevelDatabase::f_Transaction(CLowLevelReadTransaction const &_Transaction)
 		{
+			if (mp_DatabaseID == TCLimitsInt<uint32>::mc_Max)
+				DMibError("Invalid database");
 			return {_Transaction.mp_pTransaction.f_Get(), mp_DatabaseID};
 		}
 		
 		CLowLevelDatabaseWriteTransaction CLowLevelDatabase::f_Transaction(CLowLevelWriteTransaction const &_Transaction)
 		{
+			if (mp_DatabaseID == TCLimitsInt<uint32>::mc_Max)
+				DMibError("Invalid database");
 			return {_Transaction.mp_pTransaction.f_Get(), mp_DatabaseID};
 		}
 		

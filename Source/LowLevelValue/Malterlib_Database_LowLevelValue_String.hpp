@@ -5,18 +5,18 @@
 
 namespace NMib::NDatabase
 {
-	template <bool t_bDescending>
-	struct TCOrderedByteArrayCoder<NStr::CStr, t_bDescending>
+	template <bool t_bDescending, typename t_CTCStrTraits>
+	struct TCOrderedByteArrayCoder<NStr::TCStr<t_CTCStrTraits>, t_bDescending>
 	{
 		template <typename tf_CStream>
-		static void fs_Encode(tf_CStream &_Stream, NStr::CStr const &_Value)
+		static void fs_Encode(tf_CStream &_Stream, NStr::TCStr<t_CTCStrTraits> const &_Value)
 		{
 			_Stream.f_FeedBytes(_Value.f_GetStr(), _Value.f_GetLen() + 1);
 		}			
 		template <typename tf_CStream>
-		static void fs_Decode(tf_CStream &_Stream, NStr::CStr &o_Value)
+		static void fs_Decode(tf_CStream &_Stream, NStr::TCStr<t_CTCStrTraits> &o_Value)
 		{
-			NStr::CStr Return;
+			NStr::TCStr<t_CTCStrTraits> Return;
 			
 			while (true)
 			{
@@ -28,6 +28,29 @@ namespace NMib::NDatabase
 			}
 			
 			o_Value = fg_Move(Return);
+		}			
+	};
+
+	template <bool t_bDescending, typename t_CTCStrTraits>
+	struct TCOrderedByteArrayCoder<NStr::TCStrAggregate<t_CTCStrTraits>, t_bDescending>
+	{
+		template <typename tf_CStream>
+		static void fs_Encode(tf_CStream &_Stream, NStr::TCStrAggregate<t_CTCStrTraits> const &_Value)
+		{
+			_Stream.f_FeedBytes(_Value.f_GetStr(), _Value.f_GetLen() + 1);
+		}			
+		template <typename tf_CStream>
+		static void fs_Decode(tf_CStream &_Stream, NStr::TCStrAggregate<t_CTCStrTraits> &o_Value)
+		{
+			o_Value.f_Clear();
+			while (true)
+			{
+				ch8 Character;
+				_Stream >> Character;
+				if (!Character)
+					break;
+				o_Value.f_AddChar(Character);
+			}
 		}			
 	};
 

@@ -269,6 +269,8 @@ namespace NMib
 		
 		struct CLowLevelDatabase
 		{
+			CLowLevelDatabase();
+			
 			CLowLevelDatabaseReadTransaction f_Transaction(CLowLevelReadTransaction const &_Transaction);
 			CLowLevelDatabaseWriteTransaction f_Transaction(CLowLevelWriteTransaction const &_Transaction);
 			
@@ -465,3 +467,7 @@ namespace NMib
 }
 
 #include "Malterlib_Database_LowLevel.hpp"
+
+#ifndef DMibPNoShortCuts
+using namespace NMib::NDatabase;
+#endif
