@@ -76,6 +76,16 @@ namespace NMib::NDatabase
 		Stream.f_OpenRead(_Value.m_pData, _Value.m_Size);
 		fg_Decode(Stream, o_Value);
 	}
+
+	template <typename tf_CValue>
+	tf_CValue fg_DecodeOneValue(CLowLevelValue const &_Value)
+	{
+		NStream::CBinaryStreamMemoryPtr<NStream::CBinaryStreamBigEndian> Stream;
+		Stream.f_OpenRead(_Value.m_pData, _Value.m_Size);
+		tf_CValue Value;
+		fg_Decode(Stream, Value);
+		return Value;
+	}
 	
 	template <typename tf_CStream, typename tf_CValue>
 	void fg_Encode(tf_CStream &_Stream, tf_CValue const &_Value)
@@ -103,7 +113,7 @@ namespace NMib::NDatabase
 	template <typename tf_CValue>
 	tf_CValue const &fg_RawValue(CLowLevelValue const &_Value)
 	{
-		DMibFastCheck(sizeof(_Value) == _Value.m_Size);
+		DMibFastCheck(sizeof(tf_CValue) == _Value.m_Size);
 		return *reinterpret_cast<tf_CValue const *>(_Value.m_pData);
 	}
 }

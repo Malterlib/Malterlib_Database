@@ -70,6 +70,10 @@ namespace NMib
 			
 			bool operator < (CLowLevelValue const &_Right) const;
 			bool operator == (CLowLevelValue const &_Right) const;
+			bool f_HasPrefix(CLowLevelValue const &_Right) const;
+
+			template <typename tf_CStr>
+			void f_Format(tf_CStr &o_String) const;
 		};
 		
 		using FLowLevelCompare = NFunction::TCFunction<int (CLowLevelValue const &_Left, CLowLevelValue const &_Right), NFunction::CFunctionSupportCompareTag>;
@@ -292,7 +296,7 @@ namespace NMib
 			CLowLevelStatistics f_DatabaseStatistics();
 			uint32 f_DatabaseFlags();
 
-			void f_Get(CLowLevelValue *_pKey, CLowLevelValue *_pValue);
+			bool f_Get(CLowLevelValue const &_Key, CLowLevelValue &o_Value);
 			int f_KeyCompare(CLowLevelValue const &_Left, CLowLevelValue const &_Right);
 			int f_DataCompare(CLowLevelValue const &_Left, CLowLevelValue const &_Right);
 

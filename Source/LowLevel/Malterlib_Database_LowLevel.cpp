@@ -61,4 +61,11 @@ namespace NMib::NDatabase
 			return false;
 		return NMem::fg_MemCmp(m_pData, _Right.m_pData, m_Size) == 0;
 	}
+	
+	bool CLowLevelValue::f_HasPrefix(CLowLevelValue const &_Right) const
+	{
+		if (m_Size < _Right.m_Size)
+			return false;
+		return NMem::fg_MemCmp(m_pData, _Right.m_pData, _Right.m_Size) == 0;
+	}
 }

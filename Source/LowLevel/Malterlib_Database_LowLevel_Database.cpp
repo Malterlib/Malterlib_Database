@@ -72,9 +72,9 @@ namespace NMib
 			return mp_pTransaction->f_DatabaseFlags(mp_DatabaseID);
 		}
 
-		void CLowLevelDatabaseReadTransaction::f_Get(CLowLevelValue *key, CLowLevelValue *data)
+		bool CLowLevelDatabaseReadTransaction::f_Get(CLowLevelValue const &_Key, CLowLevelValue &o_Value)
 		{
-			return mp_pTransaction->f_Get(mp_DatabaseID, key, data);
+			return mp_pTransaction->f_Get(mp_DatabaseID, const_cast<CLowLevelValue *>(&_Key), &o_Value);
 		}
 		
 		int CLowLevelDatabaseReadTransaction::f_KeyCompare(CLowLevelValue const &_Left, CLowLevelValue const &_Right)

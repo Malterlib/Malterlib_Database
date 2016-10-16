@@ -61,7 +61,7 @@ namespace NMib
 	 *	<li>EINVAL - an invalid parameter was specified.
 	 * </ul>
 	 */
-	void NDatabase::CLowLevelTransactionCommon::CInternal::f_Get(CLowLevelDatabaseID dbi, CLowLevelValue *key, CLowLevelValue *data)
+	bool NDatabase::CLowLevelTransactionCommon::CInternal::f_Get(CLowLevelDatabaseID dbi, CLowLevelValue *key, CLowLevelValue *data)
 	{
 		DMibRequire(key);
 		DMibRequire(data);
@@ -83,7 +83,11 @@ namespace NMib
 		{
 			int rc = mdb_cursor_set(&mc, key, data, MDB_SET, &exact);
 			if (rc)
+			{
+				if (rc == MDB_NOTFOUND)
+					return false;
 				DMibError(NStr::fg_Format("Error setting data: {}", mdb_strerror(rc)));
+			}
 		}
 	#ifdef DMibDatabaseLowLevel_Always64BitSupport
 		{
@@ -93,6 +97,7 @@ namespace NMib
 			mdb_cursor_unref(&mc);
 		}
 	#endif
+		return true;
 	}
 	
 	/** @brief Store items into a database.
@@ -151,7 +156,7 @@ namespace NMib
 		if (!TXN_DBI_EXIST(this, dbi, DB_USRVALID))
 			DMibError("Database does not exists");
 
-		if (_WriteFlags & ~(ELowLevelWriteFlag_NoOverwrite|ELowLevelWriteFlag_NoDuplicateData|ELowLevelWriteFlag_ReserveSpace|ELowLevelWriteFlag_Append|ELowLevelWriteFlag_AppendDuplicateData))
+		if (_WriteFlags & ~(ELowLevelWriteFlag_NoOverwrite|ELowLevelWriteFlag_NoDuplicateData|ELowLevelWriteFlag_ReserveSpace|ELowLevelWriteFlag_Append|ELowLevelWriteFlag_AppendDuplicateData|ELowLevelWriteFlag_OverwriteAtCurrentCursorPos))
 			DMibError("Invalid flags");
 
 		f_CheckBlocked();

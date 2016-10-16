@@ -40,9 +40,9 @@ namespace NMib
 	using namespace NDatabase::NPrivate;
 	
 		/** The name of the lock file in the DB environment */
-	#define DDatabaseLowLevelLockName	"/MalterlibDB.mibdb"
+	#define DDatabaseLowLevelLockName	"/MalterlibDB.lock"
 		/** The name of the data file in the DB environment */
-	#define DDatabaseLowLevelDataName	"/MalterlibDB.lock"
+	#define DDatabaseLowLevelDataName	"/MalterlibDB.mibdb"
 		/** The suffix of the lock file when no subdir is used */
 	#define DDatabaseLowLevelLockSuffix	".lock"
 	

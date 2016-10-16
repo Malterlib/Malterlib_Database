@@ -1187,7 +1187,7 @@ namespace NMib
 			void f_SetDatabaseKeyCompare(CLowLevelDatabaseID dbi, FLowLevelCompare &&_fCompare);
 			void f_SetDatabaseDataCompare(CLowLevelDatabaseID dbi, FLowLevelCompare &&_fCompare);
 
-			void f_Get(CLowLevelDatabaseID dbi, CLowLevelValue *key, CLowLevelValue *data);
+			bool f_Get(CLowLevelDatabaseID dbi, CLowLevelValue *key, CLowLevelValue *data);
 			void f_Put(CLowLevelDatabaseID dbi, CLowLevelValue *key, CLowLevelValue *data, ELowLevelWriteFlag _WriteFlags);
 			void f_Delete(CLowLevelDatabaseID dbi, CLowLevelValue const *key, CLowLevelValue const *data);
 			int f_KeyCompare(CLowLevelDatabaseID dbi, const CLowLevelValue *a, const CLowLevelValue *b);

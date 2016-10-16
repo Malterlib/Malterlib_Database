@@ -75,7 +75,7 @@ namespace NMib
 			DMibRequire(data);
 			using namespace NPrivate;
 
-			if (_WriteFlags & ~(ELowLevelWriteFlag_NoOverwrite|ELowLevelWriteFlag_NoDuplicateData|ELowLevelWriteFlag_ReserveSpace|ELowLevelWriteFlag_Append|ELowLevelWriteFlag_AppendDuplicateData))
+			if (_WriteFlags & ~(ELowLevelWriteFlag_NoOverwrite|ELowLevelWriteFlag_NoDuplicateData|ELowLevelWriteFlag_ReserveSpace|ELowLevelWriteFlag_Append|ELowLevelWriteFlag_AppendDuplicateData|ELowLevelWriteFlag_OverwriteAtCurrentCursorPos))
 				DMibError("Invalid flags");
 
 			if (mc_txn->mt_flags & (MDB_TXN_RDONLY))
