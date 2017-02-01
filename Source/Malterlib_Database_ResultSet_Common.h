@@ -6,6 +6,7 @@ Types common to CResultSet and it's writers etc...
 */
 #pragma once
 #include <Mib/Core/Core>
+#include <Mib/Storage/Variant>
 
 namespace NMib
 {
