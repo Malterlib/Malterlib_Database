@@ -446,8 +446,8 @@ namespace NMib
 		{
 			if (mp_pBuilder)
 			{
-				DMibCheck(mp_iCurKeyPart == mp_nKeyParts)("Row not complete! There are still key parts and columns to fill in!");
-				DMibCheck(mp_iCurColumn == mp_nColumns)("Row not complete! There are still columns to fill in!");
+				DMibCheck(NException::fg_UncaughtExceptions() || mp_iCurKeyPart == mp_nKeyParts)("Row not complete! There are still key parts and columns to fill in!");
+				DMibCheck(NException::fg_UncaughtExceptions() || mp_iCurColumn == mp_nColumns)("Row not complete! There are still columns to fill in!");
 				mp_pBuilder->mp_bRowActive = false;
 			}
 		}
