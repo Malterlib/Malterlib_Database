@@ -31,7 +31,7 @@ namespace
 			// Add two rows to the result set
 			_Builder.f_SetDescription(Desc);
 
-			NContainer::TCVector<uint8> lBinData;
+			NContainer::CByteVector lBinData;
 			lBinData.f_Insert(100);
 
 			_Builder.f_AddRow()
@@ -54,7 +54,7 @@ namespace
 
 
 			// Add result set meta data.
-			NMib::NContainer::TCVector<uint8> MetaData;
+			NMib::NContainer::CByteVector MetaData;
 
 			MetaData.f_Insert(1);
 			_Builder.f_AddMetaData(1, MetaData);
@@ -115,7 +115,7 @@ namespace
 				Column2.f_AddValue(fp64(1.0 / 3.0));
 				Column2.f_AddValue(fp64(2.0 / 3.0));
 
-				NContainer::TCVector<uint8> lBinData;
+				NContainer::CByteVector lBinData;
 				lBinData.f_Insert(100);
 
 				Column3.f_AddValue(lBinData);
@@ -124,7 +124,7 @@ namespace
 			}
 
 			// Add result set meta data.
-			NMib::NContainer::TCVector<uint8> MetaData;
+			NMib::NContainer::CByteVector MetaData;
 
 			MetaData.f_Insert(1);
 			_Builder.f_AddMetaData(1, MetaData);
@@ -161,7 +161,7 @@ namespace
 
 			{ // Check we can get the result set meta data OK, and that lookup by ID works.
 				DMibTestPath("Check MetaData 0");
-				NMib::NContainer::TCVector<uint8> const* pMetaData = nullptr;
+				NMib::NContainer::CByteVector const* pMetaData = nullptr;
 
 				pMetaData = _RS.f_GetMetaData(0);
 				DMibTest(DMibExpr(nullptr) == DMibExpr(pMetaData));
@@ -169,7 +169,7 @@ namespace
 
 			{
 				DMibTestPath("Check MetaData 1");
-				NMib::NContainer::TCVector<uint8> const* pMetaData = nullptr;
+				NMib::NContainer::CByteVector const* pMetaData = nullptr;
 				pMetaData = _RS.f_GetMetaData(1);
 				DMibTest(DMibExpr(nullptr) != DMibExpr(pMetaData));
 				DMibTest(DMibExpr(1) == DMibExpr(pMetaData->f_GetLen()));
@@ -178,7 +178,7 @@ namespace
 
 			{
 				DMibTestPath("Check MetaData 2");
-				NMib::NContainer::TCVector<uint8> const* pMetaData = nullptr;
+				NMib::NContainer::CByteVector const* pMetaData = nullptr;
 				pMetaData = _RS.f_GetMetaData(2);
 				DMibTest(DMibExpr(nullptr) != DMibExpr(pMetaData));
 				DMibTest(DMibExpr(1) == DMibExpr(pMetaData->f_GetLen()));
@@ -187,21 +187,21 @@ namespace
 
 			{
 				DMibTestPath("Check KeyPart 0 Meta Data");
-				NMib::NContainer::TCVector<uint8> const& MetaData = _RS.f_GetKeyPartMetaData(0);
+				NMib::NContainer::CByteVector const& MetaData = _RS.f_GetKeyPartMetaData(0);
 				DMibTest(DMibExpr(1) == DMibExpr(MetaData.f_GetLen()));
 				DMibTest(DMibExpr(3) == DMibExpr(MetaData.operator[](0)));
 			}
 
 			{
 				DMibTestPath("Check KeyPart 1 Meta Data");
-				NMib::NContainer::TCVector<uint8> const& MetaData = _RS.f_GetKeyPartMetaData(1);
+				NMib::NContainer::CByteVector const& MetaData = _RS.f_GetKeyPartMetaData(1);
 				DMibTest(DMibExpr(1) == DMibExpr(MetaData.f_GetLen()));
 				DMibTest(DMibExpr(4) == DMibExpr(MetaData.operator[](0)));
 			}
 
 			{
 				DMibTestPath("Check Column 0 Meta Data");
-				NMib::NContainer::TCVector<uint8> const& MetaData = _RS.f_GetColumnMetaData(0);
+				NMib::NContainer::CByteVector const& MetaData = _RS.f_GetColumnMetaData(0);
 				DMibTest(DMibExpr(1) == DMibExpr(MetaData.f_GetLen()));
 				DMibTest(DMibExpr(5) == DMibExpr(MetaData.operator[](0)));
 			}
@@ -224,11 +224,11 @@ namespace
 					DMibTest(DMibExpr(nullptr) != DMibExpr(iRow.f_GetColumnValue<fp64>(2)));
 					DMibTest(DMibExpr(fp64(1.0 / 3.0)) == DMibExpr(*iRow.f_GetColumnValue<fp64>(2)));
 
-					NContainer::TCVector<uint8> lBinData;
+					NContainer::CByteVector lBinData;
 					lBinData.f_Insert(100);
 
-					DMibTest(DMibExpr(nullptr) != DMibExpr(iRow.f_GetColumnValue<NContainer::TCVector<uint8>>(3)));
-					DMibTest(DMibExpr(lBinData) == DMibExpr(*iRow.f_GetColumnValue<NContainer::TCVector<uint8>>(3)));
+					DMibTest(DMibExpr(nullptr) != DMibExpr(iRow.f_GetColumnValue<NContainer::CByteVector>(3)));
+					DMibTest(DMibExpr(lBinData) == DMibExpr(*iRow.f_GetColumnValue<NContainer::CByteVector>(3)));
 				}
 				
 				++iRow;
@@ -247,11 +247,11 @@ namespace
 					DMibTest(DMibExpr(nullptr) != DMibExpr(iRow.f_GetColumnValue<fp64>(2)));
 					DMibTest(DMibExpr(fp64(2.0 / 3.0)) == DMibExpr(*iRow.f_GetColumnValue<fp64>(2)));
 
-					NContainer::TCVector<uint8> lBinData;
+					NContainer::CByteVector lBinData;
 					lBinData.f_Insert(200);
 
-					DMibTest(DMibExpr(nullptr) != DMibExpr(iRow.f_GetColumnValue<NContainer::TCVector<uint8>>(3)));
-					DMibTest(DMibExpr(lBinData) == DMibExpr(*iRow.f_GetColumnValue<NContainer::TCVector<uint8>>(3)));
+					DMibTest(DMibExpr(nullptr) != DMibExpr(iRow.f_GetColumnValue<NContainer::CByteVector>(3)));
+					DMibTest(DMibExpr(lBinData) == DMibExpr(*iRow.f_GetColumnValue<NContainer::CByteVector>(3)));
 
 				}
 
@@ -317,12 +317,12 @@ namespace
 				{							
 					DMibTestPath("Column 3");
 					DMibTest(DMibExpr(true) == DMibExpr((bool)iColumn));
-					DMibTest(DMibExpr(nullptr) != DMibExpr(iColumn.f_Get<NContainer::TCVector<uint8>>()));
+					DMibTest(DMibExpr(nullptr) != DMibExpr(iColumn.f_Get<NContainer::CByteVector>()));
 					
-					NContainer::TCVector<uint8> lBinData;
+					NContainer::CByteVector lBinData;
 					lBinData.f_Insert(100);
 
-					DMibTest(DMibExpr(lBinData) == DMibExpr(*iColumn.f_Get<NContainer::TCVector<uint8>>()));
+					DMibTest(DMibExpr(lBinData) == DMibExpr(*iColumn.f_Get<NContainer::CByteVector>()));
 				}
 
 				++iColumn;
@@ -368,7 +368,7 @@ namespace
 
 				DMibTestSuite("Streaming")
 				{
-					NMib::NContainer::TCVector<uint8> RawData;
+					NMib::NContainer::CByteVector RawData;
 
 					{
 						CResultSetBuilder Builder;
