@@ -78,14 +78,14 @@ namespace NMib::NDatabase
 		typedef NStorage::TCStreamableVariant
 			<
 				EResultDataType
-				, NStr::CStr	, EResultDataType_CStr
-				, fp64 			, EResultDataType_fp64
-				, uint64 		, EResultDataType_uint64
-				, CBlob			, EResultDataType_Binary
+				, NStorage::TCMember<NStr::CStr, EResultDataType_CStr>
+				, NStorage::TCMember<fp64, EResultDataType_fp64>
+				, NStorage::TCMember<uint64, EResultDataType_uint64>
+				, NStorage::TCMember<CBlob, EResultDataType_Binary>
 				/* Deprecated:
-				, int32 		, EResultDataType_int32
-				, int64 		, EResultDataType_int64
-				, fp32 			, EResultDataType_fp32
+				, NStorage::TCMember<int32, EResultDataType_int32>
+				, NStorage::TCMember<int64, EResultDataType_int64>
+				, NStorage::TCMember<fp32, EResultDataType_fp32>
 				*/
 			> CValue
 		;
@@ -95,14 +95,14 @@ namespace NMib::NDatabase
 		typedef NStorage::TCStreamableVariant
 			<
 				EResultDataType
-				, NContainer::TCVector<NStr::CStr>		, EResultDataType_CStr
-				, NContainer::TCVector<fp64>			, EResultDataType_fp64
-				, NContainer::TCVector<uint64>			, EResultDataType_uint64
-				, NContainer::TCVector<CBlob>			, EResultDataType_Binary
+				, NStorage::TCMember<NContainer::TCVector<NStr::CStr>, EResultDataType_CStr>
+				, NStorage::TCMember<NContainer::TCVector<fp64>, EResultDataType_fp64>
+				, NStorage::TCMember<NContainer::TCVector<uint64>, EResultDataType_uint64>
+				, NStorage::TCMember<NContainer::TCVector<CBlob>, EResultDataType_Binary>
 			/* Deprecated:
-				, NContainer::TCVector<int32> 			, EResultDataType_int32
-				, NContainer::TCVector<int64>			, EResultDataType_int64
-				, NContainer::TCVector<fp32> 			, EResultDataType_fp32
+				, NStorage::TCMember<NContainer::TCVector<int32>, EResultDataType_int32>
+				, NStorage::TCMember<NContainer::TCVector<int64>, EResultDataType_int64>
+				, NStorage::TCMember<NContainer::TCVector<fp32>, EResultDataType_fp32>
 			*/
 			> CValueVector
 		;
@@ -143,14 +143,14 @@ namespace NMib::NDatabase
 		typedef NStorage::TCStreamableVariant
 			<
 				EResultDataType
-				, NContainer::TCVector<TCSparseDataEntry<NStr::CStr>>		, EResultDataType_CStr
-				, NContainer::TCVector<TCSparseDataEntry<fp64>>				, EResultDataType_fp64
-				, NContainer::TCVector<TCSparseDataEntry<uint64>>			, EResultDataType_uint64
-				, NContainer::TCVector<TCSparseDataEntry<CBlob>>			, EResultDataType_Binary
+				, NStorage::TCMember<NContainer::TCVector<TCSparseDataEntry<NStr::CStr>>, EResultDataType_CStr>
+				, NStorage::TCMember<NContainer::TCVector<TCSparseDataEntry<fp64>>, EResultDataType_fp64>
+				, NStorage::TCMember<NContainer::TCVector<TCSparseDataEntry<uint64>>, EResultDataType_uint64>
+				, NStorage::TCMember<NContainer::TCVector<TCSparseDataEntry<CBlob>>, EResultDataType_Binary>
 		/*	Deprecated
-				, NContainer::TCVector<TCSparseDataEntry<int32>> 			, EResultDataType_int32
-				, NContainer::TCVector<TCSparseDataEntry<int64>>			, EResultDataType_int64
-				, NContainer::TCVector<TCSparseDataEntry<fp32>> 			, EResultDataType_fp32
+				, NStorage::TCMember<NContainer::TCVector<TCSparseDataEntry<int32>>, EResultDataType_int32>
+				, NStorage::TCMember<NContainer::TCVector<TCSparseDataEntry<int64>>, EResultDataType_int64>
+				, NStorage::TCMember<NContainer::TCVector<TCSparseDataEntry<fp32>>, EResultDataType_fp32>
 		*/
 			> CSparseValueVector
 		;
