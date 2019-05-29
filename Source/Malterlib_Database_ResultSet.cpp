@@ -272,17 +272,17 @@ namespace NMib::NDatabase
 
 	struct CMetaDataCompare
 	{
-		bint operator()(NResultSet::CMetaDataEntry const& _A, NResultSet::CMetaDataEntry const& _B) const
+		bool operator()(NResultSet::CMetaDataEntry const& _A, NResultSet::CMetaDataEntry const& _B) const
 		{
 			return _A.m_ID < _B.m_ID;
 		}
 
-		bint operator()(NResultSet::CMetaDataEntry const& _A, uint32 _B) const
+		bool operator()(NResultSet::CMetaDataEntry const& _A, uint32 _B) const
 		{
 			return _A.m_ID < _B;
 		}
 
-		bint operator()(uint32 _A, NResultSet::CMetaDataEntry const& _B) const
+		bool operator()(uint32 _A, NResultSet::CMetaDataEntry const& _B) const
 		{
 			return _A < _B.m_ID;
 		}

@@ -113,7 +113,7 @@ namespace NMib::NDatabase
 		// Editing
 		//
 
-		bint mp_bRowActive;			// We are adding rows
+		bool mp_bRowActive;			// We are adding rows
 		mint mp_nColumnWiseActive;	// We are adding values by keypart/column
 
 	public:
