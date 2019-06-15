@@ -1,26 +1,26 @@
-// Copyright © 2016 Hansoft AB 
+// Copyright © 2016 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 /*
  This code is derived from lmdb with the following copyright:
- 
+
  Copyright 2011-2016 Howard Chu, Symas Corp. All rights reserved.
- 
+
  Redistribution and use in source and binary forms, with or without
  modification, are permitted only as authorized by the OpenLDAP
  Public License.
- 
+
  A copy of this license is available in the file LICENSE.OpenLDAP in the
  top-level directory of the distribution or, alternatively, at
  <http://www.OpenLDAP.org/license.html>.
- 
+
  This code is derived from btree.c written by Martin Hedenfalk.
- 
+
  Copyright (c) 2009, 2010 Martin Hedenfalk <martin@bzero.se>
- 
+
  Permission to use, copy, modify, and distribute this software for any
  purpose with or without fee is hereby granted, provided that the above
  copyright notice and this permission notice appear in all copies.
- 
+
  THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
  WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
  MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
@@ -36,7 +36,7 @@
 namespace NMib
 {
 	#if MDB_DEBUG
-	
+
 	namespace NDatabase::NPrivate
 	{
 		int mdb_debug = 0;
@@ -130,12 +130,12 @@ namespace NMib
 			key.m_Size = node->mn_ksize;
 			key.m_pData = node->mn_data;
 			nsize = NODESIZE + key.m_Size;
-			if (IS_BRANCH(mp)) 
+			if (IS_BRANCH(mp))
 			{
 				DMibConErrOut2("key {}: page {}, {}\n", i, NODEPGNO(node), DKEY(&key));
 				total += nsize;
 			}
-			else 
+			else
 			{
 				if (F_ISSET(node->mn_flags, F_BIGDATA))
 					nsize += sizeof(pgno_t);
@@ -152,7 +152,7 @@ namespace NMib
 
 	void NDatabase::NPrivate::mdb_cursor_chk(MDB_cursor const *mc)
 	{
-		using namespace NPrivate; 
+		using namespace NPrivate;
 		uint32 i;
 		MDB_node *node;
 		MDB_page *mp;
@@ -166,7 +166,7 @@ namespace NMib
 		}
 		if (mc->mc_ki[i] >= NUMKEYS(mc->mc_pg[i]))
 			printf("ack!\n");
-		if (mc->mc_xcursor && (mc->mc_xcursor->mx_cursor.mc_flags & C_INITIALIZED)) {
+		if (XCURSOR_INITED(mc)) {
 			node = NODEPTR(mc->mc_pg[mc->mc_top], mc->mc_ki[mc->mc_top]);
 			if (((node->mn_flags & (F_DUPDATA|F_SUBDATA)) == F_DUPDATA) &&
 				mc->mc_xcursor->mx_cursor.mc_pg[0] != (MDB_page *)NODEDATA(node)) {
@@ -226,7 +226,7 @@ namespace NMib
 				DMibCheck(rc == MDB_NOTFOUND);
 			}
 		}
-		if (freecount + count + NUM_METAS != txn->mt_next_pgno) 
+		if (freecount + count + NUM_METAS != txn->mt_next_pgno)
 		{
 			DMibConErrOut2
 				(

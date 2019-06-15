@@ -1,26 +1,26 @@
-// Copyright © 2016 Hansoft AB 
+// Copyright © 2016 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 /*
  This code is derived from lmdb with the following copyright:
- 
+
  Copyright 2011-2016 Howard Chu, Symas Corp. All rights reserved.
- 
+
  Redistribution and use in source and binary forms, with or without
  modification, are permitted only as authorized by the OpenLDAP
  Public License.
- 
+
  A copy of this license is available in the file LICENSE.OpenLDAP in the
  top-level directory of the distribution or, alternatively, at
  <http://www.OpenLDAP.org/license.html>.
- 
+
  This code is derived from btree.c written by Martin Hedenfalk.
- 
+
  Copyright (c) 2009, 2010 Martin Hedenfalk <martin@bzero.se>
- 
+
  Permission to use, copy, modify, and distribute this software for any
  purpose with or without fee is hereby granted, provided that the above
  copyright notice and this permission notice appear in all copies.
- 
+
  THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
  WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
  MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
@@ -131,7 +131,7 @@ namespace NMib
 		/* nodeptr is fake for LEAF2 */
 		return node;
 	}
-	
+
 
 	/** Return the data associated with a given node.
 	 * @param[in] mc The cursor for this operation.
@@ -145,12 +145,10 @@ namespace NMib
 		pgno_t		 pgno;
 		int rc;
 
-	#ifdef DMibDatabaseLowLevel_Always64BitSupport
-		if (mc->mc_ovpg) {
-			MDB_PAGE_UNREF(mc->mc_txn, mc->mc_ovpg);
-			mc->mc_ovpg = 0;
+		if (MC_OVPG(mc)) {
+			MDB_PAGE_UNREF(mc->mc_txn, MC_OVPG(mc));
+			MC_SET_OVPG(mc, NULL);
 		}
-	#endif
 		if (!F_ISSET(leaf->mn_flags, F_BIGDATA)) {
 			data->m_Size = NODEDSZ(leaf);
 			data->m_pData = NODEDATA(leaf);
@@ -166,14 +164,13 @@ namespace NMib
 			return rc;
 		}
 		data->m_pData = METADATA(omp);
-	#ifdef DMibDatabaseLowLevel_Always64BitSupport
-		mc->mc_ovpg = omp;
-	#endif
+		MC_SET_OVPG(mc, omp);
 
 		return MDB_SUCCESS;
 	}
-	
+
 	/** Add a node to the page pointed to by the cursor.
+	 * Set #MDB_TXN_ERROR on failure.
 	 * @param[in] mc The cursor for this operation.
 	 * @param[in] indx The index on the page where the new node should be added.
 	 * @param[in] key The key for the new node.
@@ -410,7 +407,7 @@ namespace NMib
 				mp->mp_ptrs[i] += delta;
 		}
 		mp->mp_upper += delta;
-	}		
+	}
 
 	/** Move a node from csrc to cdst.
 	 */
@@ -543,12 +540,8 @@ namespace NMib
 						m3->mc_ki[csrc->mc_top] = cdst->mc_ki[cdst->mc_top];
 						m3->mc_ki[csrc->mc_top-1]++;
 					}
-					if (m3->mc_xcursor && (m3->mc_xcursor->mx_cursor.mc_flags & C_INITIALIZED) &&
-						IS_LEAF(mps)) {
-						MDB_node *node = NODEPTR(m3->mc_pg[csrc->mc_top], m3->mc_ki[csrc->mc_top]);
-						if ((node->mn_flags & (F_DUPDATA|F_SUBDATA)) == F_DUPDATA)
-							m3->mc_xcursor->mx_cursor.mc_pg[0] = (MDB_page *)NODEDATA(node);
-					}
+					if (IS_LEAF(mps))
+						XCURSOR_REFRESH(m3, csrc->mc_top, m3->mc_pg[csrc->mc_top]);
 				}
 			} else
 			/* Adding on the right, bump others down */
@@ -569,12 +562,8 @@ namespace NMib
 						} else {
 							m3->mc_ki[csrc->mc_top]--;
 						}
-						if (m3->mc_xcursor && (m3->mc_xcursor->mx_cursor.mc_flags & C_INITIALIZED) &&
-							IS_LEAF(mps)) {
-							MDB_node *node = NODEPTR(m3->mc_pg[csrc->mc_top], m3->mc_ki[csrc->mc_top]);
-							if ((node->mn_flags & (F_DUPDATA|F_SUBDATA)) == F_DUPDATA)
-								m3->mc_xcursor->mx_cursor.mc_pg[0] = (MDB_page *)NODEDATA(node);
-						}
+						if (IS_LEAF(mps))
+							XCURSOR_REFRESH(m3, csrc->mc_top, m3->mc_pg[csrc->mc_top]);
 					}
 				}
 			}
@@ -644,7 +633,7 @@ namespace NMib
 
 		return MDB_SUCCESS;
 	}
-	
+
 	/** Calculate the size of a leaf node.
 	 * The size depends on the environment's page size; if a data item
 	 * is too large it will be put onto an overflow page and the node
@@ -692,8 +681,9 @@ namespace NMib
 
 		return sz + sizeof(indx_t);
 	}
-	
+
 	/** Replace the key for a branch node with a new key.
+	 * Set #MDB_TXN_ERROR on failure.
 	 * @param[in] mc Cursor pointing to the node to operate on.
 	 * @param[in] key The new key to use.
 	 * @return 0 on success, non-zero on failure.
@@ -770,7 +760,7 @@ namespace NMib
 
 		return MDB_SUCCESS;
 	}
-	
+
 	/** Rebalance the tree after a delete operation.
 	 * @param[in] mc Cursor pointing to the page where rebalancing
 	 * should begin.
@@ -962,7 +952,7 @@ namespace NMib
 		mc->mc_ki[mc->mc_top] = oldki;
 		return rc;
 	}
-	
+
 	/** Add all the DB's pages to the free list.
 	 * @param[in] mc Cursor on the DB to free.
 	 * @param[in] subs non-Zero to check for sub-DBs in this DB.
@@ -1023,7 +1013,7 @@ namespace NMib
 						goto pop;
 				} else {
 					mdb_midl_need(&txn->mt_free_pgs, n);
-					for (i=0; i<n; i++) 
+					for (i=0; i<n; i++)
 					{
 						pgno_t pg;
 						ni = NODEPTR(mp, i);

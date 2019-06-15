@@ -1,26 +1,26 @@
-// Copyright © 2016 Hansoft AB 
+// Copyright © 2016 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 /*
  This code is derived from lmdb with the following copyright:
- 
+
  Copyright 2011-2016 Howard Chu, Symas Corp. All rights reserved.
- 
+
  Redistribution and use in source and binary forms, with or without
  modification, are permitted only as authorized by the OpenLDAP
  Public License.
- 
+
  A copy of this license is available in the file LICENSE.OpenLDAP in the
  top-level directory of the distribution or, alternatively, at
  <http://www.OpenLDAP.org/license.html>.
- 
+
  This code is derived from btree.c written by Martin Hedenfalk.
- 
+
  Copyright (c) 2009, 2010 Martin Hedenfalk <martin@bzero.se>
- 
+
  Permission to use, copy, modify, and distribute this software for any
  purpose with or without fee is hereby granted, provided that the above
  copyright notice and this permission notice appear in all copies.
- 
+
  THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
  WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
  MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
@@ -38,37 +38,37 @@ namespace NMib
 	namespace NDatabase
 	{
 		CLowLevelCursorCommon::CLowLevelCursorCommon() = default;
-		
+
 		CLowLevelCursorCommon::~CLowLevelCursorCommon()
 		{
 			if (mp_pInternal)
 				NPrivate::mdb_cursor_close(mp_pInternal.f_Detach());
 		}
-		
+
 		CLowLevelCursorCommon::CLowLevelCursorCommon(CLowLevelCursorCommon &&_Other) = default;
-		
+
 		CLowLevelCursorCommon &CLowLevelCursorCommon::operator =(CLowLevelCursorCommon &&_Other) = default;
-		
-		CLowLevelCursorCommon::CLowLevelCursorCommon(NPtr::TCUniquePointer<CInternal> &&_pInternal)
+
+		CLowLevelCursorCommon::CLowLevelCursorCommon(NStorage::TCUniquePointer<CInternal> &&_pInternal)
 			: mp_pInternal(fg_Move(_pInternal))
 		{
 		}
-		
-		CLowLevelCursor::CLowLevelCursor(NPtr::TCUniquePointer<CInternal> &&_pInternal)
-			: CLowLevelCursorCommon(fg_Move(_pInternal))
-		{
-		}
-		
-		CLowLevelCursorDuplicateData::CLowLevelCursorDuplicateData(NPtr::TCUniquePointer<CInternal> &&_pInternal)
+
+		CLowLevelCursor::CLowLevelCursor(NStorage::TCUniquePointer<CInternal> &&_pInternal)
 			: CLowLevelCursorCommon(fg_Move(_pInternal))
 		{
 		}
 
-		CLowLevelCursorWrite::CLowLevelCursorWrite(NPtr::TCUniquePointer<CInternal> &&_pInternal)
+		CLowLevelCursorDuplicateData::CLowLevelCursorDuplicateData(NStorage::TCUniquePointer<CInternal> &&_pInternal)
+			: CLowLevelCursorCommon(fg_Move(_pInternal))
+		{
+		}
+
+		CLowLevelCursorWrite::CLowLevelCursorWrite(NStorage::TCUniquePointer<CInternal> &&_pInternal)
 			: CLowLevelCursor(fg_Move(_pInternal))
 		{
 		}
-		
+
 		void CLowLevelCursorCommon::CInternal::f_Put(CLowLevelValue *key, CLowLevelValue *data, ELowLevelWriteFlag _WriteFlags)
 		{
 			DMibRequire(key);
@@ -80,12 +80,12 @@ namespace NMib
 
 			if (mc_txn->mt_flags & (MDB_TXN_RDONLY))
 				DMibError("Trying to write to read only transaction");
-			
+
 			int rc = mdb_cursor_put(this, key, data, _WriteFlags);
 			if (rc)
 				DMibError(NStr::fg_Format("Error putting data: {}", mdb_strerror(rc)));
 		}
-		
+
 		void CLowLevelCursorCommon::CInternal::f_Delete(ELowLevelWriteFlag _WriteFlags)
 		{
 			using namespace NPrivate;
@@ -95,12 +95,12 @@ namespace NMib
 
 			if (mc_txn->mt_flags & (MDB_TXN_RDONLY))
 				DMibError("Trying to delete in read only transaction");
-			
+
 			int rc = mdb_cursor_del(this, _WriteFlags);
 			if (rc)
 				DMibError(NStr::fg_Format("Error deleting data: {}", mdb_strerror(rc)));
 		}
-		
+
 		CLowLevelSize CLowLevelCursorCommon::CInternal::f_CountDuplicates()
 		{
 			using namespace NPrivate;
@@ -111,7 +111,7 @@ namespace NMib
 				DMibError(NStr::fg_Format("Error counting duplicates: {}", mdb_strerror(rc)));
 			return Ret;
 		}
-		
+
 		void CLowLevelCursorWrite::f_SetValue(CLowLevelValue const &_Value, bool _bAppend)
 		{
 			auto &Cursor = *mp_pInternal;
@@ -120,8 +120,8 @@ namespace NMib
 			Cursor.f_Put(&mp_Key, &Value, Flags);
 			mp_Value = Value;
 		}
-		
-		
+
+
 		CLowLevelValue CLowLevelCursorWrite::f_SetValue(mint _DataSize, bool _bAppend)
 		{
 			auto &Cursor = *mp_pInternal;
@@ -132,7 +132,7 @@ namespace NMib
 			mp_Value = Value;
 			return Value;
 		}
-		
+
 		void CLowLevelCursorWrite::f_Insert(CLowLevelValue const &_Key, CLowLevelValue const &_Value, bool _bAppend)
 		{
 			auto &Cursor = *mp_pInternal;
@@ -140,10 +140,10 @@ namespace NMib
 			auto Flags = (_bAppend ? ELowLevelWriteFlag_Append : ELowLevelWriteFlag_None) | ELowLevelWriteFlag_NoOverwrite;
 			auto Key = _Key;
 			Cursor.f_Put(&Key, &Value, Flags);
-			mp_Key = Key; 
+			mp_Key = Key;
 			mp_Value = Value;
 		}
-		
+
 		CLowLevelValue CLowLevelCursorWrite::f_Insert(CLowLevelValue const &_Key, mint _DataSize, bool _bAppend)
 		{
 			auto &Cursor = *mp_pInternal;
@@ -152,11 +152,11 @@ namespace NMib
 			auto Flags = (_bAppend ? ELowLevelWriteFlag_Append : ELowLevelWriteFlag_None) | ELowLevelWriteFlag_NoOverwrite | ELowLevelWriteFlag_ReserveSpace;
 			auto Key = _Key;
 			Cursor.f_Put(&Key, &Value, Flags);
-			mp_Key = Key; 
+			mp_Key = Key;
 			mp_Value = Value;
-			return Value; 
+			return Value;
 		}
-		
+
 		void CLowLevelCursorWrite::f_Upsert(CLowLevelValue const &_Key, CLowLevelValue const &_Value, bool _bAppend)
 		{
 			auto &Cursor = *mp_pInternal;
@@ -164,10 +164,10 @@ namespace NMib
 			auto Flags = (_bAppend ? ELowLevelWriteFlag_Append : ELowLevelWriteFlag_None);
 			auto Key = _Key;
 			Cursor.f_Put(&Key, &Value, Flags);
-			mp_Key = Key; 
+			mp_Key = Key;
 			mp_Value = Value;
 		}
-		
+
 		CLowLevelValue CLowLevelCursorWrite::f_Upsert(CLowLevelValue const &_Key, mint _DataSize, bool _bAppend)
 		{
 			auto &Cursor = *mp_pInternal;
@@ -176,23 +176,23 @@ namespace NMib
 			auto Flags = (_bAppend ? ELowLevelWriteFlag_Append : ELowLevelWriteFlag_None) | ELowLevelWriteFlag_ReserveSpace;
 			auto Key = _Key;
 			Cursor.f_Put(&Key, &Value, Flags);
-			mp_Key = Key; 
+			mp_Key = Key;
 			mp_Value = Value;
-			return Value; 
+			return Value;
 		}
-		
+
 		void CLowLevelCursorWrite::f_Delete()
 		{
 			auto &Cursor = *mp_pInternal;
 			Cursor.f_Delete(ELowLevelWriteFlag_None);
 			fp_SetToCurrent();
-		}		
-		
-		CLowLevelCursorDuplicateDataWrite::CLowLevelCursorDuplicateDataWrite(NPtr::TCUniquePointer<CInternal> &&_pInternal)
+		}
+
+		CLowLevelCursorDuplicateDataWrite::CLowLevelCursorDuplicateDataWrite(NStorage::TCUniquePointer<CInternal> &&_pInternal)
 			: CLowLevelCursorDuplicateData(fg_Move(_pInternal))
 		{
-		}	
-		
+		}
+
 		void CLowLevelCursorDuplicateDataWrite::f_SetValue(CLowLevelValue const &_Value, bool _bAppend)
 		{
 			auto &Cursor = *mp_pInternal;
@@ -201,7 +201,7 @@ namespace NMib
 			Cursor.f_Put(&mp_Key, &Value, Flags);
 			mp_Value = Value;
 		}
-		
+
 		void CLowLevelCursorDuplicateDataWrite::f_Insert(CLowLevelValue const &_Key, CLowLevelValue const &_Value, bool _bAppend)
 		{
 			auto &Cursor = *mp_pInternal;
@@ -209,10 +209,10 @@ namespace NMib
 			auto Flags = (_bAppend ? ELowLevelWriteFlag_Append : ELowLevelWriteFlag_None) | ELowLevelWriteFlag_NoOverwrite | ELowLevelWriteFlag_NoDuplicateData;
 			auto Key = _Key;
 			Cursor.f_Put(&Key, &Value, Flags);
-			mp_Key = Key; 
+			mp_Key = Key;
 			mp_Value = Value;
 		}
-		
+
 		void CLowLevelCursorDuplicateDataWrite::f_Upsert(CLowLevelValue const &_Key, CLowLevelValue const &_Value, bool _bAppend)
 		{
 			auto &Cursor = *mp_pInternal;
@@ -220,34 +220,34 @@ namespace NMib
 			auto Flags = (_bAppend ? ELowLevelWriteFlag_Append : ELowLevelWriteFlag_None);
 			auto Key = _Key;
 			Cursor.f_Put(&Key, &Value, Flags);
-			mp_Key = Key; 
+			mp_Key = Key;
 			mp_Value = Value;
 		}
-		
+
 		void CLowLevelCursorDuplicateDataWrite::f_DeleteKey()
 		{
 			auto &Cursor = *mp_pInternal;
 			Cursor.f_Delete(ELowLevelWriteFlag_NoDuplicateData);
 			fp_SetToCurrent();
 		}
-		
+
 		void CLowLevelCursorDuplicateDataWrite::f_DeleteData()
 		{
 			auto &Cursor = *mp_pInternal;
 			Cursor.f_Delete(ELowLevelWriteFlag_None);
 			fp_SetToCurrent();
 		}
-		
+
 		CLowLevelCursorCommon::operator bool() const
 		{
 			return mp_bValid;
 		}
-		
+
 		CLowLevelValue const &CLowLevelCursorCommon::f_Key() const
 		{
 			return mp_Key;
 		}
-		
+
 		void CLowLevelCursorCommon::fp_SetToCurrent()
 		{
 			int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_GET_CURRENT);
@@ -270,7 +270,7 @@ namespace NMib
 				mp_bValid = true;
 			return mp_bValid;
 		}
-		
+
 		bool CLowLevelCursorCommon::f_Last()
 		{
 			int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_LAST);
@@ -282,7 +282,7 @@ namespace NMib
 				mp_bValid = true;
 			return mp_bValid;
 		}
-		
+
 		bool CLowLevelCursorCommon::f_FindEqual(CLowLevelValue const &_Key) // MDB_SET, MDB_SET_KEY
 		{
 			mp_Key = _Key;
@@ -295,7 +295,7 @@ namespace NMib
 				mp_bValid = true;
 			return mp_bValid;
 		}
-	
+
 		bool CLowLevelCursorCommon::f_FindLowerBound(CLowLevelValue const &_Key) // MDB_SET_RANGE
 		{
 			mp_Key = _Key;
@@ -306,9 +306,9 @@ namespace NMib
 				DMibError(NStr::fg_Format("Error setting cursor to lower bound: {}", NPrivate::mdb_strerror(Result)));
 			else
 				mp_bValid = true;
-			return mp_bValid;			
-		}		
-		
+			return mp_bValid;
+		}
+
 		void CLowLevelCursorCommon::operator ++()
 		{
 			int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_NEXT_NODUP);
@@ -319,7 +319,7 @@ namespace NMib
 			else
 				mp_bValid = true;
 		}
-		
+
 		void CLowLevelCursorCommon::operator --()
 		{
 			int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_PREV_NODUP);
@@ -330,18 +330,18 @@ namespace NMib
 			else
 				mp_bValid = true;
 		}
-		
+
 		CLowLevelValue const &CLowLevelCursor::f_Value() const
 		{
 			return mp_Value;
 		}
-		
+
 		CLowLevelSize CLowLevelCursorDuplicateData::f_DataCount()
 		{
 			auto &Cursor = *mp_pInternal;
 			return Cursor.f_CountDuplicates();
 		}
-		
+
 		bool CLowLevelCursorDuplicateData::f_NextData()
 		{
 			int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_NEXT_DUP);
@@ -351,7 +351,7 @@ namespace NMib
 				DMibError(NStr::fg_Format("Error setting cursor to next data: {}", NPrivate::mdb_strerror(Result)));
 			return true;
 		}
-		
+
 		bool CLowLevelCursorDuplicateData::f_PrevData()
 		{
 			int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_PREV_DUP);
@@ -361,7 +361,7 @@ namespace NMib
 				DMibError(NStr::fg_Format("Error setting cursor to prev data: {}", NPrivate::mdb_strerror(Result)));
 			return true;
 		}
-		
+
 		bool CLowLevelCursorDuplicateData::f_FirstData()
 		{
 			int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_FIRST_DUP);
@@ -371,7 +371,7 @@ namespace NMib
 				DMibError(NStr::fg_Format("Error setting cursor to first data: {}", NPrivate::mdb_strerror(Result)));
 			return true;
 		}
-		
+
 		bool CLowLevelCursorDuplicateData::f_LastData()
 		{
 			int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_LAST_DUP);
@@ -381,7 +381,7 @@ namespace NMib
 				DMibError(NStr::fg_Format("Error setting cursor to last data: {}", NPrivate::mdb_strerror(Result)));
 			return true;
 		}
-		
+
 		bool CLowLevelCursorDuplicateData::f_FindEqual(CLowLevelValue const &_Key, CLowLevelValue const &_Data)
 		{
 			mp_Key = _Key;
@@ -395,7 +395,7 @@ namespace NMib
 				mp_bValid = true;
 			return mp_bValid;
 		}
-		
+
 		bool CLowLevelCursorDuplicateData::f_FindLowerBound(CLowLevelValue const &_Key, CLowLevelValue const &_Data)
 		{
 			mp_Key = _Key;
@@ -407,10 +407,10 @@ namespace NMib
 				DMibError(NStr::fg_Format("Error setting cursor to lower bound key and data: {}", NPrivate::mdb_strerror(Result)));
 			else
 				mp_bValid = true;
-			return mp_bValid;			
+			return mp_bValid;
 		}
 	}
-	
+
 	/** @brief Create a cursor handle.
 	 *
 	 * A cursor is associated with a specific transaction and database.
@@ -420,7 +420,7 @@ namespace NMib
 	 * A cursor in a write-transaction can be closed before its transaction
 	 * ends, and will otherwise be closed when its transaction ends.
 	 * A cursor in a read-only transaction must be closed explicitly, before
-	 * or after its transaction ends. 
+	 * or after its transaction ends.
 	 * @note Earlier documentation said that cursors in every transaction
 	 * were closed when the transaction committed or aborted.
 	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
@@ -435,7 +435,7 @@ namespace NMib
 	NDatabase::NPrivate::MDB_cursor *NDatabase::CLowLevelTransactionCommon::CInternal::f_Cursor(CLowLevelDatabaseID dbi)
 	{
 		using namespace NPrivate;
-		
+
 		MDB_cursor	*mc;
 		mint size = sizeof(MDB_cursor);
 
@@ -450,14 +450,14 @@ namespace NMib
 		if (mt_dbs[dbi].md_flags & ELowLevelDatabaseFlag_SortedDuplicates)
 			size += sizeof(MDB_xcursor);
 
-		mc = (MDB_cursor *)NMem::fg_AllocNoSize(size);
+		mc = (MDB_cursor *)NMemory::fg_Alloc(size);
 		auto Cleanup = g_OnScopeExit > [&]()
 			{
-				mdb_cursor_close(mc);				
+				mdb_cursor_close(mc);
 			}
 		;
 		mdb_cursor_init(mc, this, dbi, (MDB_xcursor *)(mc + 1));
-		if (mt_cursors) 
+		if (mt_cursors)
 		{
 			mc->mc_next = mt_cursors[dbi];
 			mt_cursors[dbi] = mc;
@@ -467,7 +467,7 @@ namespace NMib
 		Cleanup.f_Clear();
 		return mc;
 	}
-	
+
 	/** @brief Close a cursor handle.
 	 *
 	 * The cursor handle will be freed and must not be used again after this call.
@@ -476,18 +476,24 @@ namespace NMib
 	 */
 	void NDatabase::NPrivate::mdb_cursor_close(MDB_cursor *mc)
 	{
+		if (mc) {
+			MDB_CURSOR_UNREF(mc, 0);
+		}
 		if (mc && !mc->mc_backup) {
-			/* remove from txn, if tracked */
+			/* Remove from txn, if tracked.
+			 * A read-only txn (!C_UNTRACK) may have been freed already,
+			 * so do not peek inside it.  Only write txns track cursors.
+			 */
 			if ((mc->mc_flags & C_UNTRACK) && mc->mc_txn->mt_cursors) {
 				MDB_cursor **prev = &mc->mc_txn->mt_cursors[mc->mc_dbi];
 				while (*prev && *prev != mc) prev = &(*prev)->mc_next;
 				if (*prev == mc)
 					*prev = mc->mc_next;
 			}
-			NMem::fg_Free(mc);
+			NMemory::fg_FreeNoSize(mc);
 		}
 	}
-	
+
 	/** @brief Retrieve by cursor.
 	 *
 	 * This function retrieves key/data pairs from the database. The address and length
@@ -510,7 +516,7 @@ namespace NMib
 	int NDatabase::NPrivate::mdb_cursor_get(MDB_cursor *mc, CLowLevelValue *key, CLowLevelValue *data, ELowLevelCursorGet op)
 	{
 		using namespace NPrivate;
-		
+
 		int		 rc;
 		int		 exact = 0;
 		int		 (*mfunc)(MDB_cursor *mc, CLowLevelValue *key, CLowLevelValue *data);
@@ -656,6 +662,11 @@ namespace NMib
 				rc = MDB_INCOMPATIBLE;
 				break;
 			}
+			if (mc->mc_ki[mc->mc_top] >= NUMKEYS(mc->mc_pg[mc->mc_top])) {
+				mc->mc_ki[mc->mc_top] = NUMKEYS(mc->mc_pg[mc->mc_top]);
+				rc = MDB_NOTFOUND;
+				break;
+			}
 			{
 				MDB_node *leaf = NODEPTR(mc->mc_pg[mc->mc_top], mc->mc_ki[mc->mc_top]);
 				if (!F_ISSET(leaf->mn_flags, F_DUPDATA)) {
@@ -687,7 +698,7 @@ namespace NMib
 
 		return rc;
 	}
-	
+
 	/** @brief Store by cursor.
 	 *
 	 * This function stores key/data pairs into the database.
@@ -783,7 +794,7 @@ namespace NMib
 		flags &= ~MDB_NOSPILL;
 
 		mc->mc_txn->f_CheckBlocked();
-		
+
 		if (mc->mc_txn->mt_flags & (MDB_TXN_RDONLY))
 			return EACCES;
 
@@ -802,7 +813,7 @@ namespace NMib
 
 		dkey.m_Size = 0;
 
-		if (flags == ELowLevelWriteFlag_OverwriteAtCurrentCursorPos) {
+		if (flags & ELowLevelWriteFlag_OverwriteAtCurrentCursorPos) {
 			if (!(mc->mc_flags & C_INITIALIZED))
 				return EINVAL;
 			rc = MDB_SUCCESS;
@@ -878,7 +889,7 @@ namespace NMib
 		}
 
 		unsigned offset = 0;
-		
+
 		insert_key = insert_data = rc;
 		if (insert_key) {
 			/* The key does not exist */
@@ -953,10 +964,8 @@ namespace NMib
 					if (flags == ELowLevelWriteFlag_OverwriteAtCurrentCursorPos)
 						goto current;
 					pDataCompare = &(mc->mc_dbx->m_fDataCompare);
-	#if UINT_MAX < SIZE_MAX || defined(DMibDatabaseLowLevel_Always64BitSupport)
-					if (olddata.m_Size == sizeof(CLowLevelSize) && *pDataCompare == g_mdb_cmp_int)
+					if (NEED_CMP_CLONG(*pDataCompare, olddata.m_Size))
 						pDataCompare = &g_mdb_cmp_clong;
-	#endif
 					/* does data match? */
 					if (!(*pDataCompare)(*data, olddata)) {
 						if (flags & (ELowLevelWriteFlag_NoDuplicateData|ELowLevelWriteFlag_AppendDuplicateData))
@@ -1052,8 +1061,9 @@ namespace NMib
 					} else {
 						memcpy((char *)mp + mp->mp_upper + PAGEBASE, (char *)fp + fp->mp_upper + PAGEBASE,
 							olddata.m_Size - fp->mp_upper - PAGEBASE);
+						memcpy((char *)(&mp->mp_ptrs), (char *)(&fp->mp_ptrs), NUMKEYS(fp) * sizeof(mp->mp_ptrs[0]));
 						for (i=0; i<NUMKEYS(fp); i++)
-							mp->mp_ptrs[i] = fp->mp_ptrs[i] + offset;
+							mp->mp_ptrs[i] += offset;
 					}
 				}
 
@@ -1180,11 +1190,7 @@ namespace NMib
 					if (m3->mc_ki[i] >= mc->mc_ki[i] && insert_key) {
 						m3->mc_ki[i]++;
 					}
-					if (m3->mc_xcursor && (m3->mc_xcursor->mx_cursor.mc_flags & C_INITIALIZED)) {
-						MDB_node *n2 = NODEPTR(mp, m3->mc_ki[i]);
-						if ((n2->mn_flags & (F_SUBDATA|F_DUPDATA)) == F_DUPDATA)
-							m3->mc_xcursor->mx_cursor.mc_pg[0] = (MDB_page *)NODEDATA(n2);
-					}
+					XCURSOR_REFRESH(m3, i, mp);
 				}
 			}
 		}
@@ -1202,7 +1208,7 @@ namespace NMib
 				xdata.m_Size = 0;
 				xdata.m_pData = (uint8 *)"";
 				leaf = NODEPTR(mc->mc_pg[mc->mc_top], mc->mc_ki[mc->mc_top]);
-				if (flags & ELowLevelWriteFlag_OverwriteAtCurrentCursorPos) {
+				if (flags == ELowLevelWriteFlag_OverwriteAtCurrentCursorPos) {
 					xflags = ELowLevelWriteFlag_OverwriteAtCurrentCursorPos|MDB_NOSPILL;
 				} else {
 					mdb_xcursor_init1(mc, leaf);
@@ -1226,7 +1232,6 @@ namespace NMib
 					MDB_xcursor *mx = mc->mc_xcursor;
 					unsigned i = mc->mc_top;
 					MDB_page *mp = mc->mc_pg[i];
-					int nkeys = NUMKEYS(mp);
 
 					for (m2 = mc->mc_txn->mt_cursors[mc->mc_dbi]; m2; m2=m2->mc_next) {
 						if (m2 == mc || m2->mc_snum < mc->mc_snum) continue;
@@ -1234,10 +1239,8 @@ namespace NMib
 						if (m2->mc_pg[i] == mp) {
 							if (m2->mc_ki[i] == mc->mc_ki[i]) {
 								mdb_xcursor_init2(m2, mx, new_dupdata);
-							} else if (!insert_key && m2->mc_ki[i] < nkeys) {
-								MDB_node *n2 = NODEPTR(mp, m2->mc_ki[i]);
-								if ((n2->mn_flags & (F_SUBDATA|F_DUPDATA)) == F_DUPDATA)
-									m2->mc_xcursor->mx_cursor.mc_pg[0] = (MDB_page *)NODEDATA(n2);
+							} else if (!insert_key) {
+								XCURSOR_REFRESH(m2, i, mp);
 							}
 						}
 					}
@@ -1279,15 +1282,19 @@ namespace NMib
 			return rc;
 	bad_sub:
 			if (rc == MDB_KEYEXIST)	/* should not happen, we deleted that item */
-				rc = MDB_CORRUPTED;
+				rc = MDB_PROBLEM;
 		}
 		mc->mc_txn->mt_flags |= MDB_TXN_ERROR;
 		return rc;
 	}
-	
+
 	/** @brief Delete current key/data pair
 	 *
 	 * This function deletes the key/data pair to which the cursor refers.
+	 * This does not invalidate the cursor, so operations such as MDB_NEXT
+	 * can still be used on it.
+	 * Both MDB_NEXT and MDB_GET_CURRENT will return the same record after
+	 * this operation.
 	 * @param[in] cursor A cursor handle returned by #f_Cursor()
 	 * @param[in] flags Options for this operation. This parameter
 	 * must be set to 0 or one of the values described here.
@@ -1306,13 +1313,13 @@ namespace NMib
 	{
 		uint32 flags = _Flags;
 		using namespace NPrivate;
-		
+
 		MDB_node	*leaf;
 		MDB_page	*mp;
 		int rc;
 
 		mc->mc_txn->f_CheckBlocked();
-		
+
 		if (mc->mc_txn->mt_flags & (MDB_TXN_RDONLY))
 			return EACCES;
 
@@ -1363,13 +1370,7 @@ namespace NMib
 							if (m2 == mc || m2->mc_snum < mc->mc_snum) continue;
 							if (!(m2->mc_flags & C_INITIALIZED)) continue;
 							if (m2->mc_pg[mc->mc_top] == mp) {
-								if (m2->mc_ki[mc->mc_top] == mc->mc_ki[mc->mc_top]) {
-									m2->mc_xcursor->mx_cursor.mc_pg[0] = (MDB_page *)NODEDATA(leaf);
-								} else {
-									MDB_node *n2 = NODEPTR(mp, m2->mc_ki[mc->mc_top]);
-									if (!(n2->mn_flags & F_SUBDATA))
-										m2->mc_xcursor->mx_cursor.mc_pg[0] = (MDB_page *)NODEDATA(n2);
-								}
+								XCURSOR_REFRESH(m2, mc->mc_top, mp);
 							}
 						}
 					}
@@ -1412,7 +1413,7 @@ namespace NMib
 		mc->mc_txn->mt_flags |= MDB_TXN_ERROR;
 		return rc;
 	}
-	
+
 	/** @brief Return count of duplicates for current key.
 	 *
 	 * This call is only valid on databases that support sorted duplicate
@@ -1428,7 +1429,7 @@ namespace NMib
 	int NDatabase::NPrivate::mdb_cursor_count(MDB_cursor *mc, CLowLevelSize *countp)
 	{
 		using namespace NPrivate;
-		
+
 		// Return the count of duplicate data items for the current key
 		MDB_node	*leaf;
 
@@ -1439,12 +1440,18 @@ namespace NMib
 			return MDB_INCOMPATIBLE;
 
 		mc->mc_txn->f_CheckBlocked();
-		
+
 		if (!(mc->mc_flags & C_INITIALIZED))
 			return EINVAL;
 
-		if (!mc->mc_snum || (mc->mc_flags & C_EOF))
+		if (!mc->mc_snum)
 			return MDB_NOTFOUND;
+
+		if (mc->mc_flags & C_EOF) {
+			if (mc->mc_ki[mc->mc_top] >= NUMKEYS(mc->mc_pg[mc->mc_top]))
+				return MDB_NOTFOUND;
+			mc->mc_flags ^= C_EOF;
+		}
 
 		leaf = NODEPTR(mc->mc_pg[mc->mc_top], mc->mc_ki[mc->mc_top]);
 		if (!F_ISSET(leaf->mn_flags, F_DUPDATA)) {
@@ -1461,25 +1468,27 @@ namespace NMib
 	// ---------------------------------------------------------------------------------------------------------------------------------------
 	// Private from here
 	// ---------------------------------------------------------------------------------------------------------------------------------------
-	
+
 	#ifdef DMibDatabaseLowLevel_Always64BitSupport
 	void NDatabase::NPrivate::mdb_cursor_unref(MDB_cursor *mc)
 	{
 		int i;
-		if (!mc->mc_snum || !mc->mc_pg[0] || IS_SUBP(mc->mc_pg[0]))
-			return;
-		for (i=0; i<mc->mc_snum; i++)
-			mdb_page_unref(mc->mc_txn, mc->mc_pg[i]);
-		if (mc->mc_ovpg) {
-			mdb_page_unref(mc->mc_txn, mc->mc_ovpg);
-			mc->mc_ovpg = 0;
+		if (mc->mc_txn->mt_rpages[0].mid) {
+			if (!mc->mc_snum || !mc->mc_pg[0] || IS_SUBP(mc->mc_pg[0]))
+				return;
+			for (i=0; i<mc->mc_snum; i++)
+				mdb_page_unref(mc->mc_txn, mc->mc_pg[i]);
+			if (mc->mc_ovpg) {
+				mdb_page_unref(mc->mc_txn, mc->mc_ovpg);
+				mc->mc_ovpg = 0;
+			}
 		}
 		mc->mc_snum = mc->mc_top = 0;
 		mc->mc_pg[0] = nullptr;
 		mc->mc_flags &= ~C_INITIALIZED;
 	}
 	#endif /* DMibDatabaseLowLevel_Always64BitSupport */
-	
+
 	/** Back up parent txn's cursors, then grab the originals for tracking */
 	void NDatabase::NPrivate::mdb_cursor_shadow(MDB_txn *src, MDB_txn *dst)
 	{
@@ -1494,7 +1503,7 @@ namespace NMib
 				if (mc->mc_xcursor)
 					size += sizeof(MDB_xcursor);
 				for (; mc; mc = bk->mc_next) {
-					bk = (MDB_cursor *)NMem::fg_AllocNoSize(size);
+					bk = (MDB_cursor *)NMemory::fg_Alloc(size);
 					*bk = *mc;
 					mc->mc_backup = bk;
 					mc->mc_db = &dst->mt_dbs[i];
@@ -1514,7 +1523,7 @@ namespace NMib
 			}
 		}
 	}
-	
+
 	/** Close this write txn's cursors, give parent txn's cursors back to parent.
 	 * @param[in] txn the transaction handle.
 	 * @param[in] merge true to keep changes to parent cursors, false to revert.
@@ -1548,12 +1557,12 @@ namespace NMib
 					mc = bk;
 				}
 				/* Only malloced cursors are permanently tracked. */
-				NMem::fg_Free(mc);
+				NMemory::fg_FreeNoSize(mc);
 			}
 			cursors[i] = nullptr;
 		}
 	}
-	
+
 	/** Pop a page off the top of the cursor's stack. */
 	void NDatabase::NPrivate::mdb_cursor_pop(MDB_cursor *mc)
 	{
@@ -1569,7 +1578,9 @@ namespace NMib
 		}
 	}
 
-	/** Push a page onto the top of the cursor's stack. */
+	/** Push a page onto the top of the cursor's stack.
+	 * Set #MDB_TXN_ERROR on failure.
+	 */
 	int NDatabase::NPrivate::mdb_cursor_push(MDB_cursor *mc, MDB_page *mp)
 	{
 		DMibDatabaseLowLevelTrace("pushing page {} on db {} cursor {}", mp->mp_p.p_pgno, DDBI(mc), (void *) mc);
@@ -1654,14 +1665,19 @@ namespace NMib
 		MDB_node	*leaf;
 		int rc;
 
-		if ((mc->mc_flags & C_EOF) ||
-			((mc->mc_flags & C_DEL) && op == MDB_NEXT_DUP)) {
+		if ((mc->mc_flags & C_DEL && op == MDB_NEXT_DUP))
 			return MDB_NOTFOUND;
-		}
+
 		if (!(mc->mc_flags & C_INITIALIZED))
 			return mdb_cursor_first(mc, key, data);
 
 		mp = mc->mc_pg[mc->mc_top];
+
+		if (mc->mc_flags & C_EOF) {
+			if (mc->mc_ki[mc->mc_top] >= NUMKEYS(mp)-1)
+				return MDB_NOTFOUND;
+			mc->mc_flags ^= C_EOF;
+		}
 
 		if (mc->mc_db->md_flags & ELowLevelDatabaseFlag_SortedDuplicates) {
 			leaf = NODEPTR(mp, mc->mc_ki[mc->mc_top]);
@@ -1674,13 +1690,9 @@ namespace NMib
 						return rc;
 					}
 				}
-	#ifdef DMibDatabaseLowLevel_Always64BitSupport
 				else {
-					if (mc->mc_xcursor->mx_cursor.mc_flags & C_INITIALIZED) {
-						mdb_cursor_unref(&mc->mc_xcursor->mx_cursor);
-					}
+					MDB_CURSOR_UNREF(&mc->mc_xcursor->mx_cursor, 0);
 				}
-	#endif
 			} else {
 				mc->mc_xcursor->mx_cursor.mc_flags &= ~(C_INITIALIZED|C_EOF);
 				if (op == MDB_NEXT_DUP)
@@ -1742,7 +1754,7 @@ namespace NMib
 		MDB_node	*leaf;
 		int rc;
 
-		if (!(mc->mc_flags & C_INITIALIZED)) 
+		if (!(mc->mc_flags & C_INITIALIZED))
 		{
 			rc = mdb_cursor_last(mc, key, data);
 			if (rc)
@@ -1752,12 +1764,12 @@ namespace NMib
 
 		mp = mc->mc_pg[mc->mc_top];
 
-		if (mc->mc_db->md_flags & ELowLevelDatabaseFlag_SortedDuplicates) 
+		if (mc->mc_db->md_flags & ELowLevelDatabaseFlag_SortedDuplicates)
 		{
 			leaf = NODEPTR(mp, mc->mc_ki[mc->mc_top]);
 			if (F_ISSET(leaf->mn_flags, F_DUPDATA))
 			{
-				if (op == MDB_PREV || op == MDB_PREV_DUP) 
+				if (op == MDB_PREV || op == MDB_PREV_DUP)
 				{
 					rc = mdb_cursor_prev(&mc->mc_xcursor->mx_cursor, data, nullptr, MDB_PREV);
 					if (op != MDB_PREV || rc != MDB_NOTFOUND)
@@ -1770,13 +1782,9 @@ namespace NMib
 						return rc;
 					}
 				}
-	#ifdef DMibDatabaseLowLevel_Always64BitSupport
-				else
-				{
-					if (mc->mc_xcursor->mx_cursor.mc_flags & C_INITIALIZED)
-						mdb_cursor_unref(&mc->mc_xcursor->mx_cursor);
+				else {
+					MDB_CURSOR_UNREF(&mc->mc_xcursor->mx_cursor, 0);
 				}
-	#endif
 			}
 			else
 			{
@@ -1790,25 +1798,23 @@ namespace NMib
 
 		mc->mc_flags &= ~(C_EOF|C_DEL);
 
-		if (mc->mc_ki[mc->mc_top] == 0)  
+		if (mc->mc_ki[mc->mc_top] == 0)
 		{
 			DPUTS("=====> move to prev sibling page");
-			if ((rc = mdb_cursor_sibling(mc, 0)) != MDB_SUCCESS) 
+			if ((rc = mdb_cursor_sibling(mc, 0)) != MDB_SUCCESS)
 			{
 				return rc;
 			}
 			mp = mc->mc_pg[mc->mc_top];
 			mc->mc_ki[mc->mc_top] = NUMKEYS(mp) - 1;
 			DMibDatabaseLowLevelTrace("prev page is {}, key index {}", mp->mp_p.p_pgno, mc->mc_ki[mc->mc_top]);
-		} 
+		}
 		else
 			mc->mc_ki[mc->mc_top]--;
 
-		mc->mc_flags &= ~C_EOF;
-
 		DMibDatabaseLowLevelTrace("==> cursor points to page {} with {} keys, key index {}", mdb_dbg_pgno(mp), NUMKEYS(mp), mc->mc_ki[mc->mc_top]);
 
-		if (IS_LEAF2(mp)) 
+		if (IS_LEAF2(mp))
 		{
 			key->m_Size = mc->mc_db->md_pad;
 			key->m_pData = LEAF2KEY(mp, mc->mc_ki[mc->mc_top], key->m_Size);
@@ -1818,15 +1824,15 @@ namespace NMib
 		DMibCheck(IS_LEAF(mp));
 		leaf = NODEPTR(mp, mc->mc_ki[mc->mc_top]);
 
-		if (F_ISSET(leaf->mn_flags, F_DUPDATA)) 
+		if (F_ISSET(leaf->mn_flags, F_DUPDATA))
 			mdb_xcursor_init1(mc, leaf);
-		
-		if (data) 
+
+		if (data)
 		{
 			if ((rc = mdb_node_read(mc, leaf, data)) != MDB_SUCCESS)
 				return rc;
 
-			if (F_ISSET(leaf->mn_flags, F_DUPDATA)) 
+			if (F_ISSET(leaf->mn_flags, F_DUPDATA))
 			{
 				rc = mdb_cursor_last(&mc->mc_xcursor->mx_cursor, data, nullptr);
 				if (rc != MDB_SUCCESS)
@@ -1849,8 +1855,10 @@ namespace NMib
 		if (key->m_Size == 0)
 			return MDB_BAD_VALSIZE;
 
-		if (mc->mc_xcursor)
+		if (mc->mc_xcursor) {
+			MDB_CURSOR_UNREF(&mc->mc_xcursor->mx_cursor, 0);
 			mc->mc_xcursor->mx_cursor.mc_flags &= ~(C_INITIALIZED|C_EOF);
+		}
 
 		/* See if we're already on the right page */
 		if (mc->mc_flags & C_INITIALIZED) {
@@ -1916,6 +1924,7 @@ namespace NMib
 							}
 						}
 						rc = 0;
+						mc->mc_flags &= ~C_EOF;
 						goto set2;
 					}
 				}
@@ -1982,11 +1991,6 @@ namespace NMib
 			return MDB_SUCCESS;
 		}
 
-	#ifdef DMibDatabaseLowLevel_Always64BitSupport
-		if (mc->mc_xcursor && mc->mc_xcursor->mx_cursor.mc_flags & C_INITIALIZED) {
-			mdb_cursor_unref(&mc->mc_xcursor->mx_cursor);
-		}
-	#endif
 		if (F_ISSET(leaf->mn_flags, F_DUPDATA)) {
 			mdb_xcursor_init1(mc, leaf);
 		}
@@ -2012,10 +2016,8 @@ namespace NMib
 				if ((rc = mdb_node_read(mc, leaf, &olddata)) != MDB_SUCCESS)
 					return rc;
 				pDataCompare = &(mc->mc_dbx->m_fDataCompare);
-	#if UINT_MAX < SIZE_MAX || defined(DMibDatabaseLowLevel_Always64BitSupport)
-				if (olddata.m_Size == sizeof(CLowLevelSize) && *pDataCompare == g_mdb_cmp_int)
+				if (NEED_CMP_CLONG(*pDataCompare, olddata.m_Size))
 					pDataCompare = &g_mdb_cmp_clong;
-	#endif
 				rc = (*pDataCompare)(*data, olddata);
 				if (rc) {
 					if (op == MDB_GET_BOTH || rc > 0)
@@ -2047,11 +2049,7 @@ namespace NMib
 		MDB_node	*leaf;
 
 		if (mc->mc_xcursor) {
-	#ifdef DMibDatabaseLowLevel_Always64BitSupport
-			if (mc->mc_xcursor->mx_cursor.mc_flags & C_INITIALIZED) {
-				mdb_cursor_unref(&mc->mc_xcursor->mx_cursor);
-			}
-	#endif
+			MDB_CURSOR_UNREF(&mc->mc_xcursor->mx_cursor, 0);
 			mc->mc_xcursor->mx_cursor.mc_flags &= ~(C_INITIALIZED|C_EOF);
 		}
 
@@ -2096,24 +2094,17 @@ namespace NMib
 		MDB_node	*leaf;
 
 		if (mc->mc_xcursor) {
-	#ifdef DMibDatabaseLowLevel_Always64BitSupport
-			if (mc->mc_xcursor->mx_cursor.mc_flags & C_INITIALIZED) {
-				mdb_cursor_unref(&mc->mc_xcursor->mx_cursor);
-			}
-	#endif
+			MDB_CURSOR_UNREF(&mc->mc_xcursor->mx_cursor, 0);
 			mc->mc_xcursor->mx_cursor.mc_flags &= ~(C_INITIALIZED|C_EOF);
 		}
 
-		if (!(mc->mc_flags & C_EOF)) {
-
-			if (!(mc->mc_flags & C_INITIALIZED) || mc->mc_top) {
-				rc = mdb_page_search(mc, nullptr, MDB_PS_LAST);
-				if (rc != MDB_SUCCESS)
-					return rc;
-			}
-			DMibCheck(IS_LEAF(mc->mc_pg[mc->mc_top]));
-
+		if (!(mc->mc_flags & C_INITIALIZED) || mc->mc_top) {
+			rc = mdb_page_search(mc, nullptr, MDB_PS_LAST);
+			if (rc != MDB_SUCCESS)
+				return rc;
 		}
+		DMibCheck(IS_LEAF(mc->mc_pg[mc->mc_top]));
+
 		mc->mc_ki[mc->mc_top] = NUMKEYS(mc->mc_pg[mc->mc_top]) - 1;
 		mc->mc_flags |= C_INITIALIZED|C_EOF;
 		leaf = NODEPTR(mc->mc_pg[mc->mc_top], mc->mc_ki[mc->mc_top]);
@@ -2149,7 +2140,8 @@ namespace NMib
 	{
 		int rc = MDB_SUCCESS;
 
-		if (mc->mc_dbi >= CORE_DBS && !(*mc->mc_dbflag & DB_DIRTY)) {
+		if (mc->mc_dbi >= CORE_DBS && !(*mc->mc_dbflag & (DB_DIRTY|DB_DUPDATA))) {
+			/* Touch DB record of named DB */
 			MDB_cursor mc2;
 			MDB_xcursor mcx;
 			if (TXN_DBI_CHANGED(mc->mc_txn, mc->mc_dbi))
@@ -2169,7 +2161,7 @@ namespace NMib
 		}
 		return rc;
 	}
-	
+
 	/** Initial setup of a sorted-dups cursor.
 	 * Sorted duplicates are implemented as a sub-database for the given key.
 	 * The duplicate data items are actually keys of the sub-database.
@@ -2191,9 +2183,7 @@ namespace NMib
 		mx->mx_cursor.mc_dbflag = &mx->mx_dbflag;
 		mx->mx_cursor.mc_snum = 0;
 		mx->mx_cursor.mc_top = 0;
-	#ifdef DMibDatabaseLowLevel_Always64BitSupport
-		mx->mx_cursor.mc_ovpg = 0;
-	#endif
+		MC_SET_OVPG(&mx->mx_cursor, NULL);
 		mx->mx_cursor.mc_flags = C_SUB | (mc->mc_flags & (C_ORIG_RDONLY|C_WRITEMAP));
 		mx->mx_dbx.m_DatabaseName.m_Size = 0;
 		mx->mx_dbx.m_DatabaseName.m_pData = nullptr;
@@ -2240,11 +2230,9 @@ namespace NMib
 			}
 		}
 		DMibDatabaseLowLevelTrace("Sub-db -{} root page {}", mx->mx_cursor.mc_dbi, mx->mx_db.md_root);
-		mx->mx_dbflag = DB_VALID|DB_USRVALID|DB_DIRTY; /* DB_DIRTY guides mdb_cursor_touch */
-	#if UINT_MAX < SIZE_MAX || defined(DMibDatabaseLowLevel_Always64BitSupport)
-		if (mx->mx_db.md_pad == sizeof(CLowLevelSize) && mx->mx_dbx.m_fKeyCompare == g_mdb_cmp_int)
+		mx->mx_dbflag = DB_VALID|DB_USRVALID|DB_DUPDATA;
+		if (NEED_CMP_CLONG(mx->mx_dbx.m_fKeyCompare, mx->mx_db.md_pad))
 			mx->mx_dbx.m_fKeyCompare = g_mdb_cmp_clong;
-	#endif
 	}
 
 	/** Fixup a sorted-dups cursor due to underlying update.
@@ -2264,8 +2252,8 @@ namespace NMib
 			mx->mx_cursor.mc_top = 0;
 			mx->mx_cursor.mc_flags |= C_INITIALIZED;
 			mx->mx_cursor.mc_ki[0] = 0;
-			mx->mx_dbflag = DB_VALID|DB_USRVALID|DB_DIRTY; /* DB_DIRTY guides mdb_cursor_touch */
-	#if UINT_MAX < SIZE_MAX
+			mx->mx_dbflag = DB_VALID|DB_USRVALID|DB_DUPDATA;
+	#if DMibPPtrBits < DMibDatabaseLowLevel_IDBits	/* matches mdb_xcursor_init1:NEED_CMP_CLONG() */
 			mx->mx_dbx.m_fKeyCompare = src_mx->mx_dbx.m_fKeyCompare;
 	#endif
 		} else if (!(mx->mx_cursor.mc_flags & C_INITIALIZED)) {
@@ -2290,9 +2278,7 @@ namespace NMib
 		mc->mc_top = 0;
 		mc->mc_pg[0] = 0;
 		mc->mc_ki[0] = 0;
-	#ifdef DMibDatabaseLowLevel_Always64BitSupport
-		mc->mc_ovpg = 0;
-	#endif
+		MC_SET_OVPG(mc, NULL);
 		mc->mc_flags = txn->mt_flags & (C_ORIG_RDONLY|C_WRITEMAP);
 		if (txn->mt_dbs[dbi].md_flags & ELowLevelDatabaseFlag_SortedDuplicates) {
 			DMibCheck(mx != nullptr);
@@ -2301,7 +2287,7 @@ namespace NMib
 		} else {
 			mc->mc_xcursor = nullptr;
 		}
-		if (*mc->mc_dbflag & DB_STALE) 
+		if (*mc->mc_dbflag & DB_STALE)
 		{
 			mdb_page_search(mc, nullptr, MDB_PS_ROOTONLY);
 		}
@@ -2322,9 +2308,7 @@ namespace NMib
 		cdst->mc_snum = csrc->mc_snum;
 		cdst->mc_top = csrc->mc_top;
 		cdst->mc_flags = csrc->mc_flags;
-	#ifdef DMibDatabaseLowLevel_Always64BitSupport
-		cdst->mc_ovpg = csrc->mc_ovpg;
-	#endif
+		MC_SET_OVPG(cdst, MC_OVPG(csrc));
 
 		for (i=0; i<csrc->mc_snum; i++) {
 			cdst->mc_pg[i] = csrc->mc_pg[i];
@@ -2357,14 +2341,15 @@ namespace NMib
 				if (m3->mc_pg[mc->mc_top] == mp) {
 					if (m3->mc_ki[mc->mc_top] == ki) {
 						m3->mc_flags |= C_DEL;
+						if (mc->mc_db->md_flags & ELowLevelDatabaseFlag_SortedDuplicates) {
+							/* Sub-cursor referred into dataset which is gone */
+							m3->mc_xcursor->mx_cursor.mc_flags &= ~(C_INITIALIZED|C_EOF);
+						}
+						continue;
 					} else if (m3->mc_ki[mc->mc_top] > ki) {
 						m3->mc_ki[mc->mc_top]--;
 					}
-					if (m3->mc_xcursor && (m3->mc_xcursor->mx_cursor.mc_flags & C_INITIALIZED)) {
-						MDB_node *node = NODEPTR(m3->mc_pg[mc->mc_top], m3->mc_ki[mc->mc_top]);
-						if ((node->mn_flags & (F_DUPDATA|F_SUBDATA)) == F_DUPDATA)
-							m3->mc_xcursor->mx_cursor.mc_pg[0] = (MDB_page *)NODEDATA(node);
-					}
+					XCURSOR_REFRESH(m3, mc->mc_top, mp);
 				}
 			}
 		}
@@ -2401,9 +2386,20 @@ namespace NMib
 						}
 						if (mc->mc_db->md_flags & ELowLevelDatabaseFlag_SortedDuplicates) {
 							MDB_node *node = NODEPTR(m3->mc_pg[m3->mc_top], m3->mc_ki[m3->mc_top]);
+							/* If this node has dupdata, it may need to be reinited
+							 * because its data has moved.
+							 * If the xcursor was not initd it must be reinited.
+							 * Else if node points to a subDB, nothing is needed.
+							 * Else (xcursor was initd, not a subDB) needs mc_pg[0] reset.
+							 */
 							if (node->mn_flags & F_DUPDATA) {
-								mdb_xcursor_init1(m3, node);
-								m3->mc_xcursor->mx_cursor.mc_flags |= C_DEL;
+								if (m3->mc_xcursor->mx_cursor.mc_flags & C_INITIALIZED) {
+									if (!(node->mn_flags & F_SUBDATA))
+										m3->mc_xcursor->mx_cursor.mc_pg[0] = (MDB_page *)NODEDATA(node);
+								} else {
+									mdb_xcursor_init1(m3, node);
+									m3->mc_xcursor->mx_cursor.mc_flags |= C_DEL;
+								}
 							}
 						}
 					}
@@ -2415,5 +2411,5 @@ namespace NMib
 		if (rc)
 			mc->mc_txn->mt_flags |= MDB_TXN_ERROR;
 		return rc;
-	}		
+	}
 }

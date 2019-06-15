@@ -1,26 +1,26 @@
-// Copyright © 2016 Hansoft AB 
+// Copyright © 2016 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 /*
  This code is derived from lmdb with the following copyright:
- 
+
  Copyright 2011-2016 Howard Chu, Symas Corp. All rights reserved.
- 
+
  Redistribution and use in source and binary forms, with or without
  modification, are permitted only as authorized by the OpenLDAP
  Public License.
- 
+
  A copy of this license is available in the file LICENSE.OpenLDAP in the
  top-level directory of the distribution or, alternatively, at
  <http://www.OpenLDAP.org/license.html>.
- 
+
  This code is derived from btree.c written by Martin Hedenfalk.
- 
+
  Copyright (c) 2009, 2010 Martin Hedenfalk <martin@bzero.se>
- 
+
  Permission to use, copy, modify, and distribute this software for any
  purpose with or without fee is hereby granted, provided that the above
  copyright notice and this permission notice appear in all copies.
- 
+
  THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
  WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
  MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
@@ -43,7 +43,11 @@ namespace NMib
 	{
 		MDB_reader *reader = (MDB_reader *)ptr;
 
-		reader->m_OwningProcessID = 0;
+#ifndef DPlatformFamily_Windows
+		if (reader->m_OwningProcessID == getpid()) /* catch pthread_exit() in child process */
+#endif
+			/* We omit the mutex, so do this atomically (i.e. skip mr_txnid) */
+			reader->m_OwningProcessID = 0;
 	}
 
 	#ifdef DPlatformFamily_Windows
@@ -55,7 +59,7 @@ namespace NMib
 	#ifndef MAX_TLS_KEYS
 	#define MAX_TLS_KEYS	64
 	#endif
-	namespace 
+	namespace
 	{
 		pthread_key_t mdb_tls_keys[MAX_TLS_KEYS];
 		int mdb_tls_nkeys;

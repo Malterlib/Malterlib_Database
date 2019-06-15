@@ -1,4 +1,4 @@
-// Copyright © 2016 Hansoft AB 
+// Copyright © 2016 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #pragma once
@@ -16,9 +16,9 @@ namespace NMib
 			typename tf_CStr::CFormat Formatter{"{nfh,sf0,sj2}"};
 			uint8 ValueToFormat;
 			Formatter << ValueToFormat;
-			
+
 			o_String += "[";
-			
+
 			for (uint8 const *pData = m_pData; pData != pDataEnd; ++pData)
 			{
 				ValueToFormat = *pData;

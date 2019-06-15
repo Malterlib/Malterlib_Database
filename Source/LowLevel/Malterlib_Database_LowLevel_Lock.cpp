@@ -1,26 +1,26 @@
-// Copyright © 2016 Hansoft AB 
+// Copyright © 2016 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 /*
  This code is derived from lmdb with the following copyright:
- 
+
  Copyright 2011-2016 Howard Chu, Symas Corp. All rights reserved.
- 
+
  Redistribution and use in source and binary forms, with or without
  modification, are permitted only as authorized by the OpenLDAP
  Public License.
- 
+
  A copy of this license is available in the file LICENSE.OpenLDAP in the
  top-level directory of the distribution or, alternatively, at
  <http://www.OpenLDAP.org/license.html>.
- 
+
  This code is derived from btree.c written by Martin Hedenfalk.
- 
+
  Copyright (c) 2009, 2010 Martin Hedenfalk <martin@bzero.se>
- 
+
  Permission to use, copy, modify, and distribute this software for any
  purpose with or without fee is hereby granted, provided that the above
  copyright notice and this permission notice appear in all copies.
- 
+
  THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
  WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
  MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
@@ -78,7 +78,7 @@ namespace NMib
 		}
 	#endif
 	}
-	
+
 
 	/** Insert pid into list if not already present.
 	 * return -1 if already present.
@@ -130,11 +130,10 @@ namespace NMib
 		mint nDead = 0;
 
 		rdrs = m_pLocksMemoryMap->mti_numreaders;
-		pids = (CProcessID *)NMem::fg_AllocNoSize((rdrs+1) * sizeof(CProcessID));
-		auto Cleanup = g_OnScopeExit > 
-			[&]
+		pids = (CProcessID *)NMemory::fg_Alloc((rdrs+1) * sizeof(CProcessID));
+		auto Cleanup = g_OnScopeExit > [&]
 			{
-				NMem::fg_Free(pids);
+				NMemory::fg_FreeNoSize(pids);
 			}
 		;
 		pids[0] = 0;
@@ -221,7 +220,7 @@ namespace NMib
 				DMibDatabaseLowLevelTrace("LOCK_MUTEX recovery failed, {}", mdb_strerror(rc));
 				UNLOCK_MUTEX(mutex);
 			}
-		} 
+		}
 		else
 		{
 	#ifdef DPlatformFamily_Windows
@@ -232,7 +231,7 @@ namespace NMib
 		return rc;
 	}
 	#endif	/* MDB_ROBUST_SUPPORTED */
-	
+
 	/** Open and/or initialize the lock region for the environment.
 	 * @param[in] _LockPath The pathname of the file used for the lock region.
 	 * @param[in] mode The Unix permissions for the file, if we create it.
@@ -245,12 +244,6 @@ namespace NMib
 	#	define MDB_ERRCODE_ROFS	ERROR_WRITE_PROTECT
 	#else
 	#	define MDB_ERRCODE_ROFS	EROFS
-	#ifdef O_CLOEXEC	/* Linux: Open file and set FD_CLOEXEC atomically */
-	#	define MDB_CLOEXEC		O_CLOEXEC
-	#else
-		int fdflags;
-	#	define MDB_CLOEXEC		0
-	#endif
 	#endif
 	#ifdef MDB_USE_SYSV_SEM
 		int semid;
@@ -258,23 +251,17 @@ namespace NMib
 	#endif
 		off_t size, rsize;
 
-	#ifdef DPlatformFamily_Windows
-		me_lfd = CreateFileW(NStr::CWStr(_LockPath).f_GetStr(), GENERIC_READ|GENERIC_WRITE, FILE_SHARE_READ|FILE_SHARE_WRITE, nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
-	#else
-		me_lfd = open(_LockPath, O_RDWR|O_CREAT|MDB_CLOEXEC, mode);
-	#endif
-		if (me_lfd == INVALID_HANDLE_VALUE)
+		NStr::CStr LockPath = mdb_getfilename(_LockPath, MDB_O_LOCKS);
 		{
-			int rc = ErrCode();
-			if (rc == MDB_ERRCODE_ROFS && (me_flags & ELowLevelEnvironmentFlag_ReadOnly)) 
-				return;
-			DMibError(NStr::fg_Format("Error opening lock file: {}", mdb_strerror(rc)));
+			int rc = mdb_fopen(_LockPath, MDB_O_LOCKS, mode, &me_lfd);
+			if (rc) {
+				/* Omit lockfile if read-only env on read-only filesystem */
+				if (rc == MDB_ERRCODE_ROFS && (me_flags & ELowLevelEnvironmentFlag_ReadOnly))
+					return;
+
+				DMibError(NStr::fg_Format("Error opening lock file: {}", mdb_strerror(rc)));
+			}
 		}
-	#if ! ((MDB_CLOEXEC) || defined(DPlatformFamily_Windows))
-		/* Lose record locks when exec*() */
-		if ((fdflags = fcntl(me_lfd, F_GETFD) | FD_CLOEXEC) >= 0)
-				fcntl(me_lfd, F_SETFD, fdflags);
-	#endif
 
 		if (!(me_flags & ELowLevelEnvironmentFlag_NoTls)) {
 			int rc = pthread_key_create(&me_txkey, mdb_env_reader_dest);
@@ -302,7 +289,7 @@ namespace NMib
 		size = GetFileSize(me_lfd, nullptr);
 	#else
 		size = lseek(me_lfd, 0, SEEK_END);
-		if (size == -1) 
+		if (size == -1)
 			goto fail_errno;
 	#endif
 		rsize = (m_MaxReaders-1) * sizeof(MDB_reader) + sizeof(CLocksMemoryMap);
@@ -335,8 +322,8 @@ namespace NMib
 			m_pLocksMemoryMap = (CLocksMemoryMap	*)m;
 	#endif
 		}
-		
-		if (*excl > 0) 
+
+		if (*excl > 0)
 		{
 	#ifdef DPlatformFamily_Windows
 			BY_HANDLE_FILE_INFORMATION stbuf;
@@ -345,8 +332,6 @@ namespace NMib
 				DWORD nhigh;
 				DWORD nlow;
 			} idbuf;
-			CLowLevelValue val;
-			char encbuf[11];
 
 			if (!mdb_sec_inited) {
 				InitializeSecurityDescriptor(&mdb_null_sd,
@@ -361,14 +346,11 @@ namespace NMib
 			idbuf.volume = stbuf.dwVolumeSerialNumber;
 			idbuf.nhigh  = stbuf.nFileIndexHigh;
 			idbuf.nlow   = stbuf.nFileIndexLow;
-			val.m_pData = &idbuf;
-			val.m_Size = sizeof(idbuf);
-			mdb_hash_enc(&val, encbuf);
-			sprintf(m_pLocksMemoryMap->mti_rmname, "Global\\MDBr%s", encbuf);
-			sprintf(m_pLocksMemoryMap->mti_wmname, "Global\\MDBw%s", encbuf);
-			me_rmutex = CreateMutexA(&mdb_all_sa, FALSE, m_pLocksMemoryMap->mti_rmname);
+			m_pLocksMemoryMap->mti_mutexid = mdb_hash(&idbuf, sizeof(idbuf));
+			mdb_env_mname_init(env);
+			me_rmutex = CreateMutexA(&mdb_all_sa, FALSE, MUTEXNAME(env, 'r'));
 			if (!me_rmutex) goto fail_errno;
-			me_wmutex = CreateMutexA(&mdb_all_sa, FALSE, m_pLocksMemoryMap->mti_wmname);
+			me_wmutex = CreateMutexA(&mdb_all_sa, FALSE, MUTEXNAME(env, 'w'));
 			if (!me_wmutex) goto fail_errno;
 	#elif defined(MDB_USE_POSIX_SEM)
 			struct stat stbuf;
@@ -376,37 +358,35 @@ namespace NMib
 				dev_t dev;
 				ino_t ino;
 			} idbuf;
-			CLowLevelValue val;
-			char encbuf[11];
 
 	#if defined(__NetBSD__)
 	#define	MDB_SHORT_SEMNAMES	1	/* limited to 14 chars */
 	#endif
 			if (fstat(me_lfd, &stbuf)) goto fail_errno;
+			memset(&idbuf, 0, sizeof(idbuf));
 			idbuf.dev = stbuf.st_dev;
 			idbuf.ino = stbuf.st_ino;
-			val.m_pData = &idbuf;
-			val.m_Size = sizeof(idbuf);
-			mdb_hash_enc(&val, encbuf);
+			m_pLocksMemoryMap->mti_mutexid = mdb_hash(&idbuf, sizeof(idbuf))
 	#ifdef MDB_SHORT_SEMNAMES
-			encbuf[9] = '\0';	/* drop name from 15 chars to 14 chars */
+				/* Max 9 base85-digits.  We truncate here instead of in
+				 * mdb_env_mname_init() to keep the latter portable.
+				 */
+				% ((mdb_hash_t)85*85*85*85*85*85*85*85*85)
 	#endif
-			sprintf(m_pLocksMemoryMap->mti_rmname, "/MDBr%s", encbuf);
-			sprintf(m_pLocksMemoryMap->mti_wmname, "/MDBw%s", encbuf);
+				;
+			mdb_env_mname_init(env);
 			/* Clean up after a previous run, if needed:  Try to
 			 * remove both semaphores before doing anything else.
 			 */
-			sem_unlink(m_pLocksMemoryMap->mti_rmname);
-			sem_unlink(m_pLocksMemoryMap->mti_wmname);
-			me_rmutex = sem_open(m_pLocksMemoryMap->mti_rmname,
-				O_CREAT|O_EXCL, mode, 1);
+			sem_unlink(MUTEXNAME(env, 'r'));
+			sem_unlink(MUTEXNAME(env, 'w'));
+			me_rmutex = sem_open(MUTEXNAME(env, 'r'), O_CREAT|O_EXCL, mode, 1);
 			if (me_rmutex == SEM_FAILED) goto fail_errno;
-			me_wmutex = sem_open(m_pLocksMemoryMap->mti_wmname,
-				O_CREAT|O_EXCL, mode, 1);
+			me_wmutex = sem_open(MUTEXNAME(env, 'w'), O_CREAT|O_EXCL, mode, 1);
 			if (me_wmutex == SEM_FAILED) goto fail_errno;
 	#elif defined(MDB_USE_SYSV_SEM)
 			unsigned short vals[2] = {1, 1};
-			key_t key = ftok(_LockPath, 'M');
+			key_t key = ftok(LockPath.f_GetStr(), 'M'); /* fname is lockfile path now */
 			if (key == -1)
 				goto fail_errno;
 			semid = semget(key, 2, (mode & 0777) | IPC_CREAT);
@@ -416,6 +396,8 @@ namespace NMib
 			if (semctl(semid, 0, SETALL, semu) < 0)
 				goto fail_errno;
 			m_pLocksMemoryMap->mti_semid = semid;
+			m_pLocksMemoryMap->mti_rlocked = 0;
+			m_pLocksMemoryMap->mti_wlocked = 0;
 	#else	/* MDB_USE_POSIX_MUTEX: */
 			pthread_mutexattr_t mattr;
 
@@ -426,23 +408,17 @@ namespace NMib
 			memset(m_pLocksMemoryMap->mti_rmutex, 0, sizeof(*m_pLocksMemoryMap->mti_rmutex));
 			memset(m_pLocksMemoryMap->mti_wmutex, 0, sizeof(*m_pLocksMemoryMap->mti_wmutex));
 
-			{
-				int rc;
-				if
-					(
-						(rc = pthread_mutexattr_init(&mattr))
-						|| (rc = pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED))
-#ifdef MDB_ROBUST_SUPPORTED
-						|| (rc = pthread_mutexattr_setrobust(&mattr, PTHREAD_MUTEX_ROBUST))
-#endif
-						|| (rc = pthread_mutex_init(m_pLocksMemoryMap->mti_rmutex, &mattr))
-						|| (rc = pthread_mutex_init(m_pLocksMemoryMap->mti_wmutex, &mattr))
-					)
-				{
-					DMibError(NStr::fg_Format("Error initializing pthread mutex: {}", mdb_strerror(rc)));
-				}
-			}
+			if ((rc = pthread_mutexattr_init(&mattr)) != 0)
+				goto fail;
+			rc = pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
+	#ifdef MDB_ROBUST_SUPPORTED
+			if (!rc) rc = pthread_mutexattr_setrobust(&mattr, PTHREAD_MUTEX_ROBUST);
+	#endif
+			if (!rc) rc = pthread_mutex_init(m_pLocksMemoryMap->mti_rmutex, &mattr);
+			if (!rc) rc = pthread_mutex_init(m_pLocksMemoryMap->mti_wmutex, &mattr);
 			pthread_mutexattr_destroy(&mattr);
+			if (rc)
+				goto fail;
 	#endif	/* DPlatformFamily_Windows || ... */
 
 			m_pLocksMemoryMap->mti_magic = MDB_MAGIC;
@@ -450,32 +426,34 @@ namespace NMib
 			m_pLocksMemoryMap->mti_txnid = 0;
 			m_pLocksMemoryMap->mti_numreaders = 0;
 
-		} 
-		else 
+		}
+		else
 		{
 	#ifdef MDB_USE_SYSV_SEM
 			struct semid_ds buf;
 	#endif
 			if (m_pLocksMemoryMap->mti_magic != MDB_MAGIC)
 				DMibError("Lock region has invalid magic");
-			
-			if (m_pLocksMemoryMap->mti_format != MDB_LOCK_FORMAT) 
+
+			if (m_pLocksMemoryMap->mti_format != MDB_LOCK_FORMAT)
 				DMibError(NStr::fg_Format("Lock region has format+version 0x{nfh,sf0,sj8}, expected 0x{nfh,sf0,sj8}", m_pLocksMemoryMap->mti_format, uint32(MDB_LOCK_FORMAT)));
-			
+
 			{
 				int rc = ErrCode();
 				if (rc && rc != EACCES && rc != EAGAIN)
 					DMibError(NStr::fg_Format("Error setting up locks: {}", mdb_strerror(rc)));
 			}
 	#ifdef DPlatformFamily_Windows
-			me_rmutex = OpenMutexA(SYNCHRONIZE, FALSE, m_pLocksMemoryMap->mti_rmname);
+			mdb_env_mname_init(this);
+			me_rmutex = OpenMutexA(SYNCHRONIZE, FALSE, MUTEXNAME(env, 'r'));
 			if (!me_rmutex) goto fail_errno;
-			me_wmutex = OpenMutexA(SYNCHRONIZE, FALSE, m_pLocksMemoryMap->mti_wmname);
+			me_wmutex = OpenMutexA(SYNCHRONIZE, FALSE, MUTEXNAME(env, 'w'));
 			if (!me_wmutex) goto fail_errno;
 	#elif defined(MDB_USE_POSIX_SEM)
-			me_rmutex = sem_open(m_pLocksMemoryMap->mti_rmname, 0);
+			mdb_env_mname_init(env);
+			me_rmutex = sem_open(MUTEXNAME(env, 'r'), 0);
 			if (me_rmutex == SEM_FAILED) goto fail_errno;
-			me_wmutex = sem_open(m_pLocksMemoryMap->mti_wmname, 0);
+			me_wmutex = sem_open(MUTEXNAME(env, 'w'), 0);
 			if (me_wmutex == SEM_FAILED) goto fail_errno;
 	#elif defined(MDB_USE_SYSV_SEM)
 			semid = m_pLocksMemoryMap->mti_semid;
@@ -496,13 +474,6 @@ namespace NMib
 		me_rmutex->locked = &m_pLocksMemoryMap->mti_rlocked;
 		me_wmutex->locked = &m_pLocksMemoryMap->mti_wlocked;
 	#endif
-	#ifdef DMibDatabaseLowLevel_Always64BitSupport
-	#ifdef DPlatformFamily_Windows
-		me_rpmutex = CreateMutex(nullptr, FALSE, nullptr);
-	#else
-		pthread_mutex_init(&me_rpmutex, nullptr);
-	#endif
-	#endif
 
 		return;
 
@@ -512,14 +483,11 @@ namespace NMib
 			DMibError(NStr::fg_Format("Error setting up locks: {}", mdb_strerror(rc)));
 		}
 	}
-	
+
 	/** Downgrade the exclusive lock on the region back to shared */
 	int DMibDatabaseInfrequentSection NDatabase::CLowLevelEnvironment_Internal::mdb_env_share_locks(int *excl)
 	{
 		int rc = 0;
-		MDB_meta *meta = mdb_env_pick_meta();
-
-		m_pLocksMemoryMap->mti_txnid = meta->mm_txnid;
 
 	#ifdef DPlatformFamily_Windows
 		{

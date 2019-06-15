@@ -40,7 +40,7 @@ namespace
 						CLowLevelValue Value;
 						Value.m_pData = KeyData.f_GetArray(); 
 						Value.m_Size = KeyData.f_GetLen(); 
-						fp32 TestValue = NMib::NContainer::fg_Get<0>(fg_DecodeValue<fp32>(Value));
+						fp32 TestValue = fg_Get<0>(fg_DecodeValue<fp32>(Value));
 						return TestValue; 
 					}
 				;
@@ -92,7 +92,7 @@ namespace
 				for (uint32 iExpectedOrder = 0; iData; ++iData, ++iExpectedOrder)
 				{
 					auto &Value = iData.f_Value();
-					auto DecodedOrder = NContainer::fg_Get<0>(fg_DecodeValue<uint32>(Value));
+					auto DecodedOrder = fg_Get<0>(fg_DecodeValue<uint32>(Value));
 					DMibExpect(DecodedOrder, ==, iExpectedOrder)(ETestFlag_Aggregated);
 				}
 			};

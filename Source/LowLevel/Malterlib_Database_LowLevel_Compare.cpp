@@ -1,26 +1,26 @@
-// Copyright © 2016 Hansoft AB 
+// Copyright © 2016 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 /*
  This code is derived from lmdb with the following copyright:
- 
+
  Copyright 2011-2016 Howard Chu, Symas Corp. All rights reserved.
- 
+
  Redistribution and use in source and binary forms, with or without
  modification, are permitted only as authorized by the OpenLDAP
  Public License.
- 
+
  A copy of this license is available in the file LICENSE.OpenLDAP in the
  top-level directory of the distribution or, alternatively, at
  <http://www.OpenLDAP.org/license.html>.
- 
+
  This code is derived from btree.c written by Martin Hedenfalk.
- 
+
  Copyright (c) 2009, 2010 Martin Hedenfalk <martin@bzero.se>
- 
+
  Permission to use, copy, modify, and distribute this software for any
  purpose with or without fee is hereby granted, provided that the above
  copyright notice and this permission notice appear in all copies.
- 
+
  THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
  WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
  MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
@@ -46,25 +46,25 @@ namespace NMib
 	{
 		auto &Database = txn->mt_dbs[dbi];
 		auto &LocalDatabase = txn->mt_dbxs[dbi];
-		
+
 		uint16 f = Database.md_flags;
-		
+
 		FLowLevelCompare fKeyCompare;
-		
+
 		if (f & ELowLevelDatabaseFlag_ReverseKeys)
 			fKeyCompare = g_mdb_cmp_memnr;
-		else 
+		else
 		{
 			if (f & ELowLevelDatabaseFlag_IntegerKeys)
 				fKeyCompare = g_mdb_cmp_cint;
 			else
 				fKeyCompare = g_mdb_cmp_memn;
 		}
-		
-		LocalDatabase.m_fKeyCompare = fKeyCompare;
-		
+
+		LocalDatabase.m_fKeyCompare = fg_Move(fKeyCompare);
+
 		FLowLevelCompare fDataCompare;
-		
+
 		if (!(f & ELowLevelDatabaseFlag_SortedDuplicates))
 			;
 		else
@@ -84,11 +84,11 @@ namespace NMib
 					fDataCompare = g_mdb_cmp_memn;
 			}
 		}
-		
-		LocalDatabase.m_fDataCompare = fDataCompare;
+
+		LocalDatabase.m_fDataCompare = fg_Move(fDataCompare);
 	}
-	
-	/** Compare two items pointing at aligned CLowLevelSize's */
+
+	/** Compare two items pointing at aligned #CLowLevelSize's */
 	int NDatabase::NPrivate::mdb_cmp_long(CLowLevelValue const &_Left, CLowLevelValue const &_Right)
 	{
 		return (*(CLowLevelSize *)_Left.m_pData < *(CLowLevelSize *)_Right.m_pData) ? -1 :
@@ -98,7 +98,7 @@ namespace NMib
 	/** Compare two items pointing at aligned unsigned int's.
 	 *
 	 *	This is also set as #ELowLevelDatabaseFlag_SortedDuplicatesIntegerKeys|#ELowLevelDatabaseFlag_SortedDuplicatesFixedSize's #MDB_dbx.%m_fDataCompare,
-	 *	but #mdb_cmp_clong() is called instead if the data type is CLowLevelSize.
+	 *	but #mdb_cmp_clong() is called instead if the data type is #CLowLevelSize.
 	 */
 	int NDatabase::NPrivate::mdb_cmp_int(CLowLevelValue const &_Left, CLowLevelValue const &_Right)
 	{
@@ -177,7 +177,7 @@ namespace NMib
 		}
 		return len_diff<0 ? -1 : len_diff;
 	}
-	
+
 	NDatabase::FLowLevelCompare NDatabase::NPrivate::g_mdb_cmp_memn = NPrivate::mdb_cmp_memn;
 	NDatabase::FLowLevelCompare NDatabase::NPrivate::g_mdb_cmp_memnr = NPrivate::mdb_cmp_memnr;
 	NDatabase::FLowLevelCompare NDatabase::NPrivate::g_mdb_cmp_int = NPrivate::mdb_cmp_int;

@@ -1,17 +1,17 @@
-// Copyright © 2016 Hansoft AB 
+// Copyright © 2016 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 /*
  This code is derived from lmdb with the following copyright:
 
  This work is part of OpenLDAP Software <http://www.openldap.org/>.
- 
+
  Copyright 2000-2016 The OpenLDAP Foundation.
  All rights reserved.
- 
+
  Redistribution and use in source and binary forms, with or without
  modification, are permitted only as authorized by the OpenLDAP
  Public License.
- 
+
  A copy of this license is available in the file LICENSE.OpenLDAP in the
  top-level directory of the distribution or, alternatively, at
  <http://www.OpenLDAP.org/license.html>.
@@ -20,10 +20,11 @@
 #pragma once
 
 #include <Mib/Core/Core>
+#include "Malterlib_Database_LowLevel.h"
 
 namespace NMib::NDatabase::NPrivate
 {
-	/** @defgroup internal	LMDB Internals 
+	/** @defgroup internal	LMDB Internals
 	 *	@{
 	 */
 
@@ -33,11 +34,8 @@ namespace NMib::NDatabase::NPrivate
 		/** A generic unsigned ID number. These were entryIDs in back-bdb.
 		 *	Preferably it should have the same size as a pointer.
 		 */
-	#ifdef DMibDatabaseLowLevel_Always64BitSupport
-	typedef uint64 MDB_ID;
-	#else
-	typedef mint MDB_ID;
-	#endif
+
+	using MDB_ID = CLowLevelSize;
 
 		/** An IDL is an ID List, a sorted array of IDs. The first
 		 * element of the array is a counter for how many actual
@@ -50,11 +48,7 @@ namespace NMib::NDatabase::NPrivate
 	/* IDL sizes - likely should be even bigger
 	 *   limiting factors: sizeof(ID), thread stack size
 	 */
-	#ifdef DMibDatabaseLowLevel_Always64BitSupport
-	#define	MDB_IDL_LOGN	14	/* DB_SIZE is 2^14, UM_SIZE is 2^15 */
-	#else
 	#define	MDB_IDL_LOGN	16	/* DB_SIZE is 2^16, UM_SIZE is 2^17 */
-	#endif
 	#define MDB_IDL_DB_SIZE		(1<<MDB_IDL_LOGN)
 	#define MDB_IDL_UM_SIZE		(1<<(MDB_IDL_LOGN+1))
 

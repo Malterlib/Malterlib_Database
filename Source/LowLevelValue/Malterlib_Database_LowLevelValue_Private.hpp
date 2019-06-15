@@ -20,17 +20,17 @@ namespace NMib::NDatabase
 		};
 		
 		template <typename ...tfp_CValue, mint ...tfp_Indices>
-		NContainer::TCTuple<typename NPrivate::TCGetDescending<tfp_CValue>::CType...> fg_DecodeOrderedByteArrayImpl(CLowLevelValue const &_Value, NMeta::TCIndices<tfp_Indices...> _Dummy)
+		NStorage::TCTuple<typename NPrivate::TCGetDescending<tfp_CValue>::CType...> fg_DecodeOrderedByteArrayImpl(CLowLevelValue const &_Value, NMeta::TCIndices<tfp_Indices...> _Dummy)
 		{
 			NStream::CBinaryStreamMemoryPtr<NStream::CBinaryStreamBigEndian> Stream;
 			Stream.f_OpenRead(_Value.m_pData, _Value.m_Size);
-			NContainer::TCTuple<typename NPrivate::TCGetDescending<tfp_CValue>::CType...> Values;
+			NStorage::TCTuple<typename NPrivate::TCGetDescending<tfp_CValue>::CType...> Values;
 			
 			std::initializer_list<bool> Dummy =
 				{
 					[&]
 					{
-						fg_Decode(Stream, NContainer::fg_Get<tfp_Indices>(Values));
+						fg_Decode(Stream, fg_Get<tfp_Indices>(Values));
 						return true;
 					}
 					()...

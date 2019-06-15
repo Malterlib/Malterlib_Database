@@ -1,26 +1,26 @@
-// Copyright © 2016 Hansoft AB 
+// Copyright © 2016 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 /*
  This code is derived from lmdb with the following copyright:
- 
+
  Copyright 2011-2016 Howard Chu, Symas Corp. All rights reserved.
- 
+
  Redistribution and use in source and binary forms, with or without
  modification, are permitted only as authorized by the OpenLDAP
  Public License.
- 
+
  A copy of this license is available in the file LICENSE.OpenLDAP in the
  top-level directory of the distribution or, alternatively, at
  <http://www.OpenLDAP.org/license.html>.
- 
+
  This code is derived from btree.c written by Martin Hedenfalk.
- 
+
  Copyright (c) 2009, 2010 Martin Hedenfalk <martin@bzero.se>
- 
+
  Permission to use, copy, modify, and distribute this software for any
  purpose with or without fee is hereby granted, provided that the above
  copyright notice and this permission notice appear in all copies.
- 
+
  THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
  WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
  MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
@@ -47,26 +47,26 @@ namespace NMib
 			: mp_DatabaseID(_DatabaseID)
 		{
 		}
-		
+
 		CLowLevelDatabaseReadTransaction CLowLevelDatabase::f_Transaction(CLowLevelReadTransaction const &_Transaction)
 		{
 			if (mp_DatabaseID == TCLimitsInt<uint32>::mc_Max)
 				DMibError("Invalid database");
 			return {_Transaction.mp_pTransaction.f_Get(), mp_DatabaseID};
 		}
-		
+
 		CLowLevelDatabaseWriteTransaction CLowLevelDatabase::f_Transaction(CLowLevelWriteTransaction const &_Transaction)
 		{
 			if (mp_DatabaseID == TCLimitsInt<uint32>::mc_Max)
 				DMibError("Invalid database");
 			return {_Transaction.mp_pTransaction.f_Get(), mp_DatabaseID};
 		}
-		
+
 		CLowLevelStatistics CLowLevelDatabaseReadTransaction::f_DatabaseStatistics()
 		{
 			return mp_pTransaction->f_DatabaseStatistics(mp_DatabaseID);
 		}
-		
+
 		uint32 CLowLevelDatabaseReadTransaction::f_DatabaseFlags()
 		{
 			return mp_pTransaction->f_DatabaseFlags(mp_DatabaseID);
@@ -76,12 +76,12 @@ namespace NMib
 		{
 			return mp_pTransaction->f_Get(mp_DatabaseID, const_cast<CLowLevelValue *>(&_Key), &o_Value);
 		}
-		
+
 		int CLowLevelDatabaseReadTransaction::f_KeyCompare(CLowLevelValue const &_Left, CLowLevelValue const &_Right)
 		{
 			return mp_pTransaction->f_KeyCompare(mp_DatabaseID, &_Left, &_Right);
 		}
-		
+
 		int CLowLevelDatabaseReadTransaction::f_DataCompare(CLowLevelValue const &_Left, CLowLevelValue const &_Right)
 		{
 			return mp_pTransaction->f_DataCompare(mp_DatabaseID, &_Left, &_Right);
@@ -89,13 +89,13 @@ namespace NMib
 
 		CLowLevelCursor CLowLevelDatabaseReadTransaction::f_ReadCursor()
 		{
-			NPtr::TCUniquePointer<CLowLevelCursorCommon::CInternal> pCursor = fg_Explicit(mp_pTransaction->f_Cursor(mp_DatabaseID));
+			NStorage::TCUniquePointer<CLowLevelCursorCommon::CInternal> pCursor = fg_Explicit(mp_pTransaction->f_Cursor(mp_DatabaseID));
 			return fg_Move(pCursor);
 		}
-		
+
 		CLowLevelCursorDuplicateData CLowLevelDatabaseReadTransaction::f_ReadCursorDuplicateData()
 		{
-			NPtr::TCUniquePointer<CLowLevelCursorCommon::CInternal> pCursor = fg_Explicit(mp_pTransaction->f_Cursor(mp_DatabaseID));
+			NStorage::TCUniquePointer<CLowLevelCursorCommon::CInternal> pCursor = fg_Explicit(mp_pTransaction->f_Cursor(mp_DatabaseID));
 			return fg_Move(pCursor);
 		}
 
@@ -109,7 +109,7 @@ namespace NMib
 		{
 			return mp_pTransaction->f_DropDatabase(mp_DatabaseID, _bDelete);
 		}
-		
+
 		void CLowLevelDatabaseWriteTransaction::f_Insert(CLowLevelValue const &_Key, CLowLevelValue const &_Value, bool _bAppend)
 		{
 			auto &Transaction = *mp_pTransaction;
@@ -120,7 +120,7 @@ namespace NMib
 				Flags |= ELowLevelWriteFlag_NoDuplicateData;
 			Transaction.f_Put(mp_DatabaseID, &Key, &Value, Flags);
 		}
-		
+
 		CLowLevelValue CLowLevelDatabaseWriteTransaction::f_Insert(CLowLevelValue const &_Key, mint _DataSize, bool _bAppend)
 		{
 			auto &Transaction = *mp_pTransaction;
@@ -131,7 +131,7 @@ namespace NMib
 			Transaction.f_Put(mp_DatabaseID, &Key, &Value, Flags);
 			return Value;
 		}
-		
+
 		void CLowLevelDatabaseWriteTransaction::f_Upsert(CLowLevelValue const &_Key, CLowLevelValue const &_Value, bool _bAppend)
 		{
 			auto &Transaction = *mp_pTransaction;
@@ -140,7 +140,7 @@ namespace NMib
 			auto Flags = (_bAppend ? ELowLevelWriteFlag_Append : ELowLevelWriteFlag_None);
 			Transaction.f_Put(mp_DatabaseID, &Key, &Value, Flags);
 		}
-		
+
 		CLowLevelValue CLowLevelDatabaseWriteTransaction::f_Upsert(CLowLevelValue const &_Key, mint _DataSize, bool _bAppend)
 		{
 			auto &Transaction = *mp_pTransaction;
@@ -151,35 +151,35 @@ namespace NMib
 			Transaction.f_Put(mp_DatabaseID, &Key, &Value, Flags);
 			return Value;
 		}
-		
+
 		void CLowLevelDatabaseWriteTransaction::f_Delete(CLowLevelValue const &_Key)
 		{
 			return mp_pTransaction->f_Delete(mp_DatabaseID, &_Key, nullptr);
 		}
-		
+
 		void CLowLevelDatabaseWriteTransaction::f_DeleteData(CLowLevelValue const &_Key, CLowLevelValue const &_Data)
 		{
 			return mp_pTransaction->f_Delete(mp_DatabaseID, &_Key, &_Data);
 		}
-		
+
 		CLowLevelDatabaseWriteTransaction::CLowLevelDatabaseWriteTransaction(CLowLevelTransactionCommon::CInternal *_pTransaction, CLowLevelDatabaseID _DatabaseID)
 			: CLowLevelDatabaseReadTransaction(_pTransaction, _DatabaseID)
 		{
 		}
-		
+
 		CLowLevelCursorWrite CLowLevelDatabaseWriteTransaction::f_WriteCursor()
 		{
-			NPtr::TCUniquePointer<CLowLevelCursorCommon::CInternal> pCursor = fg_Explicit(mp_pTransaction->f_Cursor(mp_DatabaseID));
+			NStorage::TCUniquePointer<CLowLevelCursorCommon::CInternal> pCursor = fg_Explicit(mp_pTransaction->f_Cursor(mp_DatabaseID));
 			return fg_Move(pCursor);
 		}
-		
+
 		CLowLevelCursorDuplicateDataWrite CLowLevelDatabaseWriteTransaction::f_WriteCursorDuplicateData()
 		{
-			NPtr::TCUniquePointer<CLowLevelCursorCommon::CInternal> pCursor = fg_Explicit(mp_pTransaction->f_Cursor(mp_DatabaseID));
+			NStorage::TCUniquePointer<CLowLevelCursorCommon::CInternal> pCursor = fg_Explicit(mp_pTransaction->f_Cursor(mp_DatabaseID));
 			return fg_Move(pCursor);
 		}
 	}
-	
+
 	/** @brief Open a database in the environment.
 	 *
 	 * A database handle denotes the name and parameters of a database,
@@ -220,14 +220,16 @@ namespace NMib
 	 *		keys must be unique and may have only a single data item.
 	 *	<li>#ELowLevelDatabaseFlag_IntegerKeys
 	 *		Keys are binary integers in native byte order, either uint32
-	 *		or mint, and will be sorted as such.
+	 *		or CLowLevelSize, and will be sorted as such.
+	 *		(lmdb expects 32-bit int <= size_t <= 32/64-bit CLowLevelSize.)
 	 *		The keys must all be of the same size.
 	 *	<li>#ELowLevelDatabaseFlag_SortedDuplicatesFixedSize
 	 *		This flag may only be used in combination with #ELowLevelDatabaseFlag_SortedDuplicates. This option
 	 *		tells the library that the data items for this database are all the same
 	 *		size, which allows further optimizations in storage and retrieval. When
-	 *		all data items are the same size, the #MDB_GET_MULTIPLE and #MDB_NEXT_MULTIPLE
-	 *		cursor operations may be used to retrieve multiple items at once.
+	 *		all data items are the same size, the #MDB_GET_MULTIPLE, #MDB_NEXT_MULTIPLE
+	 *		and #MDB_PREV_MULTIPLE cursor operations may be used to retrieve multiple
+	 *		items at once.
 	 *	<li>#ELowLevelDatabaseFlag_SortedDuplicatesIntegerKeys
 	 *		This option specifies that duplicate data items are binary integers,
 	 *		similar to #ELowLevelDatabaseFlag_IntegerKeys keys.
@@ -260,19 +262,19 @@ namespace NMib
 
 		if (_Flags & ~VALID_FLAGS)
 			DMibError("Invalid flags specified");
-		
+
 		auto txn = mp_pTransaction.f_Get();
-		
+
 		txn->f_CheckBlocked();
 
 		/* main DB? */
-		if (!_pName) 
+		if (!_pName)
 		{
-			if (_Flags & PERSISTENT_FLAGS) 
+			if (_Flags & PERSISTENT_FLAGS)
 			{
 				uint16 f2 = _Flags & PERSISTENT_FLAGS;
 				/* make sure flag changes get committed */
-				if ((txn->mt_dbs[MAIN_DBI].md_flags | f2) != txn->mt_dbs[MAIN_DBI].md_flags) 
+				if ((txn->mt_dbs[MAIN_DBI].md_flags | f2) != txn->mt_dbs[MAIN_DBI].md_flags)
 				{
 					txn->mt_dbs[MAIN_DBI].md_flags |= f2;
 					txn->mt_flags |= MDB_TXN_DIRTY;
@@ -287,15 +289,15 @@ namespace NMib
 
 		/* Is the DB already open? */
 		len = strlen(_pName);
-		for (i=CORE_DBS; i<txn->mt_numdbs; i++) 
+		for (i=CORE_DBS; i<txn->mt_numdbs; i++)
 		{
-			if (!txn->mt_dbxs[i].m_DatabaseName.m_Size) 
+			if (!txn->mt_dbxs[i].m_DatabaseName.m_Size)
 			{
 				/* Remember this free slot */
 				if (!unused) unused = i;
 				continue;
 			}
-			if (len == txn->mt_dbxs[i].m_DatabaseName.m_Size && !strncmp(_pName, (char const *)txn->mt_dbxs[i].m_DatabaseName.m_pData, len)) 
+			if (len == txn->mt_dbxs[i].m_DatabaseName.m_Size && !strncmp(_pName, (char const *)txn->mt_dbxs[i].m_DatabaseName.m_pData, len))
 				return i;
 		}
 
@@ -321,26 +323,26 @@ namespace NMib
 		key.m_pData = (uint8 *)_pName;
 		mdb_cursor_init(&mc, txn, MAIN_DBI, nullptr);
 		int rc = mdb_cursor_set(&mc, &key, &data, MDB_SET, &exact);
-		if (rc == MDB_SUCCESS) 
+		if (rc == MDB_SUCCESS)
 		{
 			/* make sure this is actually a DB */
 			MDB_node *node = NODEPTR(mc.mc_pg[mc.mc_top], mc.mc_ki[mc.mc_top]);
 			if ((node->mn_flags & (F_DUPDATA|F_SUBDATA)) != F_SUBDATA)
 				DMibError("Named record is not a database");
-		} 
-		else if (! (rc == MDB_NOTFOUND && (_Flags & ELowLevelDatabaseFlag_Create))) 
+		}
+		else if (! (rc == MDB_NOTFOUND && (_Flags & ELowLevelDatabaseFlag_Create)))
 			DMibError(NStr::fg_Format("Error looking for database record: {}", NPrivate::mdb_strerror(rc)));
 
 		/* Done here so we cannot fail after creating a new DB */
 		char *namedup;
 		{
 			mint NameLen = NStr::fg_StrLen(_pName);
-			namedup = (char *)NMem::fg_Alloc(NameLen);
+			namedup = (char *)NMemory::fg_Alloc(NameLen);
 			NStr::fg_StrCopy(namedup, _pName, NameLen + 1);
 		}
 		auto Cleanup = g_OnScopeExit > [&]
 			{
-				NMem::fg_Free(namedup);
+				NMemory::fg_FreeNoSize(namedup);
 			}
 		;
 
@@ -377,7 +379,7 @@ namespace NMib
 			return slot;
 		}
 	}
-	
+
 	NDatabase::CLowLevelDatabaseReadTransaction NDatabase::CLowLevelReadTransaction::f_OpenDatabaseTransaction
 		(
 			const char *_pName
@@ -388,7 +390,7 @@ namespace NMib
 		auto Database = fp_OpenDatabase(_pName, _Flags, _Properties);
 		return Database.f_Transaction(*this);
 	}
-	
+
 	NContainer::TCSet<NStr::CStr> NDatabase::CLowLevelReadTransaction::f_EnumDatabases()
 	{
 		auto DatabaseTransaction = f_OpenDatabaseTransaction();
@@ -398,16 +400,16 @@ namespace NMib
 		while (iCursor)
 		{
 			auto &Key = iCursor.f_Key();
-			
+
 			NStr::CStr DatabaseName;
 			DatabaseName.f_AddStr((ch8 const *)Key.m_pData, Key.m_Size);
 			Databases[DatabaseName];
-			
+
 			++iCursor;
 		}
 		return Databases;
 	}
-	
+
 	NContainer::TCSet<NStr::CStr> NDatabase::CLowLevelWriteTransaction::f_EnumDatabases()
 	{
 		auto DatabaseTransaction = f_OpenDatabase().f_Transaction(*this);
@@ -417,11 +419,11 @@ namespace NMib
 		while (iCursor)
 		{
 			auto &Key = iCursor.f_Key();
-			
+
 			NStr::CStr DatabaseName;
 			DatabaseName.f_AddStr((ch8 const *)Key.m_pData, Key.m_Size);
 			Databases[DatabaseName];
-			
+
 			++iCursor;
 		}
 		return Databases;
@@ -460,7 +462,7 @@ namespace NMib
 		}
 		return mt_env->f_DatabaseStatistics(&mt_dbs[dbi]);
 	}
-	
+
 	/** @brief Retrieve the DB flags for a database handle.
 	 *
 	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
@@ -505,10 +507,10 @@ namespace NMib
 			Environment.m_StaticDasabaseInfo[dbi].m_DatabaseName.m_Size = 0;
 			Environment.me_dbflags[dbi] = 0;
 			Environment.me_dbiseqs[dbi]++;
-			NMem::fg_Free(ptr);
+			NMemory::fg_FreeNoSize(ptr);
 		}
 	}
-	
+
 	/** @brief Empty or delete+close a database.
 	 *
 	 * See #fp_CloseDatabase() for restrictions about closing the DB handle.
@@ -520,7 +522,7 @@ namespace NMib
 	 */
 	void NDatabase::CLowLevelTransactionCommon::CInternal::f_DropDatabase(CLowLevelDatabaseID dbi, bool _bDelete)
 	{
-		using namespace NPrivate;			
+		using namespace NPrivate;
 		MDB_cursor *mc, *m2;
 
 		if (!TXN_DBI_EXIST(this, dbi, DB_USRVALID))
@@ -533,10 +535,10 @@ namespace NMib
 			DMibError("Stale write transaction");
 
 		mc = f_Cursor(dbi);
-		
+
 		auto Cleanup = g_OnScopeExit > [&]()
 			{
-				mdb_cursor_close(mc);				
+				mdb_cursor_close(mc);
 			}
 		;
 
@@ -550,21 +552,21 @@ namespace NMib
 		}
 
 		/* Can't delete the main DB */
-		if (_bDelete && dbi >= CORE_DBS) 
+		if (_bDelete && dbi >= CORE_DBS)
 		{
 			int rc = mdb_del0(this, MAIN_DBI, &mc->mc_dbx->m_DatabaseName, nullptr, (ELowLevelWriteFlag)F_SUBDATA);
-			if (!rc) 
+			if (!rc)
 			{
 				mt_dbflags[dbi] = DB_STALE;
 				mt_env->mdb_dbi_close(dbi);
-			} 
-			else 
+			}
+			else
 			{
 				mt_flags |= MDB_TXN_ERROR;
 				DMibError(NStr::fg_Format("Error deleting database: {}", mdb_strerror(rc)));
 			}
-		} 
-		else 
+		}
+		else
 		{
 			/* reset the DB record, mark it dirty */
 			mt_dbflags[dbi] |= DB_DIRTY;
@@ -578,7 +580,7 @@ namespace NMib
 			mt_flags |= MDB_TXN_DIRTY;
 		}
 	}
-	
+
 	/** @brief Set a custom key comparison function for a database.
 	 *
 	 * The comparison function is called whenever it is necessary to compare a
@@ -634,7 +636,7 @@ namespace NMib
 
 		mt_dbxs[dbi].m_fDataCompare = fg_Move(_fCompare);
 	}
-	
+
 	// ---------------------------------------------------------------------------------------------------------------------------------------
 	// Private from here
 	// ---------------------------------------------------------------------------------------------------------------------------------------

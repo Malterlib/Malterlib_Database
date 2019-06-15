@@ -64,7 +64,7 @@ namespace NMib::NDatabase
 	}
 	
 	template <typename ...tfp_CValue>
-	NContainer::TCTuple<tfp_CValue...> fg_DecodeValue(CLowLevelValue const &_Value)
+	NStorage::TCTuple<tfp_CValue...> fg_DecodeValue(CLowLevelValue const &_Value)
 	{
 		return NPrivate::fg_DecodeOrderedByteArrayImpl<tfp_CValue...>(_Value, typename NMeta::TCMakeConsecutiveIndices<sizeof...(tfp_CValue)>::CType());
 	}

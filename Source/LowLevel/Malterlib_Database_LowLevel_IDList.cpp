@@ -1,17 +1,17 @@
-// Copyright © 2016 Hansoft AB 
+// Copyright © 2016 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 /*
  This code is derived from lmdb with the following copyright:
 
  This work is part of OpenLDAP Software <http://www.openldap.org/>.
- 
+
  Copyright 2000-2016 The OpenLDAP Foundation.
  All rights reserved.
- 
+
  Redistribution and use in source and binary forms, with or without
  modification, are permitted only as authorized by the OpenLDAP
  Public License.
- 
+
  A copy of this license is available in the file LICENSE.OpenLDAP in the
  top-level directory of the distribution or, alternatively, at
  <http://www.OpenLDAP.org/license.html>.
@@ -67,7 +67,7 @@ namespace NMib::NDatabase::NPrivate
 
 	MDB_IDL mdb_midl_alloc(int num)
 	{
-		MDB_IDL ids = (MDB_IDL)NMib::NMem::fg_AllocNoSize((num+2) * sizeof(MDB_ID));
+		MDB_IDL ids = (MDB_IDL)NMib::NMemory::fg_Alloc((num+2) * sizeof(MDB_ID));
 		*ids++ = num;
 		*ids = 0;
 		return ids;
@@ -76,14 +76,14 @@ namespace NMib::NDatabase::NPrivate
 	void mdb_midl_free(MDB_IDL ids)
 	{
 		if (ids)
-			NMib::NMem::fg_Free(ids-1);
+			NMib::NMemory::fg_FreeNoSize(ids-1);
 	}
 
 	void mdb_midl_shrink( MDB_IDL *idp )
 	{
 		MDB_IDL ids = *idp;
 		mint NewSize = (MDB_IDL_UM_MAX+2) * sizeof(MDB_ID);
-		if (*(--ids) > MDB_IDL_UM_MAX && (ids = (MDB_IDL)NMib::NMem::fg_Resize(ids, NewSize)))
+		if (*(--ids) > MDB_IDL_UM_MAX && (ids = (MDB_IDL)NMib::NMemory::fg_Resize(ids, NewSize, 0)))
 		{
 			*ids++ = MDB_IDL_UM_MAX;
 			*idp = ids;
@@ -95,7 +95,7 @@ namespace NMib::NDatabase::NPrivate
 		MDB_IDL idn = *idp-1;
 		/* grow it */
 		mint NewSize = (*idn + num + 2) * sizeof(MDB_ID);
-		idn = (MDB_IDL)NMib::NMem::fg_Resize(idn, NewSize);
+		idn = (MDB_IDL)NMib::NMemory::fg_Resize(idn, NewSize, 0);
 		*idn++ += num;
 		*idp = idn;
 	}
@@ -107,7 +107,7 @@ namespace NMib::NDatabase::NPrivate
 		if (num > ids[-1]) {
 			num = (num + num/4 + (256 + 2)) & -256;
 			mint NewSize = num * sizeof(MDB_ID);
-			ids = (MDB_IDL)NMib::NMem::fg_Resize(ids-1, NewSize);
+			ids = (MDB_IDL)NMib::NMemory::fg_Resize(ids-1, NewSize, 0);
 			*ids++ = num - 2;
 			*idp = ids;
 		}
@@ -117,7 +117,7 @@ namespace NMib::NDatabase::NPrivate
 	{
 		MDB_IDL ids = *idp;
 		/* Too big? */
-		if (ids[0] >= ids[-1]) 
+		if (ids[0] >= ids[-1])
 		{
 			mdb_midl_grow(idp, MDB_IDL_UM_MAX);
 			ids = *idp;

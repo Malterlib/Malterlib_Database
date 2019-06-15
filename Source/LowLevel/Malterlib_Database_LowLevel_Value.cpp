@@ -1,26 +1,26 @@
-// Copyright © 2016 Hansoft AB 
+// Copyright © 2016 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 /*
  This code is derived from lmdb with the following copyright:
- 
+
  Copyright 2011-2016 Howard Chu, Symas Corp. All rights reserved.
- 
+
  Redistribution and use in source and binary forms, with or without
  modification, are permitted only as authorized by the OpenLDAP
  Public License.
- 
+
  A copy of this license is available in the file LICENSE.OpenLDAP in the
  top-level directory of the distribution or, alternatively, at
  <http://www.OpenLDAP.org/license.html>.
- 
+
  This code is derived from btree.c written by Martin Hedenfalk.
- 
+
  Copyright (c) 2009, 2010 Martin Hedenfalk <martin@bzero.se>
- 
+
  Permission to use, copy, modify, and distribute this software for any
  purpose with or without fee is hereby granted, provided that the above
  copyright notice and this permission notice appear in all copies.
- 
+
  THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
  WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
  MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
@@ -65,7 +65,7 @@ namespace NMib
 	{
 		DMibRequire(key);
 		DMibRequire(data);
-		
+
 		using namespace NPrivate;
 		MDB_cursor	mc;
 		MDB_xcursor	mx;
@@ -89,17 +89,13 @@ namespace NMib
 				DMibError(NStr::fg_Format("Error setting data: {}", mdb_strerror(rc)));
 			}
 		}
-	#ifdef DMibDatabaseLowLevel_Always64BitSupport
-		{
-			/* unref all the pages - caller must copy the data
-			 * before doing anything else
-			 */
-			mdb_cursor_unref(&mc);
-		}
-	#endif
+		/* unref all the pages when DMibDatabaseLowLevel_Always64BitSupport - caller must copy the data
+		 * before doing anything else
+		 */
+		MDB_CURSOR_UNREF(&mc, 1);
 		return true;
 	}
-	
+
 	/** @brief Store items into a database.
 	 *
 	 * This function stores key/data pairs in the database. The default behavior
@@ -160,13 +156,13 @@ namespace NMib
 			DMibError("Invalid flags");
 
 		f_CheckBlocked();
-		
+
 		if (mt_flags & (MDB_TXN_RDONLY))
 			DMibError("Trying to write to read only transaction");
 
 		MDB_cursor mc;
 		MDB_xcursor mx;
-		
+
 		mdb_cursor_init(&mc, this, dbi, &mx);
 		mc.mc_next = mt_cursors[dbi];
 		mt_cursors[dbi] = &mc;
@@ -175,7 +171,7 @@ namespace NMib
 		if (rc)
 			DMibError(NStr::fg_Format("Error putting data: {}", mdb_strerror(rc)));
 	}
-	
+
 	/** @brief Delete items from a database.
 	 *
 	 * This function removes key/data pairs from the database.
@@ -207,7 +203,7 @@ namespace NMib
 			DMibError("Database does not exists");
 
 		f_CheckBlocked();
-		
+
 		if (mt_flags & (MDB_TXN_RDONLY))
 			DMibError("Trying to write to read only transaction");
 
@@ -235,7 +231,7 @@ namespace NMib
 	{
 		return mt_dbxs[dbi].m_fKeyCompare(*a, *b);
 	}
-	
+
 	/** @brief Compare two data items according to a particular database.
 	 *
 	 * This returns a comparison as if the two items were data items of
@@ -249,17 +245,17 @@ namespace NMib
 	int NDatabase::CLowLevelTransactionCommon::CInternal::f_DataCompare(CLowLevelDatabaseID dbi, const CLowLevelValue *a, const CLowLevelValue *b)
 	{
 		FLowLevelCompare const &DataCompare = mt_dbxs[dbi].m_fDataCompare;
-	#if UINT_MAX < SIZE_MAX || defined(DMibDatabaseLowLevel_Always64BitSupport)
+	#if DMibPPtrBits > 32 || defined(DMibDatabaseLowLevel_Always64BitSupport)
 		if (a->m_Size == sizeof(CLowLevelSize) && DataCompare == NPrivate::g_mdb_cmp_int)
 			return NPrivate::g_mdb_cmp_clong(*a, *b);
 	#endif
 		return DataCompare(*a, *b);
 	}
-	
+
 	// ---------------------------------------------------------------------------------------------------------------------------------------
 	// Private from here
 	// ---------------------------------------------------------------------------------------------------------------------------------------
-	
+
 	int NDatabase::NPrivate::mdb_del0(MDB_txn *txn, CLowLevelDatabaseID dbi, CLowLevelValue const *key, CLowLevelValue const *data, ELowLevelWriteFlag _Flags)
 	{
 		MDB_cursor mc;
@@ -293,7 +289,6 @@ namespace NMib
 			 * run out of space, triggering a split. We need this
 			 * cursor to be consistent until the end of the rebalance.
 			 */
-			mc.mc_flags |= C_UNTRACK;
 			mc.mc_next = txn->mt_cursors[dbi];
 			txn->mt_cursors[dbi] = &mc;
 			rc = mdb_cursor_del(&mc, _Flags);

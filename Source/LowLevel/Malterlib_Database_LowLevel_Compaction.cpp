@@ -1,26 +1,26 @@
-// Copyright © 2016 Hansoft AB 
+// Copyright © 2016 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 /*
  This code is derived from lmdb with the following copyright:
- 
+
  Copyright 2011-2016 Howard Chu, Symas Corp. All rights reserved.
- 
+
  Redistribution and use in source and binary forms, with or without
  modification, are permitted only as authorized by the OpenLDAP
  Public License.
- 
+
  A copy of this license is available in the file LICENSE.OpenLDAP in the
  top-level directory of the distribution or, alternatively, at
  <http://www.OpenLDAP.org/license.html>.
- 
+
  This code is derived from btree.c written by Martin Hedenfalk.
- 
+
  Copyright (c) 2009, 2010 Martin Hedenfalk <martin@bzero.se>
- 
+
  Permission to use, copy, modify, and distribute this software for any
  purpose with or without fee is hereby granted, provided that the above
  copyright notice and this permission notice appear in all copies.
- 
+
  THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
  WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
  MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
@@ -40,7 +40,7 @@ namespace NMib::NDatabase
 	namespace NPrivate
 	{
 		static constexpr mint gc_CopyBufferSize = 1024*1024;
-		
+
 		struct CCompactingCopyState
 		{
 			CCompactingCopyState(MDB_env *_pEnvironment, HANDLE _DestinationFile)
@@ -48,18 +48,19 @@ namespace NMib::NDatabase
 				, m_OutputFileHandle{_DestinationFile}
 			{
 			}
-			
+
 			~CCompactingCopyState()
 			{
 				if (m_WriteBuffers[0])
-					NMem::fg_Free(m_WriteBuffers[0]);
+					NMemory::fg_FreeNoSize(m_WriteBuffers[0]);
 			}
+
 			void f_Init(mint _PageSize)
 			{
 				m_ProcessingActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Low level DB Copy"));
 				mint Size = gc_CopyBufferSize*2;
-				m_WriteBuffers[0] = (uint8 *)NMem::fg_AllocAligned(Size, _PageSize);
-				NMem::fg_MemClear(m_WriteBuffers[0], gc_CopyBufferSize*2);
+				m_WriteBuffers[0] = (uint8 *)NMemory::fg_AllocAligned(Size, _PageSize);
+				NMemory::fg_MemClear(m_WriteBuffers[0], gc_CopyBufferSize*2);
 				m_WriteBuffers[1] = m_WriteBuffers[0] + gc_CopyBufferSize;
 			}
 
@@ -75,7 +76,7 @@ namespace NMib::NDatabase
 			int m_Status = 0;
 			int m_iBuffer = 0;
 		};
-		
+
 		/** Dedicated writer thread for compacting copy. */
 		void DMibDatabaseInfrequentSection fg_DoBufferWrite(CCompactingCopyState &_CopyState, mint _iBuffer)
 		{
@@ -128,7 +129,7 @@ namespace NMib::NDatabase
 			mint iBuffer = CopyState.m_iBuffer;
 			// Block on last write finishing
 			fg_Dispatch(CopyState.m_ProcessingActor, []{}).f_CallSync();
-			
+
 			if (CopyState.m_Status)
 				return CopyState.m_Status;
 
@@ -142,7 +143,7 @@ namespace NMib::NDatabase
 				)
 				> fg_DiscardResult()
 			;
-			
+
 			CopyState.m_iBuffer = iBuffer ^ 1;
 			return 0;
 		}
@@ -160,8 +161,8 @@ namespace NMib::NDatabase
 			/* Empty DB, nothing to do */
 			if (*pg == P_INVALID)
 				return MDB_SUCCESS;
-			
-			auto &CopyState = _CopyState; 
+
+			auto &CopyState = _CopyState;
 
 			mc.mc_snum = 1;
 			mc.mc_txn = CopyState.m_pInternalTransaction;
@@ -175,7 +176,7 @@ namespace NMib::NDatabase
 				return rc;
 
 			/* Make cursor pages writable */
-			buf = ptr = (char *)NMem::fg_AllocNoSize(CopyState.m_pEnvironment->me_psize * mc.mc_snum);
+			buf = ptr = (char *)NMemory::fg_Alloc(CopyState.m_pEnvironment->me_psize * mc.mc_snum);
 
 			for (i=0; i<mc.mc_top; i++) {
 				mdb_page_copy((MDB_page *)ptr, mc.mc_pg[i], CopyState.m_pEnvironment->me_psize);
@@ -209,10 +210,11 @@ namespace NMib::NDatabase
 								}
 
 								memcpy(&pg, NODEDATA(ni), sizeof(pg));
+								memcpy(NODEDATA(ni), &CopyState.m_NextPageNo, sizeof(pgno_t));
 								rc = mdb_page_get(&mc, pg, &omp, nullptr);
 								if (rc)
 									goto done;
-								if (CopyState.m_WriteBuffersLength[iBuffer] >= gc_CopyBufferSize) 
+								if (CopyState.m_WriteBuffersLength[iBuffer] >= gc_CopyBufferSize)
 								{
 									rc = fg_DispatchCopyBuffer(CopyState);
 									if (rc)
@@ -232,7 +234,6 @@ namespace NMib::NDatabase
 										goto done;
 									iBuffer = CopyState.m_iBuffer;
 								}
-								memcpy(NODEDATA(ni), &mo->mp_p.p_pgno, sizeof(pgno_t));
 							} else if (ni->mn_flags & F_SUBDATA) {
 								MDB_db db;
 
@@ -267,7 +268,7 @@ namespace NMib::NDatabase
 						mc.mc_top++;
 						mc.mc_snum++;
 						mc.mc_ki[mc.mc_top] = 0;
-						if (IS_BRANCH(mp)) 
+						if (IS_BRANCH(mp))
 						{
 							/* Whenever we advance to a sibling branch page,
 							 * we must proceed all the way down to its first leaf.
@@ -279,7 +280,7 @@ namespace NMib::NDatabase
 						continue;
 					}
 				}
-				if (CopyState.m_WriteBuffersLength[iBuffer] >= gc_CopyBufferSize) 
+				if (CopyState.m_WriteBuffersLength[iBuffer] >= gc_CopyBufferSize)
 				{
 					rc = fg_DispatchCopyBuffer(CopyState);
 					if (rc)
@@ -302,7 +303,7 @@ namespace NMib::NDatabase
 				}
 			}
 		done:
-			NMem::fg_Free(buf);
+			NMemory::fg_FreeNoSize(buf);
 			return rc;
 		}
 	}
@@ -311,21 +312,20 @@ namespace NMib::NDatabase
 	void DMibDatabaseInfrequentSection CLowLevelEnvironment_Internal::f_CopyCompact(HANDLE fd)
 	{
 		using namespace NPrivate;
-		MDB_meta *mm;
-		MDB_page *mp;
 		CCompactingCopyState CopyState{this, fd};
 		int rc;
-		
+		pgno_t root, new_root;
+
 		CopyState.f_Init(me_os_psize);
-		
+
 		auto Transaction = mdb_txn_begin(nullptr, ELowLevelEnvironmentFlag_ReadOnly);
 		auto pInternalTransaction = Transaction.fp_GetInternal();
 
-		mp = (MDB_page *)CopyState.m_WriteBuffers[0];
+		MDB_page *mp = (MDB_page *)CopyState.m_WriteBuffers[0];
 		memset(mp, 0, NUM_METAS * me_psize);
 		mp->mp_p.p_pgno = 0;
 		mp->mp_flags = P_META;
-		mm = (MDB_meta *)METADATA(mp);
+		MDB_meta *mm = (MDB_meta *)METADATA(mp);
 		mdb_env_init_meta0(mm);
 		mm->mm_address = me_metas[0]->mm_address;
 
@@ -335,39 +335,58 @@ namespace NMib::NDatabase
 		*(MDB_meta *)METADATA(mp) = *mm;
 		mm = (MDB_meta *)METADATA(mp);
 
-		/* Count the number of free pages, subtract from lastpg to find
-		 * number of active pages
-		 */
+		/* Set metapage 1 with current main DB */
+		root = new_root = pInternalTransaction->mt_dbs[MAIN_DBI].md_root;
+		if (root != P_INVALID)
 		{
+			/* Count the number of free pages, subtract from lastpg to find
+			 * number of active pages
+			 */
 			MDB_ID freecount = 0;
 			MDB_cursor mc;
-			CLowLevelValue key, data;
+			CLowLevelValue key;
+			CLowLevelValue data;
 			mdb_cursor_init(&mc, pInternalTransaction, FREE_DBI, nullptr);
 			while ((rc = mdb_cursor_get(&mc, &key, &data, MDB_NEXT)) == 0)
 				freecount += *(MDB_ID *)data.m_pData;
+			if (rc != MDB_NOTFOUND)
+				DMibError(NStr::fg_Format("Error compacting database (read cursor): {}", mdb_strerror(rc)));
 			freecount += pInternalTransaction->mt_dbs[FREE_DBI].md_branch_pages +
 				pInternalTransaction->mt_dbs[FREE_DBI].md_leaf_pages +
 				pInternalTransaction->mt_dbs[FREE_DBI].md_overflow_pages;
 
 			/* Set metapage 1 */
-			mm->mm_last_pg = pInternalTransaction->mt_next_pgno - freecount - 1;
+			new_root = pInternalTransaction->mt_next_pgno - 1 - freecount;
+			mm->mm_last_pg = new_root;
 			mm->mm_dbs[MAIN_DBI] = pInternalTransaction->mt_dbs[MAIN_DBI];
-			if (mm->mm_last_pg > NUM_METAS-1) {
-				mm->mm_dbs[MAIN_DBI].md_root = mm->mm_last_pg;
-				mm->mm_txnid = 1;
-			} else {
-				mm->mm_dbs[MAIN_DBI].md_root = P_INVALID;
-			}
+			mm->mm_dbs[MAIN_DBI].md_root = new_root;
 		}
+		else
+		{
+			/* When the DB is empty, handle it specially to
+			 * fix any breakage like page leaks from ITS#8174.
+			 */
+			mm->mm_dbs[MAIN_DBI].md_flags = pInternalTransaction->mt_dbs[MAIN_DBI].md_flags;
+		}
+
+		if (root != P_INVALID || mm->mm_dbs[MAIN_DBI].md_flags)
+			mm->mm_txnid = 1;		/* use metapage 1 */
+
 		CopyState.m_WriteBuffersLength[0] = me_psize * NUM_METAS;
 		CopyState.m_pInternalTransaction = pInternalTransaction;
 		fg_DispatchCopyBuffer(CopyState);
 		fg_Dispatch(CopyState.m_ProcessingActor, []{}).f_CallSync();
-		rc = fg_TraverseTreeCopyRecursive(CopyState, &pInternalTransaction->mt_dbs[MAIN_DBI].md_root, 0);
+		rc = fg_TraverseTreeCopyRecursive(CopyState, &root, 0);
+
+		if (rc == MDB_SUCCESS && root != new_root)
+			rc = MDB_INCOMPATIBLE;	/* page leak or corrupt DB */
+
 		if (rc)
 			DMibError(NStr::fg_Format("Error compacting database: {}", mdb_strerror(rc)));
+
 		if (rc == MDB_SUCCESS && CopyState.m_WriteBuffersLength[CopyState.m_iBuffer])
 			rc = fg_DispatchCopyBuffer(CopyState);
+
 		// Block
 		fg_Dispatch(CopyState.m_ProcessingActor, []{}).f_CallSync();
 		rc = fg_DispatchCopyBuffer(CopyState); // Get status

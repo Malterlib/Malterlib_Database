@@ -70,7 +70,7 @@ namespace NMib::NDatabase
 		template <typename tf_CStream>
 		static void fs_Encode(tf_CStream &_Stream, ch8 const _Value[t_Len])
 		{
-			DMibRequire(_Value[t_Len-1] == 0);
+			DMibRequire(_Value[t_Len - 1] == 0);
 			_Stream.f_FeedBytes(_Value, t_Len);
 		}			
 	};

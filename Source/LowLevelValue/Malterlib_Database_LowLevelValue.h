@@ -46,7 +46,7 @@ namespace NMib
 		CLowLevelValueDynamic fg_EncodeValue(CLowLevelValueCache &o_StreamCache, tfp_CValue const &...p_Value);
 		
 		template <typename ...tfp_CValue>
-		NContainer::TCTuple<tfp_CValue...> fg_DecodeValue(CLowLevelValue const &_Value);
+		NStorage::TCTuple<tfp_CValue...> fg_DecodeValue(CLowLevelValue const &_Value);
 
 		template <typename tf_CValue>
 		void fg_DecodeValue(CLowLevelValue const &_Value, tf_CValue &o_Value);

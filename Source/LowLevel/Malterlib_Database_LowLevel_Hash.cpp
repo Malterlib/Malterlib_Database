@@ -1,26 +1,26 @@
-// Copyright © 2016 Hansoft AB 
+// Copyright © 2016 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 /*
  This code is derived from lmdb with the following copyright:
- 
+
  Copyright 2011-2016 Howard Chu, Symas Corp. All rights reserved.
- 
+
  Redistribution and use in source and binary forms, with or without
  modification, are permitted only as authorized by the OpenLDAP
  Public License.
- 
+
  A copy of this license is available in the file LICENSE.OpenLDAP in the
  top-level directory of the distribution or, alternatively, at
  <http://www.OpenLDAP.org/license.html>.
- 
+
  This code is derived from btree.c written by Martin Hedenfalk.
- 
+
  Copyright (c) 2009, 2010 Martin Hedenfalk <martin@bzero.se>
- 
+
  Permission to use, copy, modify, and distribute this software for any
  purpose with or without fee is hereby granted, provided that the above
  copyright notice and this permission notice appear in all copies.
- 
+
  THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
  WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
  MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
@@ -64,32 +64,20 @@ namespace NMib
 	 * Share and Enjoy!	:-)
 	 */
 
-	typedef unsigned long long	mdb_hash_t;
-	#define MDB_HASH_INIT ((mdb_hash_t)0xcbf29ce484222325ULL)
-
 	/** perform a 64 bit Fowler/Noll/Vo FNV-1a hash on a buffer
 	 * @param[in] val	value to hash
-	 * @param[in] hval	initial value for hash
+	 * @param[in] len	length of value
 	 * @return 64 bit hash
-	 *
-	 * NOTE: To use the recommended 64 bit FNV-1a hash, use MDB_HASH_INIT as the
-	 * 	 hval arg on the first call.
 	 */
-	mdb_hash_t
-	NDatabase::NPrivate::mdb_hash_val(CLowLevelValue *val, mdb_hash_t hval)
+	static mdb_hash_t NDatabase::NPrivate::mdb_hash(const void *val, size_t len)
 	{
-		unsigned char *s = (unsigned char *)val->m_pData;	/* unsigned string */
-		unsigned char *end = s + val->m_Size;
+		const unsigned char *s = (const unsigned char *) val, *end = s + len;
+		mdb_hash_t hval = 0xcbf29ce484222325ULL;
 		/*
-		 * FNV-1a hash each octet of the string
+		 * FNV-1a hash each octet of the buffer
 		 */
 		while (s < end) {
-			/* xor the bottom with the current octet */
-			hval ^= (mdb_hash_t)*s++;
-
-			/* multiply by the 64 bit FNV magic prime mod 2^64 */
-			hval += (hval << 1) + (hval << 4) + (hval << 5) +
-				(hval << 7) + (hval << 8) + (hval << 40);
+			hval = (hval ^ *s++) * 0x100000001b3ULL;
 		}
 		/* return our new hash value */
 		return hval;
@@ -109,24 +97,32 @@ namespace NMib
 	}
 
 	void DMibDatabaseInfrequentSection
-	NDatabase::NPrivate::mdb_pack85(unsigned long l, char *out)
+	NDatabase::NPrivate::mdb_pack85(unsigned long long l, char *out)
 	{
 		int i;
 
-		for (i=0; i<5; i++) {
+		for (i=0; i<10 && l; i++) {
 			*out++ = mdb_a85[l % 85];
 			l /= 85;
 		}
+		*out = '\0';
 	}
 
-	void DMibDatabaseInfrequentSection
-	NDatabase::NPrivate::mdb_hash_enc(CLowLevelValue *val, char *encbuf)
+	/** Init #MDB_env.me_mutexname[] except the char which #MUTEXNAME() will set.
+	 *	Changes to this code must be reflected in #MDB_LOCK_FORMAT.
+	 */
+	static void DMibDatabaseInfrequentSection
+	NDatabase::NPrivate::mdb_env_mname_init(MDB_env *env)
 	{
-		mdb_hash_t h = mdb_hash_val(val, MDB_HASH_INIT);
-
-		mdb_pack85(h, encbuf);
-		mdb_pack85(h>>32, encbuf+5);
-		encbuf[10] = '\0';
+		char *nm = env->me_mutexname;
+		strcpy(nm, MUTEXNAME_PREFIX);
+		mdb_pack85(env->m_pLocksMemoryMap->mti_mutexid, nm + sizeof(MUTEXNAME_PREFIX));
 	}
+
+	/** Return env->me_mutexname after filling in ch ('r'/'w') for convenience */
+	#define MUTEXNAME(env, ch) ( \
+			(void) ((env)->me_mutexname[sizeof(MUTEXNAME_PREFIX)-1] = (ch)), \
+			(env)->me_mutexname)
+
 	#endif
 }
