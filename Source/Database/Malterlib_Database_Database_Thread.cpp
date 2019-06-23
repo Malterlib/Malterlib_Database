@@ -79,7 +79,10 @@ namespace NMib::NDatabase
 			}
 		}
 	}
+	#endif
 }
+
+#ifdef DPlatformFamily_Windows
 #ifdef __GNUC__
 #ifdef _WIN64
 extern "C" const PIMAGE_TLS_CALLBACK mdb_tls_cbp __attribute__((section (".CRT$XLB"))) = mdb_tls_callback;

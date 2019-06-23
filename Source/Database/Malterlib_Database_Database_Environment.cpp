@@ -33,7 +33,9 @@
 #include "Malterlib_Database_Database.h"
 #include "Malterlib_Database_Database_Internal.h"
 
+#ifdef DPlatformFamily_Windows
 #include <Mib/Core/PlatformSpecific/WindowsOptional>
+#endif
 
 uint32 fg_MalterlibAttributesToMode(NMib::NFile::EFileAttrib _Attributes, uint32 _Mode = 0644);
 
