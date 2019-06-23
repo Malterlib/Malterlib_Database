@@ -6,7 +6,7 @@
 namespace NMib::NDatabase
 {
 	template <typename t_CTCStrTraits>
-	struct TCOrderedByteArrayCoder<NStr::TCStr<t_CTCStrTraits>, false>
+	struct TCDatabaseStreamLexicographic<NStr::TCStr<t_CTCStrTraits>, false>
 	{
 		template <typename tf_CStream>
 		static void fs_Encode(tf_CStream &_Stream, NStr::TCStr<t_CTCStrTraits> const &_Value)
@@ -32,7 +32,7 @@ namespace NMib::NDatabase
 	};
 
 	template <typename t_CTCStrTraits>
-	struct TCOrderedByteArrayCoder<NStr::TCStrAggregate<t_CTCStrTraits>, false>
+	struct TCDatabaseStreamLexicographic<NStr::TCStrAggregate<t_CTCStrTraits>, false>
 	{
 		template <typename tf_CStream>
 		static void fs_Encode(tf_CStream &_Stream, NStr::TCStrAggregate<t_CTCStrTraits> const &_Value)
@@ -55,7 +55,7 @@ namespace NMib::NDatabase
 	};
 
 	template <>
-	struct TCOrderedByteArrayCoder<ch8 const *, false>
+	struct TCDatabaseStreamLexicographic<ch8 const *, false>
 	{
 		template <typename tf_CStream>
 		static void fs_Encode(tf_CStream &_Stream, ch8 const *_pValue)
@@ -65,7 +65,7 @@ namespace NMib::NDatabase
 	};
 
 	template <mint t_Len>
-	struct TCOrderedByteArrayCoder<ch8 [t_Len], false>
+	struct TCDatabaseStreamLexicographic<ch8 [t_Len], false>
 	{
 		template <typename tf_CStream>
 		static void fs_Encode(tf_CStream &_Stream, ch8 const _Value[t_Len])

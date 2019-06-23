@@ -813,6 +813,7 @@ namespace NMib::NDatabase
 					int rc;
 					if (LOCK_MUTEX(rc, env, env->me_wmutex))
 						DMibError(NStr::fg_Format("Write mutex lock failed: {}", mdb_strerror(rc)));
+					env->m_LockedThreadID = NSys::fg_Thread_GetCurrentUID();
 				}
 				txn->mt_txnid = pLocksMemoryMap->mti_txnid;
 				meta = env->me_metas[txn->mt_txnid & 1];
@@ -968,7 +969,10 @@ namespace NMib::NDatabase
 
 				/* The writer mutex was locked in mdb_txn_begin. */
 				if (env->m_pLocksMemoryMap)
+				{
+					DMibCheck(env->m_LockedThreadID == NSys::fg_Thread_GetCurrentUID());
 					UNLOCK_MUTEX(env->me_wmutex);
+				}
 			} else {
 				txn->mt_parent->mt_child = nullptr;
 				txn->mt_parent->mt_flags &= ~MDB_TXN_HAS_CHILD;
@@ -980,6 +984,7 @@ namespace NMib::NDatabase
 
 			mdb_midl_free(pghead);
 		}
+
 	#ifdef DMibDatabase_Always64BitSupport
 		if (!txn->mt_parent) {
 			MDB_ID3L el = env->me_rpages, tl = txn->mt_rpages;

@@ -355,11 +355,6 @@ namespace NMib::NDatabase
 		}
 	}
 
-	CDatabaseValue const &CDatabaseCursor::f_Value() const
-	{
-		return mp_Value;
-	}
-
 	CDatabaseOffset CDatabaseCursorDuplicateData::f_DataCount()
 	{
 		auto &Cursor = *mp_pInternal;

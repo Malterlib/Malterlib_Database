@@ -6,13 +6,7 @@
 namespace NMib::NDatabase
 {
 	template <typename t_CType>
-	struct TCOrderedByteArrayCoderAutoDescending<t_CType, TCEnableIfType<NTraits::TCIsFloat<t_CType>::mc_Value>>
-	{
-		static constexpr bool mc_bValue = false;
-	};
-
-	template <typename t_CType, bool t_bDescending>
-	struct TCOrderedByteArrayCoder<t_CType, t_bDescending, TCEnableIfType<NTraits::TCIsFloat<t_CType>::mc_Value>>
+	struct TCDatabaseStreamLexicographic<t_CType, false, TCEnableIfType<NTraits::TCIsFloat<t_CType>::mc_Value>>
 	{
 		using CInteger = typename NTraits::TCIntFromSize<sizeof(t_CType)>::CType;
 
@@ -28,10 +22,7 @@ namespace NMib::NDatabase
 				Integer ^= (SignExtended | SignBit);
 			}
 
-			if constexpr (t_bDescending)
-				_Stream << ~Integer;
-			else
-				_Stream << Integer;
+			_Stream << Integer;
 		}
 
 		template <typename tf_CStream>
@@ -40,8 +31,6 @@ namespace NMib::NDatabase
 			CInteger Integer;
 			
 			_Stream >> Integer;
-			if constexpr (t_bDescending)
-				Integer = ~Integer;
 
 			if (t_CType::ESignBits)
 			{

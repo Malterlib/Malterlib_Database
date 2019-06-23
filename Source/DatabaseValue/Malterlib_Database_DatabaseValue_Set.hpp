@@ -6,7 +6,7 @@
 namespace NMib::NDatabase
 {
 	template <typename t_CKey, typename t_CCompare, typename t_CAllocator>
-	struct TCOrderedByteArrayCoder<NContainer::TCSet<t_CKey, t_CCompare, t_CAllocator>, false>
+	struct TCDatabaseStreamLexicographic<NContainer::TCSet<t_CKey, t_CCompare, t_CAllocator>, false>
 	{
 		template <typename tf_CStream>
 		static void fs_Encode(tf_CStream &_Stream, NContainer::TCSet<t_CKey, t_CCompare, t_CAllocator> const &_Values)
@@ -15,7 +15,7 @@ namespace NMib::NDatabase
 				NEncoding::TCBinaryStream_Bin128<> Stream(true);
 				Stream.f_Open(&_Stream, NFile::EFileOpen_Write);
 				for (auto &Value : _Values)
-					fg_EncodeLexicographic(Stream, Value);
+					CDatabaseValue::fs_FeedLexicographic(Stream, Value);
 			}
 			_Stream << uint8(0);
 		}
@@ -43,7 +43,7 @@ namespace NMib::NDatabase
 				while (!Stream.f_IsAtEndOfStream())
 				{
 					t_CKey Key;
-					fg_DecodeLexicographic(Stream, Key);
+					CDatabaseValue::fs_ConsumeLexicographic(Stream, Key);
 					o_Values[fg_Move(Key)];
 				}
 			}

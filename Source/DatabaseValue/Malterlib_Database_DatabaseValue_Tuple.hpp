@@ -8,7 +8,7 @@
 namespace NMib::NDatabase
 {
 	template <typename... tp_CTypes>
-	struct TCOrderedByteArrayCoder<NStorage::TCTuple<tp_CTypes...>, false>
+	struct TCDatabaseStreamLexicographic<NStorage::TCTuple<tp_CTypes...>, false>
 	{
 		template <typename tf_CStream>
 		static void fs_Encode(tf_CStream &_Stream, NStorage::TCTuple<tp_CTypes...> const &_Values)
@@ -21,7 +21,7 @@ namespace NMib::NDatabase
 							{
 								[&]
 								{
-									fg_EncodeLexicographic(_Stream, p_Values);
+									CDatabaseValue::fs_FeedLexicographic(_Stream, p_Values);
 									return true;
 								}()...
 							}
@@ -43,7 +43,7 @@ namespace NMib::NDatabase
 							{
 								[&]
 								{
-									fg_EncodeLexicographic(_Stream, p_Values);
+									CDatabaseValue::fs_ConsumeLexicographic(_Stream, p_Values);
 									return true;
 								}()...
 							}

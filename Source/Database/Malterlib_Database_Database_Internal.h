@@ -631,7 +631,7 @@ namespace NMib::NDatabase
 			 *	Requires double parenthesis around 2 or more args.
 			 */
 		#	define DMibDatabaseTrace(...) { if (NPrivate::mdb_debug) DMibDatabaseTrace0(__VA_ARGS__); }
-		#	define DMibDatabaseTrace0(d_Format, ...) DMibTrace2(DMibPFileLineFormat "{\n}" d_Format "{\n}", DMibPFile, DMibPLine, __VA_ARGS__)
+		#	define DMibDatabaseTrace0(d_Format, ...) DMibTrace2(DMibPFileLineFormat d_Format "{\n}", DMibPFile, DMibPLine, __VA_ARGS__)
 		#else
 		# define DMibDatabaseTrace(...)	((void) 0)
 		#endif
@@ -763,10 +763,6 @@ namespace NMib::NDatabase
 			/* Explanation: Let p2 = 2**(n*y + x), x<n and M = (1U<<n)-1. Now p2 =
 			 * (M+1)**y * 2**x = 2**x (mod M). Finally "/" "happens" to return 7-x.
 			 */
-
-			/** Should be alignment of \b type. Ensure it is a power of 2. */
-		#define ALIGNOF2(type) \
-			LOW_BIT(offsetof(struct { char ch_; type align_; }, align_))
 
 			/**	Used for offsets within a single page.
 			 *	Since memory pages are typically 4 or 8KB in size, 12-13 bits,
@@ -940,9 +936,9 @@ namespace NMib::NDatabase
 			 *	Some low values are reserved for future tweaks.
 			 */
 		#ifdef DPlatformFamily_Windows
-		# define MDB_LOCK_TYPE	(0 + ALIGNOF2(mdb_hash_t)/8 % 2)
+		# define MDB_LOCK_TYPE	(0 + NTraits::TCAlignmentOf<mdb_hash_t>::mc_Value/8 % 2)
 		#elif defined MDB_USE_POSIX_SEM
-		# define MDB_LOCK_TYPE	(4 + ALIGNOF2(mdb_hash_t)/8 % 2)
+		# define MDB_LOCK_TYPE	(4 + NTraits::TCAlignmentOf<mdb_hash_t>::mc_Value/8 % 2)
 		#elif defined MDB_USE_SYSV_SEM
 		# define MDB_LOCK_TYPE	(8)
 		#elif defined MDB_USE_POSIX_MUTEX
@@ -950,7 +946,7 @@ namespace NMib::NDatabase
 		 * used by two executables are compatible. Just check alignment and size.
 		 */
 		# define MDB_LOCK_TYPE	(10 + \
-				LOG2_MOD(ALIGNOF2(pthread_mutex_t), 5) + \
+				LOG2_MOD(NTraits::TCAlignmentOf<pthread_mutex_t>::mc_Value, 5) + \
 				sizeof(pthread_mutex_t) / 4U % 22 * 5)
 		#endif
 
@@ -1639,6 +1635,7 @@ namespace NMib::NDatabase
 	#define MDB_ERPAGE_MAX	(MDB_ERPAGE_SIZE-1)
 		uint32 me_rpcheck;
 	#endif
+		mint m_LockedThreadID = 0;
 		// Publics
 		NDatabase::CDatabaseTransactionCommon mdb_txn_begin(NPrivate::MDB_txn *parent, uint32 flags);
 		void mdb_dbi_close(CDatabaseSubID dbi);

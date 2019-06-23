@@ -8,7 +8,7 @@
 namespace NMib::NDatabase
 {
 	template <typename t_CData, typename t_CAllocator, typename t_COptions>
-	struct TCOrderedByteArrayCoder<NContainer::TCVector<t_CData, t_CAllocator, t_COptions>, false>
+	struct TCDatabaseStreamLexicographic<NContainer::TCVector<t_CData, t_CAllocator, t_COptions>, false>
 	{
 		template <typename tf_CStream>
 		static void fs_Encode(tf_CStream &_Stream, NContainer::TCVector<t_CData, t_CAllocator, t_COptions> const &_Values)
@@ -17,7 +17,7 @@ namespace NMib::NDatabase
 				NEncoding::TCBinaryStream_Bin128<> Stream(true);
 				Stream.f_Open(&_Stream, NFile::EFileOpen_Write);
 				for (auto &Value : _Values)
-					fg_EncodeLexicographic(Stream, Value);
+					CDatabaseValue::fs_FeedLexicographic(Stream, Value);
 			}
 			_Stream << uint8(0);
 		}
@@ -43,7 +43,7 @@ namespace NMib::NDatabase
 				NEncoding::TCBinaryStream_Bin128<> Stream(true);
 				Stream.f_Open(&_Stream, NFile::EFileOpen_Read, (EndPos - StartPos) - 1);
 				while (!Stream.f_IsAtEndOfStream())
-					fg_DecodeLexicographic(Stream, o_Values.f_Insert());
+					CDatabaseValue::fs_ConsumeLexicographic(Stream, o_Values.f_Insert());
 			}
 			uint8 EndMarker;
 			_Stream >> EndMarker;
@@ -53,7 +53,7 @@ namespace NMib::NDatabase
 	};
 
 	template <typename t_CAllocator, typename t_COptions>
-	struct TCOrderedByteArrayCoder<NContainer::TCVector<uint8, t_CAllocator, t_COptions>, false>
+	struct TCDatabaseStreamLexicographic<NContainer::TCVector<uint8, t_CAllocator, t_COptions>, false>
 	{
 		template <typename tf_CStream>
 		static void fs_Encode(tf_CStream &_Stream, NContainer::TCVector<uint8, t_CAllocator, t_COptions> const &_Values)
@@ -97,12 +97,12 @@ namespace NMib::NDatabase
 	};
 
 	template <>
-	struct TCOrderedByteArrayCoder<NContainer::CByteVector, false> : public TCOrderedByteArrayCoder<NContainer::TCVector<uint8>, false>
+	struct TCDatabaseStreamLexicographic<NContainer::CByteVector, false> : public TCDatabaseStreamLexicographic<NContainer::TCVector<uint8>, false>
 	{
 	};
 
 	template <>
-	struct TCOrderedByteArrayCoder<NContainer::CSecureByteVector, false> : public TCOrderedByteArrayCoder<NContainer::TCVector<uint8, NMemory::CAllocator_HeapSecure>, false>
+	struct TCDatabaseStreamLexicographic<NContainer::CSecureByteVector, false> : public TCDatabaseStreamLexicographic<NContainer::TCVector<uint8, NMemory::CAllocator_HeapSecure>, false>
 	{
 	};
 }

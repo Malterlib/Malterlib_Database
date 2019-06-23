@@ -408,8 +408,9 @@ namespace NMib::NDatabase
 			memset(m_pLocksMemoryMap->mti_rmutex, 0, sizeof(*m_pLocksMemoryMap->mti_rmutex));
 			memset(m_pLocksMemoryMap->mti_wmutex, 0, sizeof(*m_pLocksMemoryMap->mti_wmutex));
 
+			int rc;
 			if ((rc = pthread_mutexattr_init(&mattr)) != 0)
-				goto fail;
+				DMibError(NStr::fg_Format("Error initializing mutex attributes: {}", mdb_strerror(rc)));
 			rc = pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
 	#ifdef MDB_ROBUST_SUPPORTED
 			if (!rc) rc = pthread_mutexattr_setrobust(&mattr, PTHREAD_MUTEX_ROBUST);
@@ -418,7 +419,7 @@ namespace NMib::NDatabase
 			if (!rc) rc = pthread_mutex_init(m_pLocksMemoryMap->mti_wmutex, &mattr);
 			pthread_mutexattr_destroy(&mattr);
 			if (rc)
-				goto fail;
+				DMibError(NStr::fg_Format("Error initializing mutex: {}", mdb_strerror(rc)));
 	#endif	/* DPlatformFamily_Windows || ... */
 
 			m_pLocksMemoryMap->mti_magic = MDB_MAGIC;

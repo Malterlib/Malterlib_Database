@@ -5,6 +5,7 @@
 
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ConcurrencyManager>
+#include <Mib/Concurrency/ActorSequencerAsync>
 #include <Mib/Database/Database>
 
 namespace NMib::NDatabase
@@ -15,28 +16,66 @@ namespace NMib::NDatabase
 
 		struct CTransactionRead
 		{
-			CTransactionRead(CDatabaseReadTransaction &&_MainTransaction, CDatabaseSubReadTransaction &&_Transaction);
+		private:
+			friend struct CDatabaseActor;
+			
+			NConcurrency::CActorSubscription mp_Subscription;
+			CDatabaseReadTransaction &mp_MainTransaction;
+		public:
+			CTransactionRead(NConcurrency::CActorSubscription &&_Subscription, CDatabaseReadTransaction &_MainTransaction, CDatabaseSubReadTransaction &&_Transaction);
+			CTransactionRead(CTransactionRead &&) = default;
+			CTransactionRead(CTransactionRead const &) = delete;
 
-			CDatabaseReadTransaction m_MainTransaction;
-			CDatabaseSubReadTransaction m_Transaction;
+			CDatabaseSubReadTransaction f_OpenDatabaseTransaction
+				(
+					ch8 const *_pName = nullptr
+					, EDatabaseSubFlag _Flags = EDatabaseSubFlag_None
+					, CDatabaseSubProperties const &_Properties = CDatabaseSubProperties()
+				)
+			;
+			NContainer::TCSet<NStr::CStr> f_EnumDatabases();
+
+			CDatabaseSubReadTransaction m_Transaction; // Transaction for the unnamed main database
 		};
 
 		struct CTransactionWrite
 		{
-			CTransactionWrite(CDatabaseWriteTransaction &&_MainTransaction, CDatabaseSubWriteTransaction &&_Transaction);
+		private:
+			friend struct CDatabaseActor;
 
-			CDatabaseWriteTransaction m_MainTransaction;
-			CDatabaseSubWriteTransaction m_Transaction;
+			NConcurrency::CActorSubscription mp_Subscription;
+			CDatabaseWriteTransaction &mp_MainTransaction;
+		public:
+			CTransactionWrite(NConcurrency::CActorSubscription &&_Subscription, CDatabaseWriteTransaction &_MainTransaction, CDatabaseSubWriteTransaction &&_Transaction);
+			CTransactionWrite(CTransactionWrite &&) = default;
+			CTransactionWrite(CTransactionWrite const &) = delete;
+
+			CDatabaseSub f_OpenDatabase
+				(
+					ch8 const *_pName = nullptr
+					, EDatabaseSubFlag _Flags = EDatabaseSubFlag_Create
+					, CDatabaseSubProperties const &_Properties = CDatabaseSubProperties()
+				)
+			;
+			NContainer::TCSet<NStr::CStr> f_EnumDatabases();
+			CDatabaseWriteTransaction f_BeginChildTransaction();
+
+			CDatabaseSubWriteTransaction m_Transaction; // Transaction for the unnamed main database
 		};
 
 		NConcurrency::TCFuture<void> f_OpenDatabase(NStr::CStr const &_Directory, uint64 _MaxSize);
 
 		NConcurrency::TCFuture<CTransactionRead> f_OpenTransactionRead();
 		NConcurrency::TCFuture<CTransactionWrite> f_OpenTransactionWrite();
+		NConcurrency::TCFuture<void> f_CommitWriteTransaction(CTransactionWrite &&_WriteTransaction);
 
 	private:
+		NConcurrency::TCFuture<void> fp_Destroy();
+
 		CDatabaseEnvironment mp_DatabaseEnvironment;
 		CDatabaseSub mp_Database;
+		NStorage::TCSharedPointer<NConcurrency::CCanDestroyTracker> mp_pCanDestroyTracker = fg_Construct();
+		NConcurrency::TCActorSequencerAsync<CTransactionWrite> mp_WriteSequencer;
 		bool mp_bOpened = false;
 	};
 }

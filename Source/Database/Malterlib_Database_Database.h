@@ -69,6 +69,7 @@ namespace NMib::NDatabase
 #include "Malterlib_Database_Database_Transaction.h"
 #include "Malterlib_Database_Database_SubTransaction.h"
 #include "Malterlib_Database_Database_Cursor.h"
+#include "Malterlib_Database_Database_CursorDuplicateData.h"
 
 namespace NMib::NDatabase
 {
@@ -179,6 +180,7 @@ namespace NMib::NDatabase
 }
 
 #include "Malterlib_Database_Database_Cursor.hpp"
+#include "Malterlib_Database_Database_CursorDuplicateData.hpp"
 #include "Malterlib_Database_Database_SubTransaction.hpp"
 
 #ifndef DMibPNoShortCuts

@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Concurrency/ConcurrencyManager>
@@ -13,6 +13,8 @@ using namespace NMib::NStr;
 using namespace NMib::NDatabase;
 using namespace NMib::NFile;
 using namespace NMib::NContainer;
+using namespace NMib::NStorage;
+using namespace NMib::NTime;
 
 namespace
 {
@@ -29,9 +31,17 @@ namespace
 			CDatabaseValue Value;
 			Value.m_pData = KeyData.f_GetArray();
 			Value.m_Size = KeyData.f_GetLen();
-			fp32 TestValue = fg_Get<0>(fg_DecodeLexicographicTuple<fp32>(Value));
+			fp32 TestValue = fg_Get<0>(Value.f_TupleFromLexicographic<fp32>());
 			return TestValue;
 		}
+
+		using CTestVariant = TCStreamableVariant
+			<
+				uint8
+				, NStorage::TCMember<CStr, uint8(0)>
+				, NStorage::TCMember<uint32, uint8(1)>
+			>
+		;
 
 		template <bool tf_bDescending>
 		void fp_TestOrder()
@@ -58,12 +68,10 @@ namespace
 
 			uint32 iOrder = StartOrder;
 
-			CDatabaseValueCache ValueCache;
-			CDatabaseValueCache KeyCache;
 			#define DInsertValue(d_Prefix, d_Value) DatabaseTransaction.f_Insert \
 				( \
-				 	fg_EncodeLexicographicValue(KeyCache, fg_Descending<tf_bDescending>( d_Prefix ), fg_Descending<tf_bDescending>( d_Value )) \
-				 	, fg_EncodeLexicographicValue(ValueCache, fNextOrder(iOrder)) \
+				 	fg_Tuple(fg_Descending<tf_bDescending>( d_Prefix ), fg_Descending<tf_bDescending>( d_Value )) \
+				 	, fNextOrder(iOrder) \
 				)
 
 			DInsertValue("float", (fs_ReverseEncodeFloat(0,0,0,0)));
@@ -108,9 +116,23 @@ namespace
 			DInsertValue("set  ", (TCSet<CStr>{"Test", "Test1"}));
 			DInsertValue("set  ", (TCSet<CStr>{"Test1"}));
 			DInsertValue("set  ", (TCSet<CStr>{"Test3"}));
+			DInsertValue("time ", (CTimeConvert::fs_CreateTime(55, 5, 6, 15, 20, 55, 0.6)));
+			DInsertValue("time ", (CTimeConvert::fs_CreateTime(2007, 5, 6, 15, 20, 55, 0.6)));
+			DInsertValue("time ", (CTimeConvert::fs_CreateTime(2018, 5, 6, 15, 20, 55, 0.55)));
+			DInsertValue("time ", (CTimeConvert::fs_CreateTime(2018, 5, 6, 15, 20, 55, 0.6)));
+			DInsertValue("time ", (CTimeConvert::fs_CreateTime(2018, 5, 6, 15, 20, 55, 0.7)));
+			DInsertValue("time ", (CTimeConvert::fs_CreateTime(10004556, 5, 6, 15, 20, 55, 0.6)));
+			DInsertValue("times", (CTimeSpanConvert::fs_CreateMinuteSpan(-50)));
+			DInsertValue("times", (CTimeSpanConvert::fs_CreateMinuteSpan(0)));
+			DInsertValue("times", (CTimeSpanConvert::fs_CreateMinuteSpan(10)));
+			DInsertValue("times", (CTimeSpanConvert::fs_CreateMinuteSpan(20)));
 			DInsertValue("uint ", (uint32(0)));
 			DInsertValue("uint ", (uint32(1)));
 			DInsertValue("uint ", (uint32(2)));
+			DInsertValue("vari ", (CTestVariant{"A String"}));
+			DInsertValue("vari ", (CTestVariant{"String"}));
+			DInsertValue("vari ", (CTestVariant{55}));
+			DInsertValue("vari ", (CTestVariant{66}));
 			DInsertValue("vec  ", (CByteVector{0x00}));
 			DInsertValue("vec  ", (CByteVector{0, 1, 2}));
 			DInsertValue("vec  ", (CByteVector{0, 1, 2, 3}));
@@ -130,8 +152,7 @@ namespace
 			iData.f_First();
 			for (uint32 iExpectedOrder = StartOrder; iData; ++iData, ++iExpectedOrder)
 			{
-				auto &Value = iData.f_Value();
-				auto DecodedOrder = fg_DecodeLexicographicValue<uint32>(Value);
+				auto DecodedOrder = iData.f_Value<uint32>();
 				DMibExpect(DecodedOrder, ==, iExpectedOrder)(ETestFlag_Aggregated);
 			}
 		}
@@ -143,17 +164,14 @@ namespace
 				{
 					DMibTestPath(_Path);
 					CDatabaseValueCache Cache;
-					auto RecodedValue = fg_DecodeLexicographicValue<typename NTraits::TCRemoveReferenceAndQualifiers<decltype(fg_Descending<tf_bDescending>(_Value))>::CType>
-						(
-						 	fg_EncodeLexicographicValue(Cache, fg_Descending<tf_bDescending>(_Value))
-						)
+					auto RecodedValue = CDatabaseValue::fs_ToLexicographic(Cache, fg_Descending<tf_bDescending>(_Value))
+						.template f_FromLexicographic<typename NTraits::TCRemoveReferenceAndQualifiers<decltype(fg_Descending<tf_bDescending>(_Value))>::CType>()
 					;
+
 					DMibExpect(RecodedValue, ==, _Value);
 
-					auto RecodedTuple = fg_DecodeLexicographicTuple<typename NTraits::TCRemoveReferenceAndQualifiers<decltype(fg_Descending<tf_bDescending>(_Value))>::CType>
-						(
-						 	fg_EncodeLexicographicValue(Cache, fg_Descending<tf_bDescending>(_Value))
-						)
+					auto RecodedTuple = CDatabaseValue::fs_ToLexicographic(Cache, fg_Descending<tf_bDescending>(_Value))
+						.template f_TupleFromLexicographic<typename NTraits::TCRemoveReferenceAndQualifiers<decltype(fg_Descending<tf_bDescending>(_Value))>::CType>()
 					;
 					DMibExpect(fg_Get<0>(RecodedTuple), ==, _Value);
 				}
@@ -164,18 +182,14 @@ namespace
 				{
 					DMibTestPath(_Path);
 					CDatabaseValueCache Cache;
-					auto RecodedValue = fg_DecodeLexicographicValue<typename NTraits::TCRemoveReferenceAndQualifiers<decltype(fg_Descending<tf_bDescending>(_Value))>::CType>
-						(
-						 	fg_EncodeLexicographicValue(Cache, fg_Descending<tf_bDescending>(_Value))
-						)
+					auto RecodedValue = CDatabaseValue::fs_ToLexicographic(Cache, fg_Descending<tf_bDescending>(_Value))
+						.template f_FromLexicographic<typename NTraits::TCRemoveReferenceAndQualifiers<decltype(fg_Descending<tf_bDescending>(_Value))>::CType>()
 					;
 					using CInteger = typename NTraits::TCIntFromSize<sizeof(_Value)>::CType;
 					DMibExpect((CInteger const &)RecodedValue, ==, (CInteger const &)_Value);
 
-					auto RecodedTuple = fg_DecodeLexicographicTuple<typename NTraits::TCRemoveReferenceAndQualifiers<decltype(fg_Descending<tf_bDescending>(_Value))>::CType>
-						(
-						 	fg_EncodeLexicographicValue(Cache, fg_Descending<tf_bDescending>(_Value))
-						)
+					auto RecodedTuple = CDatabaseValue::fs_ToLexicographic(Cache, fg_Descending<tf_bDescending>(_Value))
+						.template f_TupleFromLexicographic<typename NTraits::TCRemoveReferenceAndQualifiers<decltype(fg_Descending<tf_bDescending>(_Value))>::CType>()
 					;
 					DMibExpect((CInteger const &)fg_Get<0>(RecodedTuple), ==, (CInteger const &)_Value);
 				}
@@ -245,6 +259,22 @@ namespace
 			DTestEncoding((TCMap<CStr, CStr>{{"Test", "Value"}, {"Test1", "Value"}}));
 			DTestEncoding((TCMap<CStr, CStr>{{"Test1", "Value"}}));
 			DTestEncoding((TCMap<CStr, CStr>{{"Test3", "Value"}}));
+
+			DTestEncoding((CTimeConvert::fs_CreateTime(55, 5, 6, 15, 20, 55, 0.6)));
+			DTestEncoding((CTimeConvert::fs_CreateTime(2007, 5, 6, 15, 20, 55, 0.6)));
+			DTestEncoding((CTimeConvert::fs_CreateTime(2018, 5, 6, 15, 20, 55, 0.55)));
+			DTestEncoding((CTimeConvert::fs_CreateTime(2018, 5, 6, 15, 20, 55, 0.6)));
+			DTestEncoding((CTimeConvert::fs_CreateTime(10004556, 5, 6, 15, 20, 55, 0.6)));
+
+			DTestEncoding((CTimeSpanConvert::fs_CreateMinuteSpan(-50)));
+			DTestEncoding((CTimeSpanConvert::fs_CreateMinuteSpan(0)));
+			DTestEncoding((CTimeSpanConvert::fs_CreateMinuteSpan(10)));
+			DTestEncoding((CTimeSpanConvert::fs_CreateMinuteSpan(20)));
+
+			DTestEncoding((CTestVariant{"A String"}));
+			DTestEncoding((CTestVariant{"String"}));
+			DTestEncoding((CTestVariant{55}));
+			DTestEncoding((CTestVariant{66}));
 		}
 
 	public:
@@ -269,6 +299,6 @@ namespace
 			};
 		}
 	};
-	
+
 	DMibTestRegister(CDatabaseValue_Tests, Malterlib::Database);
 }

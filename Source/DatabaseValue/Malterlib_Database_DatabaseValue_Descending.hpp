@@ -23,7 +23,7 @@ namespace NMib::NDatabase
 	decltype(auto) fg_Descending(tf_CValue &&_Value)
 	{
 		if constexpr (tf_bDescending)
-			return TCDescending<typename NTraits::TCRemoveReference<tf_CValue>::CType>(_Value);
+			return (TCDescending<typename NTraits::TCRemoveReference<tf_CValue>::CType>(_Value));
 		else
 			return fg_Forward<tf_CValue>(_Value);
 	}
@@ -55,10 +55,10 @@ namespace NMib::NDatabase
 	};
 
 	template <typename t_CType>
-	struct TCOrderedByteArrayCoder<t_CType, true, TCEnableIfType<TCOrderedByteArrayCoderAutoDescending<t_CType>::mc_bValue>>
+	struct TCDatabaseStreamLexicographic<t_CType, true, TCEnableIfType<TCDatabaseStreamLexicographicAutoDescending<t_CType>::mc_bValue>>
 	{
 		template <typename t_CStream>
-		struct TCBinaryStream_Invert : public NStream::CBinaryStreamDefault
+		struct TCBinaryStream_Invert : public NStream::CBinaryStreamBigEndian
 		{
 			DMibStreamImplementOperators(TCBinaryStream_Invert);
 
@@ -172,6 +172,11 @@ namespace NMib::NDatabase
 				return mp_pStream->f_SetLength(_Length);
 			}
 
+			t_CStream &f_Stream()
+			{
+				return *mp_pStream;
+			}
+
 		protected:
 			DMibStreamImplementProtected(TCBinaryStream_Invert);
 
@@ -180,17 +185,29 @@ namespace NMib::NDatabase
 		};
 
 		template <typename tf_CStream>
+		static void fs_Encode(TCBinaryStream_Invert<tf_CStream> &_Stream, t_CType const &_Value)
+		{
+			TCDatabaseStreamLexicographic<t_CType, false>::fs_Encode(_Stream.f_Stream(), _Value);
+		}
+
+		template <typename tf_CStream>
 		static void fs_Encode(tf_CStream &_Stream, t_CType const &_Value)
 		{
 			TCBinaryStream_Invert<tf_CStream> Stream(&_Stream);
-			TCOrderedByteArrayCoder<t_CType, false>::fs_Encode(Stream, _Value);
+			TCDatabaseStreamLexicographic<t_CType, false>::fs_Encode(Stream, _Value);
+		}
+
+		template <typename tf_CStream>
+		static void fs_Decode(TCBinaryStream_Invert<tf_CStream> &_Stream, t_CType &o_Value)
+		{
+			TCDatabaseStreamLexicographic<t_CType, false>::fs_Decode(_Stream.f_Stream(), o_Value);
 		}
 
 		template <typename tf_CStream>
 		static void fs_Decode(tf_CStream &_Stream, t_CType &o_Value)
 		{
 			TCBinaryStream_Invert<tf_CStream> Stream(&_Stream);
-			TCOrderedByteArrayCoder<t_CType, false>::fs_Decode(Stream, o_Value);
+			TCDatabaseStreamLexicographic<t_CType, false>::fs_Decode(Stream, o_Value);
 		}
 	};
 }

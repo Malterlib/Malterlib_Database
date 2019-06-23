@@ -6,7 +6,7 @@
 namespace NMib::NDatabase
 {
 	template <typename t_CKey, typename t_CData, typename t_CCompare, typename t_CAllocator>
-	struct TCOrderedByteArrayCoder<NContainer::TCMap<t_CKey, t_CData, t_CCompare, t_CAllocator>, false>
+	struct TCDatabaseStreamLexicographic<NContainer::TCMap<t_CKey, t_CData, t_CCompare, t_CAllocator>, false>
 	{
 		template <typename tf_CStream>
 		static void fs_Encode(tf_CStream &_Stream, NContainer::TCMap<t_CKey, t_CData, t_CCompare, t_CAllocator> const &_Values)
@@ -17,8 +17,8 @@ namespace NMib::NDatabase
 				for (auto &Value : _Values)
 				{
 					auto &Key = _Values.fs_GetKey(Value);
-					fg_EncodeLexicographic(Stream, Key);
-					fg_EncodeLexicographic(Stream, Value);
+					CDatabaseValue::fs_FeedLexicographic(Stream, Key);
+					CDatabaseValue::fs_FeedLexicographic(Stream, Value);
 				}
 			}
 			_Stream << uint8(0);
@@ -47,8 +47,8 @@ namespace NMib::NDatabase
 				while (!Stream.f_IsAtEndOfStream())
 				{
 					t_CKey Key;
-					fg_DecodeLexicographic(Stream, Key);
-					fg_DecodeLexicographic(Stream, o_Values[fg_Move(Key)]);
+					CDatabaseValue::fs_ConsumeLexicographic(Stream, Key);
+					CDatabaseValue::fs_ConsumeLexicographic(Stream, o_Values[fg_Move(Key)]);
 				}
 			}
 			uint8 EndMarker;

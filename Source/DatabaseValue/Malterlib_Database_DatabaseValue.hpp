@@ -10,6 +10,8 @@
 #include "Malterlib_Database_DatabaseValue_Set.hpp"
 #include "Malterlib_Database_DatabaseValue_Map.hpp"
 #include "Malterlib_Database_DatabaseValue_Tuple.hpp"
+#include "Malterlib_Database_DatabaseValue_Variant.hpp"
+#include "Malterlib_Database_DatabaseValue_Time.hpp"
 #include "Malterlib_Database_DatabaseValue_Descending.hpp"
 #include "Malterlib_Database_DatabaseValue_Private.hpp"
 
@@ -27,37 +29,82 @@ namespace NMib::NDatabase
 	}
 
 	template <typename t_CType, bool t_bDescending, typename t_CEnableIf>
-	struct TCOrderedByteArrayCoder
+	struct TCDatabaseStreamLexicographic
 	{
 		template <typename tf_CStream>
 		static void fs_Encode(tf_CStream &_Stream, t_CType const &_Value)
 		{
 			if constexpr (t_bDescending)
-				_Value.f_EncodeDescending(_Stream);
+				_Value.f_FeedLexicograpicDescending(_Stream);
 			else
-				_Value.f_Encode(_Stream);
+				_Value.f_FeedLexicograpic(_Stream);
 		}
 		
 		template <typename tf_CStream>
 		static void fs_Decode(tf_CStream &_Stream, t_CType &o_Value)
 		{
 			if constexpr (t_bDescending)
-				o_Value.f_DecodeDescending(_Stream);
+				o_Value.f_ConsumeLexicographicDescending(_Stream);
 			else
-				o_Value.f_Decode(_Stream);
+				o_Value.f_ConsumeLexicographic(_Stream);
 		}
 	};
 	
 	template <typename ...tfp_CValue>
-	CDatabaseValue fg_EncodeLexicographicValue(CDatabaseValueCache &o_StreamCache, tfp_CValue const &...p_Value)
+	CDatabaseValue CDatabaseValue::fs_ToLexicographic(CDatabaseValueCache &o_StreamCache, tfp_CValue const &...p_Value)
 	{
 		{
-			NStream::CBinaryStreamMemoryRef<NStream::CBinaryStreamBigEndian, NContainer::TCGrowingVector<uint8>> Stream{o_StreamCache, 0};
-			std::initializer_list<bool> Dummy =
+			NStream::CBinaryStreamMemoryRef<NStream::CBinaryStreamBigEndian, CDatabaseValueCache> Stream{o_StreamCache, 0};
+			TCInitializerList<bool> Dummy =
 				{
 					[&]
 					{
-						fg_EncodeLexicographic(Stream, p_Value);
+						CDatabaseValue::fs_FeedLexicographic(Stream, p_Value);
+						return true;
+					}
+					()...
+				}
+			;
+			(void)Dummy;
+		}
+		return CDatabaseValue{o_StreamCache};
+	}
+
+	template <typename ...tfp_CValue>
+	CDatabaseValue CDatabaseValue::fs_ToStream(CDatabaseValueCache &o_StreamCache, NStorage::TCTuple<tfp_CValue...> const &_Value)
+	{
+		NStream::CBinaryStreamMemoryRef<NStream::CBinaryStreamDefault, CDatabaseValueCache> Stream{o_StreamCache, 0};
+
+		NStorage::fg_TupleApply
+			(
+				[&](auto && ...p_Values) -> void
+				{
+					[[maybe_unused]] TCInitializerList<bool> Dummy =
+						{
+							[&]
+							{
+								Stream << p_Values;
+								return true;
+							}()...
+						}
+					;
+				}
+				, _Value
+			)
+		;
+		return CDatabaseValue{o_StreamCache};
+	}
+
+	template <typename ...tfp_CValue>
+	CDatabaseValue CDatabaseValue::fs_ToStream(CDatabaseValueCache &o_StreamCache, tfp_CValue const &...p_Value)
+	{
+		{
+			NStream::CBinaryStreamMemoryRef<NStream::CBinaryStreamDefault, CDatabaseValueCache> Stream{o_StreamCache, 0};
+			TCInitializerList<bool> Dummy =
+				{
+					[&]
+					{
+						Stream << p_Value;
 						return true;
 					}
 					()...
@@ -69,46 +116,77 @@ namespace NMib::NDatabase
 	}
 	
 	template <typename ...tfp_CValue>
-	auto fg_DecodeLexicographicTuple(CDatabaseValue const &_Value)
+	auto CDatabaseValue::f_TupleFromLexicographic() const
 	{
-		return NPrivate::fg_DecodeOrderedByteArrayImpl<tfp_CValue...>(_Value, typename NMeta::TCMakeConsecutiveIndices<sizeof...(tfp_CValue)>::CType());
+		return NPrivate::fg_ConsumeLexicographicByteArrayImpl<tfp_CValue...>(*this, typename NMeta::TCMakeConsecutiveIndices<sizeof...(tfp_CValue)>::CType());
 	}
 	
 	template <typename tf_CValue>
-	void fg_DecodeLexicographicValue(CDatabaseValue const &_Value, tf_CValue &o_Value)
+	void CDatabaseValue::f_FromLexicographic(tf_CValue &o_Value) const
 	{
 		NStream::CBinaryStreamMemoryPtr<NStream::CBinaryStreamBigEndian> Stream;
-		Stream.f_OpenRead(_Value.m_pData, _Value.m_Size);
-		fg_DecodeLexicographic(Stream, o_Value);
+		Stream.f_OpenRead(m_pData, m_Size);
+		CDatabaseValue::fs_ConsumeLexicographic(Stream, o_Value);
 	}
 
 	template <typename tf_CValue>
-	auto fg_DecodeLexicographicValue(CDatabaseValue const &_Value)
+	auto CDatabaseValue::f_FromLexicographic() const
 	{
 		using CDecodedDescending = TCGetDescending<typename NTraits::TCRemoveQualifiers<tf_CValue>::CType>;
 
 		NStream::CBinaryStreamMemoryPtr<NStream::CBinaryStreamBigEndian> Stream;
-		Stream.f_OpenRead(_Value.m_pData, _Value.m_Size);
+		Stream.f_OpenRead(m_pData, m_Size);
 		if constexpr (CDecodedDescending::mc_bDescending)
 		{
 			typename CDecodedDescending::CType Value;
 			auto Descending = fg_Descending<CDecodedDescending::mc_bDescending>(Value);
-			fg_DecodeLexicographic(Stream, Descending);
+			CDatabaseValue::fs_ConsumeLexicographic(Stream, Descending);
 			return Value;
 		}
 		else
 		{
 			typename CDecodedDescending::CType Value;
-			fg_DecodeLexicographic(Stream, Value);
+			CDatabaseValue::fs_ConsumeLexicographic(Stream, Value);
 			return Value;
 		}
 	}
-	
+
+	template <typename ...tfp_CValue>
+	auto CDatabaseValue::f_TupleFromStream() const
+	{
+		NStream::CBinaryStreamMemoryPtr<NStream::CBinaryStreamDefault> Stream;
+		Stream.f_OpenRead(m_pData, m_Size);
+
+		NStorage::TCTuple<tfp_CValue...> Tuple;
+		Stream >> Tuple;
+		return Tuple;
+	}
+
+	template <typename tf_CValue>
+	auto CDatabaseValue::f_FromStream() const
+	{
+		NStream::CBinaryStreamMemoryPtr<NStream::CBinaryStreamDefault> Stream;
+		Stream.f_OpenRead(m_pData, m_Size);
+
+		tf_CValue Value;
+		Stream >> Value;
+		return Value;
+	}
+
+	template <typename tf_CValue>
+	void CDatabaseValue::f_FromStream(tf_CValue &o_Value) const
+	{
+		NStream::CBinaryStreamMemoryPtr<NStream::CBinaryStreamDefault> Stream;
+		Stream.f_OpenRead(m_pData, m_Size);
+
+		Stream >> o_Value;
+	}
+
 	template <typename tf_CStream, typename tf_CValue>
-	void fg_EncodeLexicographic(tf_CStream &_Stream, tf_CValue const &_Value)
+	void CDatabaseValue::fs_FeedLexicographic(tf_CStream &_Stream, tf_CValue const &_Value)
 	{
 		using CDecodedDescending = TCGetDescending<typename NTraits::TCRemoveQualifiers<tf_CValue>::CType>;
-		TCOrderedByteArrayCoder<typename NTraits::TCRemoveQualifiers<typename CDecodedDescending::CType>::CType, CDecodedDescending::mc_bDescending>::fs_Encode
+		TCDatabaseStreamLexicographic<typename NTraits::TCRemoveQualifiers<typename CDecodedDescending::CType>::CType, CDecodedDescending::mc_bDescending>::fs_Encode
 			(
 			 	_Stream
 			 	, CDecodedDescending::fs_GetValue(_Value)
@@ -117,10 +195,10 @@ namespace NMib::NDatabase
 	}
 	
 	template <typename tf_CStream, typename tf_CValue>
-	void fg_DecodeLexicographic(tf_CStream &_Stream, tf_CValue &o_Value)
+	void CDatabaseValue::fs_ConsumeLexicographic(tf_CStream &_Stream, tf_CValue &&o_Value)
 	{
-		using CDecodedDescending = TCGetDescending<typename NTraits::TCRemoveQualifiers<tf_CValue>::CType>;
-		TCOrderedByteArrayCoder<typename NTraits::TCRemoveQualifiers<typename CDecodedDescending::CType>::CType, CDecodedDescending::mc_bDescending>::fs_Decode
+		using CDecodedDescending = TCGetDescending<typename NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>::CType>;
+		TCDatabaseStreamLexicographic<typename NTraits::TCRemoveQualifiers<typename CDecodedDescending::CType>::CType, CDecodedDescending::mc_bDescending>::fs_Decode
 			(
 			 	_Stream
 			 	, CDecodedDescending::fs_GetValue(o_Value)
@@ -129,7 +207,7 @@ namespace NMib::NDatabase
 	}
 	
 	template <typename tf_CValue>
-	CDatabaseValue fg_RawDatabaseValue(tf_CValue const &_Value)
+	CDatabaseValue CDatabaseValue::fs_Raw(tf_CValue const &_Value)
 	{
 		CDatabaseValue DatabaseValue;
 		DatabaseValue.m_pData = reinterpret_cast<uint8 const *>(&_Value);
@@ -138,10 +216,10 @@ namespace NMib::NDatabase
 	}
 	
 	template <typename tf_CValue>
-	tf_CValue const &fg_RawDatabaseValue(CDatabaseValue const &_Value)
+	tf_CValue const &CDatabaseValue::f_Raw() const
 	{
-		DMibFastCheck(sizeof(tf_CValue) == _Value.m_Size);
-		return *reinterpret_cast<tf_CValue const *>(_Value.m_pData);
+		DMibFastCheck(sizeof(tf_CValue) == m_Size);
+		return *reinterpret_cast<tf_CValue const *>(m_pData);
 	}
 
 	template <typename tf_CStr>

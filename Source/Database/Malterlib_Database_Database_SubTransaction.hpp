@@ -12,25 +12,53 @@ namespace NMib::NDatabase
 
 		CDatabaseValue Value;
 
-		if (!f_Get(fg_EncodeLexicographicValue(ThreadLocal.m_KeyCache, _Key)))
+		if (!f_Get(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_KeyCache, _Key), Value))
 			return false;
 
-		fg_DecodeLexicographicValue(Value, o_Value);
+		Value.f_FromStream(o_Value);
 
 		return true;
 	}
-	
+
+	template <typename tf_CKey, typename tf_CValue>
+	bool CDatabaseSubReadTransaction::f_GetDuplicateData(tf_CKey const &_Key, tf_CValue &o_Value)
+	{
+		auto &ThreadLocal = **g_DatabaseThreadLocal;
+
+		CDatabaseValue Value;
+
+		if (!f_Get(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_KeyCache, _Key), Value))
+			return false;
+
+		Value.f_FromLexicographic(o_Value);
+
+		return true;
+	}
+
 	template <typename tf_CKey, typename tf_CValue>
 	void CDatabaseSubWriteTransaction::f_Insert(tf_CKey const &_Key, tf_CValue const &_Value, bool _bAppend)
 	{
 		auto &ThreadLocal = **g_DatabaseThreadLocal;
 
 		if constexpr (NTraits::TCIsSame<tf_CKey, CDatabaseValue>::mc_Value)
-			f_Insert(_Key, fg_EncodeLexicographicValue(ThreadLocal.m_ValueCache, _Value), _bAppend);
+			f_Insert(_Key, CDatabaseValue::fs_ToStream(ThreadLocal.m_ValueCache, _Value), _bAppend);
 		else if constexpr (NTraits::TCIsSame<tf_CValue, CDatabaseValue>::mc_Value)
-			f_Insert(fg_EncodeLexicographicValue(ThreadLocal.m_KeyCache, _Key), _Value, _bAppend);
+			f_Insert(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_KeyCache, _Key), _Value, _bAppend);
 		else
-			f_Insert(fg_EncodeLexicographicValue(ThreadLocal.m_KeyCache, _Key), fg_EncodeLexicographicValue(ThreadLocal.m_ValueCache, _Value), _bAppend);
+			f_Insert(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_KeyCache, _Key), CDatabaseValue::fs_ToStream(ThreadLocal.m_ValueCache, _Value), _bAppend);
+	}
+
+	template <typename tf_CKey, typename tf_CValue>
+	void CDatabaseSubWriteTransaction::f_InsertDuplicateData(tf_CKey const &_Key, tf_CValue const &_Value, bool _bAppend)
+	{
+		auto &ThreadLocal = **g_DatabaseThreadLocal;
+
+		if constexpr (NTraits::TCIsSame<tf_CKey, CDatabaseValue>::mc_Value)
+			f_Insert(_Key, CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_ValueCache, _Value), _bAppend);
+		else if constexpr (NTraits::TCIsSame<tf_CValue, CDatabaseValue>::mc_Value)
+			f_Insert(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_KeyCache, _Key), _Value, _bAppend);
+		else
+			f_Insert(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_KeyCache, _Key), CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_ValueCache, _Value), _bAppend);
 	}
 
 	template <typename tf_CKey>
@@ -38,7 +66,7 @@ namespace NMib::NDatabase
 	{
 		auto &ThreadLocal = **g_DatabaseThreadLocal;
 
-		return f_InsertInplace(fg_EncodeLexicographicValue(ThreadLocal.m_KeyCache, _Key), _bAppend);
+		return f_InsertInplace(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_KeyCache, _Key), _bAppend);
 	}
 
 	template <typename tf_CKey, typename tf_CValue>
@@ -47,11 +75,24 @@ namespace NMib::NDatabase
 		auto &ThreadLocal = **g_DatabaseThreadLocal;
 
 		if constexpr (NTraits::TCIsSame<tf_CKey, CDatabaseValue>::mc_Value)
-			f_Upsert(_Key, fg_EncodeLexicographicValue(ThreadLocal.m_ValueCache, _Value), _bAppend);
+			f_Upsert(_Key, CDatabaseValue::fs_ToStream(ThreadLocal.m_ValueCache, _Value), _bAppend);
 		else if constexpr (NTraits::TCIsSame<tf_CValue, CDatabaseValue>::mc_Value)
-			f_Upsert(fg_EncodeLexicographicValue(ThreadLocal.m_KeyCache, _Key), _Value, _bAppend);
+			f_Upsert(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_KeyCache, _Key), _Value, _bAppend);
 		else
-			f_Upsert(fg_EncodeLexicographicValue(ThreadLocal.m_KeyCache, _Key), fg_EncodeLexicographicValue(ThreadLocal.m_ValueCache, _Value), _bAppend);
+			f_Upsert(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_KeyCache, _Key), CDatabaseValue::fs_ToStream(ThreadLocal.m_ValueCache, _Value), _bAppend);
+	}
+
+	template <typename tf_CKey, typename tf_CValue>
+	void CDatabaseSubWriteTransaction::f_UpsertDuplicateData(tf_CKey const &_Key, tf_CValue const &_Value, bool _bAppend)
+	{
+		auto &ThreadLocal = **g_DatabaseThreadLocal;
+
+		if constexpr (NTraits::TCIsSame<tf_CKey, CDatabaseValue>::mc_Value)
+			f_Upsert(_Key, CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_ValueCache, _Value), _bAppend);
+		else if constexpr (NTraits::TCIsSame<tf_CValue, CDatabaseValue>::mc_Value)
+			f_Upsert(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_KeyCache, _Key), _Value, _bAppend);
+		else
+			f_Upsert(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_KeyCache, _Key), CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_ValueCache, _Value), _bAppend);
 	}
 
 	template <typename tf_CKey>
@@ -59,7 +100,7 @@ namespace NMib::NDatabase
 	{
 		auto &ThreadLocal = **g_DatabaseThreadLocal;
 
-		return f_UpsertInplace(fg_EncodeLexicographicValue(ThreadLocal.m_KeyCache, _Key), _bAppend);
+		return f_UpsertInplace(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_KeyCache, _Key), _bAppend);
 	}
 
 	template <typename tf_CKey>
@@ -67,7 +108,7 @@ namespace NMib::NDatabase
 	{
 		auto &ThreadLocal = **g_DatabaseThreadLocal;
 
-		return f_Delete(fg_EncodeLexicographicValue(ThreadLocal.m_KeyCache, _Key));
+		return f_Delete(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_KeyCache, _Key));
 	}
 
 	template <typename tf_CKey, typename tf_CValue>
@@ -76,11 +117,11 @@ namespace NMib::NDatabase
 		auto &ThreadLocal = **g_DatabaseThreadLocal;
 
 		if constexpr (NTraits::TCIsSame<tf_CKey, CDatabaseValue>::mc_Value)
-			f_DeleteData(_Key, fg_EncodeLexicographicValue(ThreadLocal.m_ValueCache, _Value));
+			f_DeleteData(_Key, CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_ValueCache, _Value));
 		else if constexpr (NTraits::TCIsSame<tf_CValue, CDatabaseValue>::mc_Value)
-			f_DeleteData(fg_EncodeLexicographicValue(ThreadLocal.m_KeyCache, _Key), _Value);
+			f_DeleteData(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_KeyCache, _Key), _Value);
 		else
-			f_DeleteData(fg_EncodeLexicographicValue(ThreadLocal.m_KeyCache, _Key), fg_EncodeLexicographicValue(ThreadLocal.m_ValueCache, _Value));
+			f_DeleteData(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_KeyCache, _Key), CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_ValueCache, _Value));
 	}
 
 	template <typename ...tfp_CKeys>
