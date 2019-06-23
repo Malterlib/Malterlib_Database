@@ -15,7 +15,7 @@ Import "../Core/Lib_Malterlib.MTarget"
 			}
 			%File "Include/Mib/Database/^*"
 		}
-		%File "Source/*"
+		%File "Source/^*"
 		%Group Documentation
 		{
 			%File "Documentation/*"
@@ -38,6 +38,7 @@ Property
 	{
 		!!MalterlibLibrary_Database true
 	}
+	MalterlibLibrarySeparate_Lib_Malterlib_Database true
 //	MalterlibSubLibrarySeparate_Lib_Malterlib_Database true
 	MalterlibIncludeRoots "@('Include'->MakeAbsolute());@(MalterlibIncludeRoots)"
 	{
@@ -51,5 +52,6 @@ Property
 	
 	MalterlibTests "Malterlib_Database;@(MalterlibTests)"
 	MalterlibTestFiles_Malterlib_Database "@('Test/*'->MakeAbsolute())"
+	MalterlibTestDependencies_Malterlib_Database "Lib_Malterlib_Database"
 }
 
