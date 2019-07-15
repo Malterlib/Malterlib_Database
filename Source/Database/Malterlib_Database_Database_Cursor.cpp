@@ -199,7 +199,7 @@ namespace NMib::NDatabase
 	{
 		auto &Cursor = *mp_pInternal;
 		Cursor.f_Delete(EDatabaseWriteFlag_None);
-		fp_SetToCurrent();
+		++(*this);
 	}
 
 	CDatabaseCursorDuplicateDataWrite::CDatabaseCursorDuplicateDataWrite(NStorage::TCUniquePointer<CInternal> &&_pInternal)
@@ -268,7 +268,7 @@ namespace NMib::NDatabase
 		if (Result == MDB_NOTFOUND)
 			mp_bValid = false;
 		else if (Result)
-			DMibError(NStr::fg_Format("Error setting cursor to first: {}", NPrivate::mdb_strerror(Result)));
+			DMibError(NStr::fg_Format("Error setting cursor to current: {}", NPrivate::mdb_strerror(Result)));
 		else
 			mp_bValid = true;
 	}
