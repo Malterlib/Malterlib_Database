@@ -141,7 +141,7 @@ namespace NMib::NDatabase
 		CDatabaseEnvironment(CDatabaseEnvironment &&_Other);
 		CDatabaseEnvironment &operator =(CDatabaseEnvironment &&_Other);
 
-		void f_Open(NStr::CStr const &_Path, EDatabaseEnvironmentFlag _Flags, NFile::EFileAttrib _FileAttributes);
+		void f_Open(NStr::CStr const &_Path, EDatabaseEnvironmentFlag _Flags, NFile::EFileAttrib _FileAttributes, uint32 _PageSize = 0);
 		void f_Close();
 		bool f_IsOpen() const;
 		void f_Sync(bool _bForce);

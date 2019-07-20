@@ -206,7 +206,7 @@ namespace NMib::NDatabase
 	 *	<li>EAGAIN - the environment was locked by another process.
 	 * </ul>
 	 */
-	void DMibDatabaseInfrequentSection CDatabaseEnvironment::f_Open(NStr::CStr const &_Path, EDatabaseEnvironmentFlag _Flags, NFile::EFileAttrib _FileAttributes)
+	void DMibDatabaseInfrequentSection CDatabaseEnvironment::f_Open(NStr::CStr const &_Path, EDatabaseEnvironmentFlag _Flags, NFile::EFileAttrib _FileAttributes, uint32 _PageSize)
 	{
 		uint32 flags = _Flags;
 		uint32 Mode = 0;
@@ -297,7 +297,7 @@ namespace NMib::NDatabase
 		if ((flags & (EDatabaseEnvironmentFlag_ReadOnly|EDatabaseEnvironmentFlag_NoLock)) == EDatabaseEnvironmentFlag_ReadOnly)
 			Environment.mdb_env_setup_locks(_Path, Mode, &excl);
 
-		Environment.mdb_env_open2(flags & EDatabaseEnvironmentFlag_PreviousSnapshot);
+		Environment.mdb_env_open2(flags & EDatabaseEnvironmentFlag_PreviousSnapshot, _PageSize);
 
 		if (!(flags & (EDatabaseEnvironmentFlag_ReadOnly|EDatabaseEnvironmentFlag_WriteMap))) {
 			/* Synchronous fd for meta writes. Needed even with
@@ -1365,7 +1365,7 @@ namespace NMib::NDatabase
 
 	/** Further setup required for opening an LMDB environment
 	 */
-	void DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::mdb_env_open2(int prev)
+	void DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::mdb_env_open2(int prev, uint32 _PageSize)
 	{
 		uint32 flags = me_flags;
 		int newenv = 0;
@@ -1400,7 +1400,11 @@ namespace NMib::NDatabase
 		{
 			DPUTS("new mdbenv");
 			newenv = 1;
-			me_psize = me_os_psize;
+			if (_PageSize)
+				me_psize = _PageSize;
+			else
+				me_psize = me_os_psize;
+
 			if (me_psize > MAX_PAGESIZE)
 				me_psize = MAX_PAGESIZE;
 			memset(&meta, 0, sizeof(meta));

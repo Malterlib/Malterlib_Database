@@ -708,7 +708,8 @@ namespace NMib::NDatabase
 			 *	#EDatabaseSubFlag_SortedDuplicates data items must fit on a node in a regular page.
 			 */
 		#ifndef MDB_MAXKEYSIZE
-		#define MDB_MAXKEYSIZE	 ((MDB_DEVEL) ? 0 : 511)
+		//#define MDB_MAXKEYSIZE	 ((MDB_DEVEL) ? 0 : 511)
+		#define MDB_MAXKEYSIZE	 0
 		#endif
 
 			/**	The maximum size of a key we can write to the environment. */
@@ -1049,7 +1050,8 @@ namespace NMib::NDatabase
 		#define METADATA(p)	 ((uint8 *)(p) + PAGEHDRSZ)
 
 			/** ITS#7713, change PAGEBASE to handle 65536 byte pages */
-		#define	PAGEBASE	((MDB_DEVEL) ? PAGEHDRSZ : 0)
+		//#define	PAGEBASE	((MDB_DEVEL) ? PAGEHDRSZ : 0)
+		#define	PAGEBASE	PAGEHDRSZ
 
 			/** Number of nodes on a page */
 		#define NUMKEYS(p)	 (((p)->mp_lower - (PAGEHDRSZ-PAGEBASE)) >> 1)
@@ -1668,7 +1670,7 @@ namespace NMib::NDatabase
 		void mdb_env_init_meta0(NPrivate::MDB_meta *meta);
 		void mdb_env_init_meta(NPrivate::MDB_meta *meta);
 		int mdb_env_map(void *addr);
-		void mdb_env_open2(int prev);
+		void mdb_env_open2(int prev, uint32 _PageSize);
 		int mdb_env_share_locks(int *excl);
 		int mdb_env_excl_lock(int *excl);
 		void mdb_env_setup_locks(NStr::CStr const &_LockPath, int mode, int *excl);
