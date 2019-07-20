@@ -87,6 +87,10 @@ namespace NMib::NDatabase
 	{
 		DMibRequire(key);
 		DMibRequire(data);
+		DMibRequire(!mc_txn->mt_env->f_IsInsideMemoryMap(key->m_pData) && !mc_txn->mt_env->f_IsInsideMemoryMap(data->m_pData))
+			("You cannot use a value from the database in a database write. The database can change the value while writing, corrupting the database.")
+		;
+
 		using namespace NPrivate;
 
 		if (_WriteFlags & ~(EDatabaseWriteFlag_NoOverwrite|EDatabaseWriteFlag_NoDuplicateData|EDatabaseWriteFlag_ReserveSpace|EDatabaseWriteFlag_Append|EDatabaseWriteFlag_AppendDuplicateData|EDatabaseWriteFlag_OverwriteAtCurrentCursorPos))
@@ -131,10 +135,12 @@ namespace NMib::NDatabase
 		auto &Cursor = *mp_pInternal;
 		CDatabaseValue Value = _Value;
 		auto Flags = (_bAppend ? EDatabaseWriteFlag_Append : EDatabaseWriteFlag_None) | EDatabaseWriteFlag_OverwriteAtCurrentCursorPos;
-		Cursor.f_Put(&mp_Key, &Value, Flags);
+
+		CDatabaseValue Key(mp_KeyCache, mp_Key);
+		Cursor.f_Put(&Key, &Value, Flags);
+		mp_Key = Key;
 		mp_Value = Value;
 	}
-
 
 	CDatabaseValue CDatabaseCursorWrite::f_SetValueInplace(mint _DataSize, bool _bAppend)
 	{
@@ -142,7 +148,9 @@ namespace NMib::NDatabase
 		CDatabaseValue Value;
 		Value.m_Size = _DataSize;
 		auto Flags = (_bAppend ? EDatabaseWriteFlag_Append : EDatabaseWriteFlag_None) | EDatabaseWriteFlag_OverwriteAtCurrentCursorPos | EDatabaseWriteFlag_ReserveSpace;
-		Cursor.f_Put(&mp_Key, &Value, Flags);
+		CDatabaseValue Key(mp_KeyCache, mp_Key);
+		Cursor.f_Put(&Key, &Value, Flags);
+		mp_Key = Key;
 		mp_Value = Value;
 		return Value;
 	}
@@ -212,7 +220,10 @@ namespace NMib::NDatabase
 		auto &Cursor = *mp_pInternal;
 		CDatabaseValue Value = _Value;
 		auto Flags = (_bAppend ? EDatabaseWriteFlag_Append : EDatabaseWriteFlag_None) | EDatabaseWriteFlag_OverwriteAtCurrentCursorPos;
-		Cursor.f_Put(&mp_Key, &Value, Flags);
+
+		CDatabaseValue Key(mp_KeyCache, mp_Key);
+		Cursor.f_Put(&Key, &Value, Flags);
+		mp_Key = Key;
 		mp_Value = Value;
 	}
 

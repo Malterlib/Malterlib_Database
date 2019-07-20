@@ -80,7 +80,9 @@ namespace NMib::NDatabase
 		CDatabaseValue mp_Value;
 
 		CDatabaseValue mp_Prefix;
+
 		CDatabaseValueCache mp_PrefixCache;
+		CDatabaseValueCache mp_KeyCache;
 
 		NStorage::TCUniquePointer<CInternal> mp_pInternal;
 

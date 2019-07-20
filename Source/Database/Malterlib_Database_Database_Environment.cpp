@@ -1148,6 +1148,15 @@ namespace NMib::NDatabase
 	}
 	#endif
 
+	bool DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_IsInsideMemoryMap(uint8 const *_pData)
+	{
+	#ifdef DMibDatabase_Always64BitSupport
+		return false; // TODO
+	#else
+		return _pData >= (uint8 const *)me_map && _pData < ((uint8 const *)me_map + this->m_MapSize);
+	#endif
+	}
+
 	int DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::mdb_env_map(void *addr)
 	{
 		MDB_page *p;

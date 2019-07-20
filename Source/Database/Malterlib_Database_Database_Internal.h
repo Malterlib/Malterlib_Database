@@ -1675,6 +1675,7 @@ namespace NMib::NDatabase
 		int mdb_mutex_failed(NPrivate::mdb_mutexref_t mutex, int rc);
 		int mdb_fopen(NStr::CStr const &_FileName, NPrivate::mdb_fopen_type which, NPrivate::mdb_mode_t mode, HANDLE *res);
 		NStr::CStr mdb_getfilename(NStr::CStr const &_FileName, NPrivate::mdb_fopen_type which);
+		bool f_IsInsideMemoryMap(uint8 const *_pData);
 	};
 
 	namespace NPrivate

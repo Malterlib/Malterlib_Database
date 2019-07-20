@@ -25,6 +25,7 @@ namespace NMib::NDatabase
 	{
 		CDatabaseValue() = default;
 		CDatabaseValue(CDatabaseValueCache const &_Value);
+		CDatabaseValue(CDatabaseValueCache &_ValueCache, CDatabaseValue const &_CopyFromValue);
 
 		bool operator < (CDatabaseValue const &_Right) const;
 		bool operator == (CDatabaseValue const &_Right) const;
@@ -70,6 +71,8 @@ namespace NMib::NDatabase
 
 		template <typename tf_CValue>
 		tf_CValue const &f_Raw() const;
+
+		NContainer::CByteVector f_ToVector() const;
 
 		mint m_Size = 0;				///< Size of the data item */
 		uint8 const *m_pData = nullptr;	///< Address of the data item */

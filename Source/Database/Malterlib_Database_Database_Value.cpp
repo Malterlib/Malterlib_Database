@@ -147,6 +147,9 @@ namespace NMib::NDatabase
 	{
 		DMibRequire(key);
 		DMibRequire(data);
+		DMibRequire(!mt_env->f_IsInsideMemoryMap(key->m_pData) && !mt_env->f_IsInsideMemoryMap(data->m_pData))
+			("You cannot use a value from the database in a database write. The database can change the value while writing, corrupting the database.")
+		;
 		using namespace NPrivate;
 
 		if (!TXN_DBI_EXIST(this, dbi, DB_USRVALID))

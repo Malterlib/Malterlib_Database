@@ -80,7 +80,7 @@ namespace NMib::NDatabase
 				}
 				else
 				{
-					NContainer::TCVector<uint8> Buffer;
+					NContainer::CByteVector Buffer;
 					Buffer.f_SetLen(_nBytes);
 					auto pDestination = Buffer.f_GetArray();
 					for (mint i = 0; i < _nBytes; ++i)
@@ -102,7 +102,7 @@ namespace NMib::NDatabase
 				}
 				else
 				{
-					NContainer::TCVector<uint8> Buffer;
+					NContainer::CByteVector Buffer;
 					Buffer.f_SetLen(_nBytes);
 					auto pSource = Buffer.f_GetArray();
 					mp_pStream->f_ConsumeBytes(pSource, _nBytes);
