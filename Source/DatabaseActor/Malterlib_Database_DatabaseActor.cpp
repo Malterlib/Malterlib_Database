@@ -89,9 +89,9 @@ namespace NMib::NDatabase
 	auto CDatabaseActor::f_OpenTransactionRead() -> TCFuture<CTransactionRead>
 	{
 		if (!mp_bOpened)
-			return DMibErrorInstance("Database has not been opened");
-		if (mp_bDestroyed)
-			return DMibErrorInstance("Database actor destroyed");
+			co_return DMibErrorInstance("Database has not been opened");
+		if (f_IsDestroyed())
+			co_return DMibErrorInstance("Database actor destroyed");
 
 		struct CState
 		{
@@ -105,50 +105,47 @@ namespace NMib::NDatabase
 			pState->m_MainTransaction = this->mp_DatabaseEnvironment.f_BeginReadTransaction();
 			auto Transaction = this->mp_Database.f_Transaction(pState->m_MainTransaction);
 
-			return fg_Explicit
-				(
-					CTransactionRead
+			co_return CTransactionRead
+				{
+					g_ActorSubscription / [pState, pCanDestroy = mp_pCanDestroyTracker]() mutable
 					{
-						g_ActorSubscription / [pState, pCanDestroy = mp_pCanDestroyTracker]() mutable
-						{
-							pState.f_Clear();
-						}
-						, pState->m_MainTransaction
-						, fg_Move(Transaction)
+						pState.f_Clear();
 					}
-				)
+					, pState->m_MainTransaction
+					, fg_Move(Transaction)
+				}
 			;
 		}
-		catch (NException::CException const &_Exception)
+		catch (NException::CException const &)
 		{
-			return _Exception;
+			co_return NException::fg_CurrentException();
 		}
 	}
 
 	auto CDatabaseActor::f_OpenTransactionWrite() -> TCFuture<CTransactionWrite>
 	{
 		if (!mp_bOpened)
-			return DMibErrorInstance("Database has not been opened");
-		if (mp_bDestroyed)
-			return DMibErrorInstance("Database actor destroyed");
+			co_return DMibErrorInstance("Database has not been opened");
+		if (f_IsDestroyed())
+			co_return DMibErrorInstance("Database actor destroyed");
 
 		struct CState
 		{
 			CDatabaseWriteTransaction m_MainTransaction;
 		};
 
-		return mp_WriteSequencer / [this](CActorSubscription &&_SequencerSubscription) -> TCFuture<CTransactionWrite>
-			{
-				try
+		co_return co_await
+			(
+			 	mp_WriteSequencer / [this](CActorSubscription &&_SequencerSubscription) -> TCFuture<CTransactionWrite>
 				{
-					NStorage::TCSharedPointer<CState> pState = fg_Construct();
+					try
+					{
+						NStorage::TCSharedPointer<CState> pState = fg_Construct();
 
-					pState->m_MainTransaction = this->mp_DatabaseEnvironment.f_BeginWriteTransaction();
-					auto Transaction = this->mp_Database.f_Transaction(pState->m_MainTransaction);
+						pState->m_MainTransaction = this->mp_DatabaseEnvironment.f_BeginWriteTransaction();
+						auto Transaction = this->mp_Database.f_Transaction(pState->m_MainTransaction);
 
-					return fg_Explicit
-						(
-							CTransactionWrite
+						co_return CTransactionWrite
 							{
 								g_ActorSubscription / [pState, SequencerSubscription = fg_Move(_SequencerSubscription), pCanDestroy = mp_pCanDestroyTracker]() mutable
 								{
@@ -157,14 +154,14 @@ namespace NMib::NDatabase
 								, pState->m_MainTransaction
 								, fg_Move(Transaction)
 							}
-						)
-					;
+						;
+					}
+					catch (NException::CException const &)
+					{
+						co_return NException::fg_CurrentException();
+					}
 				}
-				catch (NException::CException const &_Exception)
-				{
-					return _Exception;
-				}
-			}
+			)
 		;
 	}
 
