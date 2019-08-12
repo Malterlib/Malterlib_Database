@@ -1314,7 +1314,7 @@ namespace NMib::NDatabase
 		NPrivate::MDB_txn		*mt_child;
 		NPrivate::pgno_t		mt_next_pgno;	/**< next unallocated page */
 	#ifdef DMibDatabase_Always64BitSupport
-		pgno_t		mt_last_pgno;	/**< last written page */
+		NPrivate::pgno_t		mt_last_pgno;	/**< last written page */
 	#endif
 		/** The ID of this transaction. IDs are integers incrementing from 1.
 		 *	Only committed write transactions increment the ID. If a transaction
@@ -1365,7 +1365,7 @@ namespace NMib::NDatabase
 		unsigned char	*mt_dbflags;
 	#ifdef DMibDatabase_Always64BitSupport
 		/** List of read-only pages (actually chunks) */
-		MDB_ID3L	mt_rpages;
+		NPrivate::MDB_ID3L	mt_rpages;
 		/** We map chunks of 16 pages. Even though Windows uses 4KB pages, all
 		 * mappings must begin on 64KB boundaries. So we round off all pgnos to
 		 * a chunk boundary. We do the same on Linux for symmetry, and also to
@@ -1642,7 +1642,7 @@ namespace NMib::NDatabase
 	# endif
 	#endif
 	#ifdef DMibDatabase_Always64BitSupport
-		MDB_ID3L	me_rpages;	/**< like #mt_rpages, but global to env */
+		NPrivate::MDB_ID3L	me_rpages;	/**< like #mt_rpages, but global to env */
 		pthread_mutex_t	me_rpmutex;	/**< control access to #me_rpages */
 	#define MDB_ERPAGE_SIZE	16384
 	#define MDB_ERPAGE_MAX	(MDB_ERPAGE_SIZE-1)

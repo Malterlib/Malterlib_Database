@@ -239,18 +239,18 @@ namespace NMib::NDatabase
 			}
 		;
 
-	#ifdef DMibDatabase_Always64BitSupport
 		int rc;
+	#ifdef DMibDatabase_Always64BitSupport
 		#ifdef DPlatformFamily_Windows
 			me_rpmutex = CreateMutex(NULL, FALSE, NULL);
 			if (!me_rpmutex) {
 				rc = ErrCode();
-				goto leave;
+				DMibError(NStr::fg_Format("Error initing rmutex {}", mdb_strerror(rc)));
 			}
 		#else
-			rc = pthread_mutex_init(&me_rpmutex, NULL);
+			rc = pthread_mutex_init(&Environment.me_rpmutex, NULL);
 			if (rc)
-				goto leave;
+				DMibError(NStr::fg_Format("Error initing rmutex {}", mdb_strerror(rc)));
 		#endif
 	#endif
 		flags |= MDB_ENV_ACTIVE;	/* tell mdb_env_close0() to clean up */
@@ -270,7 +270,7 @@ namespace NMib::NDatabase
 			DMibError(NStr::fg_Format("Error opening mutex {}", mdb_strerror(rc)));
 
 		{
-			Environment.me_rpages = NMemory::fg_Alloc(MDB_ERPAGE_SIZE * sizeof(MDB_ID3));
+			Environment.me_rpages = (NPrivate::MDB_ID3L)NMemory::fg_Alloc(MDB_ERPAGE_SIZE * sizeof(NPrivate::MDB_ID3));
 			Environment.me_rpages[0].mid = 0;
 			Environment.me_rpcheck = MDB_ERPAGE_SIZE/2;
 		}
@@ -290,7 +290,7 @@ namespace NMib::NDatabase
 				DMibError(NStr::fg_Format("Previous snapshot needs exclusive access: {}", mdb_strerror(EAGAIN)));
 		}
 
-		int rc = Environment.mdb_fopen(_Path, (flags & EDatabaseEnvironmentFlag_ReadOnly) ? MDB_O_RDONLY : MDB_O_RDWR, Mode, &Environment.me_fd);
+		rc = Environment.mdb_fopen(_Path, (flags & EDatabaseEnvironmentFlag_ReadOnly) ? MDB_O_RDONLY : MDB_O_RDWR, Mode, &Environment.me_fd);
 		if (rc)
 			DMibError(NStr::fg_Format("Error opening file {}", mdb_strerror(rc)));
 
@@ -333,7 +333,7 @@ namespace NMib::NDatabase
 			txn->mt_dbflags = (unsigned char *)(txn->mt_dbiseqs + Environment.me_maxdbs);
 			txn->mt_env = &Environment;
 #ifdef DMibDatabase_Always64BitSupport
-			txn->mt_rpages = NMemory::fg_Alloc(MDB_TRPAGE_SIZE * sizeof(MDB_ID3));
+			txn->mt_rpages = (NPrivate::MDB_ID3L)NMemory::fg_Alloc(MDB_TRPAGE_SIZE * sizeof(MDB_ID3));
 			txn->mt_rpages[0].mid = 0;
 			txn->mt_rpcheck = MDB_TRPAGE_SIZE/2;
 #endif
@@ -1202,7 +1202,7 @@ namespace NMib::NDatabase
 	#else
 	#ifdef DMibDatabase_Always64BitSupport
 		(void) flags;
-		me_map = mmap(addr, NUM_METAS * me_psize, PROT_READ, MAP_SHARED,
+		me_map = (char *)mmap(addr, NUM_METAS * me_psize, PROT_READ, MAP_SHARED,
 			me_fd, 0);
 		if (me_map == MAP_FAILED) {
 			me_map = nullptr;
@@ -1519,7 +1519,7 @@ namespace NMib::NDatabase
 	#ifdef DMibDatabase_Always64BitSupport
 		if (me_txn0 && me_txn0->mt_rpages)
 			NMemory::fg_FreeNoSize(me_txn0->mt_rpages);
-		if (env->me_rpages) {
+		if (me_rpages) {
 			MDB_ID3L el = me_rpages;
 			unsigned int x;
 			for (x=1; x<=el[0].mid; x++)
@@ -1628,10 +1628,15 @@ namespace NMib::NDatabase
 	/** Copy environment as-is. */
 	void DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_Copy(HANDLE fd)
 	{
+	#ifdef DMibDatabase_Always64BitSupport
+		DMibError("Not supported on 32 bit");
+	#endif
+
 		MDB_txn *txn = nullptr;
 		mdb_mutexref_t wmutex = nullptr;
 		CDatabaseOffset wsize, w3;
 		char *ptr;
+
 	#ifdef DPlatformFamily_Windows
 		DWORD len, w2;
 	#define DO_WRITE(rc, fd, ptr, w2, len)	rc = WriteFile(fd, ptr, w2, &len, nullptr)

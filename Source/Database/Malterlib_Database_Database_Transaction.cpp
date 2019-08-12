@@ -242,7 +242,7 @@ namespace NMib::NDatabase
 		#ifdef DMibDatabase_Always64BitSupport
 			if (!parent)
 			{
-				txn->mt_rpages = NMemory::fg_Alloc(MDB_TRPAGE_SIZE * sizeof(MDB_ID3));
+				txn->mt_rpages = (NPrivate::MDB_ID3L)NMemory::fg_Alloc(MDB_TRPAGE_SIZE * sizeof(MDB_ID3));
 				txn->mt_rpages[0].mid = 0;
 				txn->mt_rpcheck = MDB_TRPAGE_SIZE/2;
 			}

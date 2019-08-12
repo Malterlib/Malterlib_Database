@@ -1000,7 +1000,7 @@ namespace NMib::NDatabase
 	 * @param[out] ret address of a pointer where the page's address will be stored.
 	 * @return 0 on success, non-zero on failure.
 	 */
-	int NPrivate::mdb_rpage_get(MDB_txn *txn, pgno_t pg0, MDB_page **ret)
+	int mdb_rpage_get(MDB_txn *txn, pgno_t pg0, MDB_page **ret)
 	{
 		MDB_env *env = txn->mt_env;
 		MDB_page *p;

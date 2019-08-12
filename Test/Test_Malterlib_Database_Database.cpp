@@ -165,6 +165,9 @@ namespace
 
 		void fp_DoCopy(CStr const &_Name, EDatabaseEnvironmentCopyFlag _Flags, CTestEnvironment &_Environment)
 		{
+			if constexpr (sizeof(void *) < 8)
+				_Flags |= EDatabaseEnvironmentCopyFlag_Compact;
+
 			DMibTestPath(_Name);
 			CStr CopyPath = _Environment.m_DatabaseDirectory + _Name;
 			if (CFile::fs_FileExists(CopyPath))
