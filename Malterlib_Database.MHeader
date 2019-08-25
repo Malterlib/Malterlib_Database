@@ -5,6 +5,8 @@ Import "../Core/Lib_Malterlib.MTarget"
 
 %Group "{Malterlib}/{Lib_Malterlib_Database}"
 {
+	Property.MalterlibConcurrency_DistributedActors true
+
 	%Group Database
 	{
 		%Group Include
