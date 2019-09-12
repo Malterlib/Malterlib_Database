@@ -239,11 +239,11 @@ namespace NMib::NDatabase
 			}
 		;
 
-		int rc;
+		int rc = 0;
 	#ifdef DMibDatabase_Always64BitSupport
 		#ifdef DPlatformFamily_Windows
-			me_rpmutex = CreateMutex(NULL, FALSE, NULL);
-			if (!me_rpmutex) {
+			Environment.me_rpmutex = CreateMutex(NULL, FALSE, NULL);
+			if (!Environment.me_rpmutex) {
 				rc = ErrCode();
 				DMibError(NStr::fg_Format("Error initing rmutex {}", mdb_strerror(rc)));
 			}

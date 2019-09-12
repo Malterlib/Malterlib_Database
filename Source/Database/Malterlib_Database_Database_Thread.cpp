@@ -105,7 +105,7 @@ extern "C" const PIMAGE_TLS_CALLBACK mdb_tls_cbp = NMib::NDatabase::mdb_tls_call
 #pragma comment(linker, "/INCLUDE:__tls_used")
 #pragma comment(linker, "/INCLUDE:_mdb_tls_cbp")
 #pragma data_seg(".CRT$XLB")
-extern "C" PIMAGE_TLS_CALLBACK mdb_tls_cbp = mdb_tls_callback;
+extern "C" PIMAGE_TLS_CALLBACK mdb_tls_cbp = NMib::NDatabase::mdb_tls_callback;
 #pragma data_seg()
 #endif	/* WIN 32/64 */
 #endif	/* !__GNUC__ */

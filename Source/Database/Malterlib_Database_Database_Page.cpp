@@ -1016,7 +1016,7 @@ namespace NMib::NDatabase
 	#define SET_OFF(off,val)	off.QuadPart = val
 	#define MAP(rc,env,addr,len,off)	\
 		addr = nullptr; \
-		rc = NtMapViewOfSection(env->me_fmh, GetCurrentProcess(), &addr, 0, \
+		rc = g_fDatabase_NtMapViewOfSection(env->me_fmh, GetCurrentProcess(), &addr, 0, \
 			len, &off, &len, ViewUnmap, (env->me_flags & EDatabaseEnvironmentFlag_ReadOnly) ? 0 : MEM_RESERVE, PAGE_READONLY); \
 		if (rc) rc = mdb_nt2win32(rc)
 	#else
