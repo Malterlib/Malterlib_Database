@@ -37,5 +37,5 @@
 
 namespace NMib::NDatabase
 {
-	NStorage::TCAggregate<NThread::TCThreadLocal<CDatabaseThreadLocal>> g_DatabaseThreadLocal = {DAggregateInit};
+	constinit NStorage::TCAggregate<NThread::TCThreadLocal<CDatabaseThreadLocal>> g_DatabaseThreadLocal = {DAggregateInit};
 }
