@@ -7,9 +7,9 @@ Import "../Core/Lib_Malterlib.MTarget"
 {
 	Property.MalterlibConcurrency_DistributedActors true
 
-	%Group Database
+	%Group "Database"
 	{
-		%Group Include
+		%Group "Include"
 		{
 			Compile.Type "C++"
 			{
@@ -18,7 +18,7 @@ Import "../Core/Lib_Malterlib.MTarget"
 			%File "Include/Mib/Database/^*"
 		}
 		%File "Source/^*"
-		%Group Documentation
+		%Group "Documentation"
 		{
 			%File "Documentation/*"
 		}
