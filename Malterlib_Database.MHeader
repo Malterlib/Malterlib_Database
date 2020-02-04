@@ -18,6 +18,30 @@ Import "../Core/Lib_Malterlib.MTarget"
 			%File "Include/Mib/Database/^*"
 		}
 		%File "Source/^*"
+		%Group "Database"
+		{
+			%File "Source/Database/*.cpp"
+			{
+				Compile.Disabled true
+				{
+					!Documentation ""
+				}
+			}
+			%File "Source/Database/*IDList.*"
+			{
+				Compile.Disabled true
+				{
+					!Documentation ""
+				}
+			}
+			%File "Source/Database/*Internal.h"
+			{
+				Compile.Disabled true
+				{
+					!Documentation ""
+				}
+			}
+		}
 		%Group "Documentation"
 		{
 			%File "Documentation/*"
