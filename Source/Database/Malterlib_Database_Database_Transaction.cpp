@@ -645,7 +645,7 @@ namespace NMib::NDatabase
 		if (txn->mt_child)
 			mdb_txn_abort(txn->mt_child);
 
-		mdb_txn_end(txn, NPrivate::MDB_END_ABORT|MDB_END_SLOT|MDB_END_FREE);
+		mdb_txn_end(txn, unsigned(NPrivate::MDB_END_ABORT)|MDB_END_SLOT|MDB_END_FREE);
 	}
 
 	/** @brief Reset a read-only transaction.

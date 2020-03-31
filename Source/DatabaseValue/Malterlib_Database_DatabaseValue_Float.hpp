@@ -15,10 +15,10 @@ namespace NMib::NDatabase
 		{
 			CInteger Integer = reinterpret_cast<CInteger const &>(_Value);
 
-			if (t_CType::ESignBits)
+			if (t_CType::mc_SignBits)
 			{
-				auto SignBit = CInteger(1) << t_CType::ESignBitPos;
-				auto SignExtended = (Integer << ((sizeof(CInteger)*8 - 1) - t_CType::ESignBitPos)) >> (sizeof(CInteger)*8 - 1);
+				auto SignBit = CInteger(1) << t_CType::mc_SignBitPos;
+				auto SignExtended = (Integer << ((sizeof(CInteger)*8 - 1) - t_CType::mc_SignBitPos)) >> (sizeof(CInteger)*8 - 1);
 				Integer ^= (SignExtended | SignBit);
 			}
 
@@ -32,10 +32,10 @@ namespace NMib::NDatabase
 			
 			_Stream >> Integer;
 
-			if (t_CType::ESignBits)
+			if (t_CType::mc_SignBits)
 			{
-				auto SignBit = CInteger(1) << t_CType::ESignBitPos;
-				auto SignExtended = ((~Integer) << ((sizeof(CInteger)*8 - 1) - t_CType::ESignBitPos)) >> (sizeof(CInteger)*8 - 1);
+				auto SignBit = CInteger(1) << t_CType::mc_SignBitPos;
+				auto SignExtended = ((~Integer) << ((sizeof(CInteger)*8 - 1) - t_CType::mc_SignBitPos)) >> (sizeof(CInteger)*8 - 1);
 				Integer ^= SignExtended | SignBit; 
 			}
 			
