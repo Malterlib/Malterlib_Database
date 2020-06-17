@@ -35,9 +35,9 @@ namespace NMib::NDatabase
 		static void fs_Encode(tf_CStream &_Stream, t_CType const &_Value)
 		{
 			if constexpr (t_bDescending)
-				_Value.f_FeedLexicograpicDescending(_Stream);
+				_Value.f_FeedLexicographicDescending(_Stream);
 			else
-				_Value.f_FeedLexicograpic(_Stream);
+				_Value.f_FeedLexicographic(_Stream);
 		}
 		
 		template <typename tf_CStream>
