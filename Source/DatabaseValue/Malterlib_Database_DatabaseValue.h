@@ -31,6 +31,9 @@ namespace NMib::NDatabase
 		bool operator == (CDatabaseValue const &_Right) const;
 		bool f_HasPrefix(CDatabaseValue const &_Right) const;
 
+		template <typename tf_CValue>
+		bool f_HasPrefix(tf_CValue const &_Right) const;
+
 		template <typename tf_CStr>
 		void f_Format(tf_CStr &o_String) const;
 

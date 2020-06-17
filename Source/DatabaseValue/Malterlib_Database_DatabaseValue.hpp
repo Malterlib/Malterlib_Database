@@ -14,6 +14,7 @@
 #include "Malterlib_Database_DatabaseValue_Time.hpp"
 #include "Malterlib_Database_DatabaseValue_Descending.hpp"
 #include "Malterlib_Database_DatabaseValue_Private.hpp"
+#include "../Database/Malterlib_Database_Database_ThreadLocal.h"
 
 namespace NMib::NDatabase
 {
@@ -239,5 +240,12 @@ namespace NMib::NDatabase
 		}
 
 		o_String += "]";
+	}
+
+	template <typename tf_CValue>
+	bool CDatabaseValue::f_HasPrefix(tf_CValue const &_Right) const
+	{
+		auto &ThreadLocal = **g_DatabaseThreadLocal;
+		return f_HasPrefix(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_ValueCache, _Right));
 	}
 }
