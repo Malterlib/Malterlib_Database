@@ -970,7 +970,7 @@ namespace NMib::NDatabase
 				/* The writer mutex was locked in mdb_txn_begin. */
 				if (env->m_pLocksMemoryMap)
 				{
-					DMibCheck(env->m_LockedThreadID == NSys::fg_Thread_GetCurrentUID());
+					DMibCheck(env->m_LockedThreadID == NSys::fg_Thread_GetCurrentUID())(env->m_LockedThreadID)(NSys::fg_Thread_GetCurrentUID());
 					UNLOCK_MUTEX(env->me_wmutex);
 				}
 			} else {

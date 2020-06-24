@@ -138,6 +138,9 @@ namespace NMib::NDatabase
 			(
 			 	mp_WriteSequencer / [this](CActorSubscription &&_SequencerSubscription) -> TCFuture<CTransactionWrite>
 				{
+					if (f_IsDestroyed())
+						co_return DMibErrorInstance("Database actor destroyed");
+
 					try
 					{
 						NStorage::TCSharedPointer<CState> pState = fg_Construct();
