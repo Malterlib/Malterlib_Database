@@ -75,6 +75,9 @@ namespace NMib::NDatabase
 		CDatabaseCursorCommon(NStorage::TCUniquePointer<CInternal> &&_pInternal);
 
 		void fp_SetToCurrent();
+		bool fp_FindLowerBoundIgnoringPrefix(CDatabaseValue const &_Key);
+		bool fp_CheckValidity(int _Result, ch8 const *_pErrorFormat);
+		bool fp_CheckValidityIgnoringPrefix(int _Result, ch8 const *_pErrorFormat);
 
 		CDatabaseValue mp_Key;
 		CDatabaseValue mp_Value;
@@ -82,6 +85,7 @@ namespace NMib::NDatabase
 		CDatabaseValue mp_Prefix;
 
 		CDatabaseValueCache mp_PrefixCache;
+		CDatabaseValueCache mp_PrefixReverseCache;
 		CDatabaseValueCache mp_KeyCache;
 
 		NStorage::TCUniquePointer<CInternal> mp_pInternal;

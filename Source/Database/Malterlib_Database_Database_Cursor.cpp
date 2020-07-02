@@ -76,7 +76,7 @@ namespace NMib::NDatabase
 			return;
 		}
 
-		if (!f_FindLowerBound(mp_Prefix))
+		if (!fp_FindLowerBoundIgnoringPrefix(mp_Prefix))
 			return;
 
 		if (!mp_Key.f_HasPrefix(mp_Prefix))
@@ -275,95 +275,126 @@ namespace NMib::NDatabase
 
 	void CDatabaseCursorCommon::fp_SetToCurrent()
 	{
-		int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_GET_CURRENT);
-		if (Result == MDB_NOTFOUND)
+		fp_CheckValidityIgnoringPrefix(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_GET_CURRENT), "Error setting cursor to current: {}");
+	}
+
+	bool CDatabaseCursorCommon::fp_FindLowerBoundIgnoringPrefix(CDatabaseValue const &_Key)
+	{
+		mp_Key = _Key;
+
+		return fp_CheckValidityIgnoringPrefix(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_SET_RANGE), "Error setting cursor to lower bound: {}");
+	}
+
+	bool CDatabaseCursorCommon::fp_CheckValidityIgnoringPrefix(int _Result, ch8 const *_pErrorFormat)
+	{
+		if (_Result == MDB_NOTFOUND)
 			mp_bValid = false;
-		else if (Result)
-			DMibError(NStr::fg_Format("Error setting cursor to current: {}", NPrivate::mdb_strerror(Result)));
+		else if (_Result)
+			DMibError(NStr::fg_Format(_pErrorFormat, NPrivate::mdb_strerror(_Result)));
 		else
 			mp_bValid = true;
+		return mp_bValid;
+	}
+
+	bool CDatabaseCursorCommon::fp_CheckValidity(int _Result, ch8 const *_pErrorFormat)
+	{
+		if (_Result == MDB_NOTFOUND)
+			mp_bValid = false;
+		else if (_Result)
+			DMibError(NStr::fg_Format(_pErrorFormat, NPrivate::mdb_strerror(_Result)));
+		else if (mp_Prefix.f_IsValid())
+			mp_bValid = mp_Key.f_HasPrefix(mp_Prefix);
+		else
+			mp_bValid = true;
+
+		return mp_bValid;
 	}
 
 	bool CDatabaseCursorCommon::f_First()
 	{
-		int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_FIRST);
-		if (Result == MDB_NOTFOUND)
-			mp_bValid = false;
-		else if (Result)
-			DMibError(NStr::fg_Format("Error setting cursor to first: {}", NPrivate::mdb_strerror(Result)));
-		else
-			mp_bValid = true;
-		return mp_bValid;
+		if (mp_Prefix.f_IsValid())
+		{
+			if (!fp_FindLowerBoundIgnoringPrefix(mp_Prefix))
+				return false;
+
+			if (!mp_Key.f_HasPrefix(mp_Prefix))
+				mp_bValid = false;
+
+			return mp_bValid;
+		}
+
+		return fp_CheckValidityIgnoringPrefix(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_FIRST), "Error setting cursor to first: {}");
 	}
 
 	bool CDatabaseCursorCommon::f_Last()
 	{
-		int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_LAST);
-		if (Result == MDB_NOTFOUND)
-			mp_bValid = false;
-		else if (Result)
-			DMibError(NStr::fg_Format("Error setting cursor to last: {}", NPrivate::mdb_strerror(Result)));
-		else
-			mp_bValid = true;
-		return mp_bValid;
+		if (mp_Prefix.f_IsValid() && mp_Prefix.m_Size)
+		{
+			CDatabaseValue PrefixReverse;
+			mp_PrefixReverseCache = mp_PrefixCache;
+			auto &LastByte = mp_PrefixReverseCache[mp_Prefix.m_Size - 1];
+			if (LastByte < 255)
+				++LastByte;
+			else
+				mp_PrefixReverseCache.f_Insert(uint8(0));
+
+			PrefixReverse = mp_PrefixReverseCache;
+			if (!fp_FindLowerBoundIgnoringPrefix(PrefixReverse))
+			{
+				int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_LAST);
+				if (Result == MDB_NOTFOUND)
+				{
+					mp_bValid = false;
+					return false;
+				}
+				else if (Result)
+					DMibError(NStr::fg_Format("Error setting cursor to last: {}", NPrivate::mdb_strerror(Result)));
+				else
+					mp_bValid = true;
+			}
+
+			if (mp_Key.f_HasPrefix(mp_Prefix))
+				return true;
+
+			--(*this);
+			if (!mp_bValid)
+				return false;
+
+			if (!mp_Key.f_HasPrefix(mp_Prefix))
+				mp_bValid = false;
+
+			return mp_bValid;
+		}
+
+		return fp_CheckValidityIgnoringPrefix(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_LAST), "Error setting cursor to last: {}");
 	}
 
 	bool CDatabaseCursorCommon::f_FindEqual(CDatabaseValue const &_Key) // MDB_SET, MDB_SET_KEY
 	{
+		DMibRequire(!mp_Prefix.f_IsValid() || _Key.f_HasPrefix(mp_Prefix));
+
 		mp_Key = _Key;
-		int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_SET_KEY);
-		if (Result == MDB_NOTFOUND)
-			mp_bValid = false;
-		else if (Result)
-			DMibError(NStr::fg_Format("Error setting cursor to key: {}", NPrivate::mdb_strerror(Result)));
-		else
-			mp_bValid = true;
-		return mp_bValid;
+
+		return fp_CheckValidity(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_SET_KEY), "Error setting cursor to key: {}");
 	}
 
 	bool CDatabaseCursorCommon::f_FindLowerBound(CDatabaseValue const &_Key) // MDB_SET_RANGE
 	{
+		DMibRequire(!mp_Prefix.f_IsValid() || _Key.f_HasPrefix(mp_Prefix));
+
 		mp_Key = _Key;
-		int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_SET_RANGE);
-		if (Result == MDB_NOTFOUND)
-			mp_bValid = false;
-		else if (Result)
-			DMibError(NStr::fg_Format("Error setting cursor to lower bound: {}", NPrivate::mdb_strerror(Result)));
-		else
-			mp_bValid = true;
-		return mp_bValid;
+
+		return fp_CheckValidity(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_SET_RANGE), "Error setting cursor to lower bound: {}");
 	}
 
 	void CDatabaseCursorCommon::operator ++()
 	{
-		int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_NEXT_NODUP);
-		if (Result == MDB_NOTFOUND)
-			mp_bValid = false;
-		else if (Result)
-			DMibError(NStr::fg_Format("Error setting cursor to next: {}", NPrivate::mdb_strerror(Result)));
-		else
-		{
-			if (mp_Prefix.f_IsValid() && !mp_Key.f_HasPrefix(mp_Prefix))
-				mp_bValid = false;
-			else
-				mp_bValid = true;
-		}
+		fp_CheckValidity(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_NEXT_NODUP), "Error setting cursor to next: {}");
 	}
 
 	void CDatabaseCursorCommon::operator --()
 	{
-		int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_PREV_NODUP);
-		if (Result == MDB_NOTFOUND)
-			mp_bValid = false;
-		else if (Result)
-			DMibError(NStr::fg_Format("Error setting cursor to previous: {}", NPrivate::mdb_strerror(Result)));
-		else
-		{
-			if (mp_Prefix.f_IsValid() && !mp_Key.f_HasPrefix(mp_Prefix))
-				mp_bValid = false;
-			else
-				mp_bValid = true;
-		}
+		fp_CheckValidity(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_PREV_NODUP), "Error setting cursor to previous: {}");
 	}
 
 	CDatabaseOffset CDatabaseCursorDuplicateData::f_DataCount()
@@ -374,70 +405,104 @@ namespace NMib::NDatabase
 
 	bool CDatabaseCursorDuplicateData::f_NextData()
 	{
-		int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_NEXT_DUP);
-		if (Result == MDB_NOTFOUND)
-			return false;
-		else if (Result)
-			DMibError(NStr::fg_Format("Error setting cursor to next data: {}", NPrivate::mdb_strerror(Result)));
-		return true;
+		return fp_CheckValidity(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_NEXT_DUP), "Error setting cursor to next data: {}");
 	}
 
 	bool CDatabaseCursorDuplicateData::f_PrevData()
 	{
-		int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_PREV_DUP);
-		if (Result == MDB_NOTFOUND)
-			return false;
-		else if (Result)
-			DMibError(NStr::fg_Format("Error setting cursor to prev data: {}", NPrivate::mdb_strerror(Result)));
-		return true;
+		return fp_CheckValidity(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_PREV_DUP), "Error setting cursor to prev data: {}");
+	}
+
+	bool CDatabaseCursorDuplicateData::fp_FindLowerBoundIgnoringPrefix(CDatabaseValue const &_Key, CDatabaseValue const &_Value)
+	{
+		mp_Key = _Key;
+		mp_Value = _Value;
+
+		return fp_CheckValidityIgnoringPrefix
+			(
+				NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_GET_BOTH_RANGE)
+				, "Error setting cursor to lower bound key and data: {}"
+			)
+		;
 	}
 
 	bool CDatabaseCursorDuplicateData::f_FirstData()
 	{
-		int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_FIRST_DUP);
-		if (Result == MDB_NOTFOUND)
-			return false;
-		else if (Result)
-			DMibError(NStr::fg_Format("Error setting cursor to first data: {}", NPrivate::mdb_strerror(Result)));
-		return true;
+		if (mp_Prefix.f_IsValid())
+		{
+			if (!fp_FindLowerBoundIgnoringPrefix(mp_Prefix, CDatabaseValue()))
+				return false;
+
+			if (!mp_Key.f_HasPrefix(mp_Prefix))
+				mp_bValid = false;
+
+			return mp_bValid;
+		}
+
+		return fp_CheckValidityIgnoringPrefix(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_FIRST_DUP), "Error setting cursor to first data: {}");
 	}
 
 	bool CDatabaseCursorDuplicateData::f_LastData()
 	{
-		int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_LAST_DUP);
-		if (Result == MDB_NOTFOUND)
-			return false;
-		else if (Result)
-			DMibError(NStr::fg_Format("Error setting cursor to last data: {}", NPrivate::mdb_strerror(Result)));
-		return true;
+		if (mp_Prefix.f_IsValid() && mp_Prefix.m_Size)
+		{
+			CDatabaseValue PrefixReverse;
+			mp_PrefixReverseCache = mp_PrefixCache;
+			auto &LastByte = mp_PrefixReverseCache[mp_Prefix.m_Size - 1];
+			if (LastByte < 255)
+				++LastByte;
+			else
+				mp_PrefixReverseCache.f_Insert(uint8(0));
+
+			PrefixReverse = mp_PrefixReverseCache;
+			if (!fp_FindLowerBoundIgnoringPrefix(PrefixReverse, CDatabaseValue()))
+			{
+				int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_LAST_DUP);
+				if (Result == MDB_NOTFOUND)
+				{
+					mp_bValid = false;
+					return false;
+				}
+				else if (Result)
+					DMibError(NStr::fg_Format("Error setting cursor to last: {}", NPrivate::mdb_strerror(Result)));
+				else
+					mp_bValid = true;
+			}
+
+			if (mp_Key.f_HasPrefix(mp_Prefix))
+				return true;
+
+			f_PrevData();
+			if (!mp_bValid)
+				return false;
+
+			if (!mp_Key.f_HasPrefix(mp_Prefix))
+				mp_bValid = false;
+
+			return mp_bValid;
+		}
+
+		return fp_CheckValidityIgnoringPrefix(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_LAST_DUP), "Error setting cursor to last data: {}");
 	}
 
 	bool CDatabaseCursorDuplicateData::f_FindEqual(CDatabaseValue const &_Key, CDatabaseValue const &_Data)
 	{
+		DMibRequire(!mp_Prefix.f_IsValid() || _Key.f_HasPrefix(mp_Prefix));
+
 		mp_Key = _Key;
 		mp_Value = _Data;
-		int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_GET_BOTH);
-		if (Result == MDB_NOTFOUND)
-			mp_bValid = false;
-		else if (Result)
-			DMibError(NStr::fg_Format("Error setting cursor to key and data: {}", NPrivate::mdb_strerror(Result)));
-		else
-			mp_bValid = true;
-		return mp_bValid;
+
+		return fp_CheckValidity(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_GET_BOTH), "Error setting cursor to key and data: {}");
 	}
 
 	bool CDatabaseCursorDuplicateData::f_FindLowerBound(CDatabaseValue const &_Key, CDatabaseValue const &_Data)
 	{
+		DMibRequire(!mp_Prefix.f_IsValid() || _Key.f_HasPrefix(mp_Prefix));
+
 		mp_Key = _Key;
 		mp_Value = _Data;
-		int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_GET_BOTH_RANGE);
-		if (Result == MDB_NOTFOUND)
-			mp_bValid = false;
-		else if (Result)
-			DMibError(NStr::fg_Format("Error setting cursor to lower bound key and data: {}", NPrivate::mdb_strerror(Result)));
-		else
-			mp_bValid = true;
-		return mp_bValid;
+
+		return fp_CheckValidity(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_GET_BOTH_RANGE), "Error setting cursor to lower bound key and data: {}");
 	}
 
 	/** @brief Create a cursor handle.
