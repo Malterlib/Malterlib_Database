@@ -176,4 +176,34 @@ namespace NMib::NDatabase
 			}
 		;
 	}
+
+	NConcurrency::TCFuture<CDatabaseStatistics> CDatabaseActor::f_Statistics()
+	{
+		if (!mp_bOpened)
+			co_return DMibErrorInstance("Database has not been opened");
+		if (f_IsDestroyed())
+			co_return DMibErrorInstance("Database actor destroyed");
+
+		co_return mp_DatabaseEnvironment.f_Statistics();
+	}
+
+	NConcurrency::TCFuture<CDatabaseEnvironmentInfo> CDatabaseActor::f_Info()
+	{
+		if (!mp_bOpened)
+			co_return DMibErrorInstance("Database has not been opened");
+		if (f_IsDestroyed())
+			co_return DMibErrorInstance("Database actor destroyed");
+
+		co_return mp_DatabaseEnvironment.f_Info();
+	}
+
+	NConcurrency::TCFuture<NStr::CStr> CDatabaseActor::f_GetPath()
+	{
+		if (!mp_bOpened)
+			co_return DMibErrorInstance("Database has not been opened");
+		if (f_IsDestroyed())
+			co_return DMibErrorInstance("Database actor destroyed");
+		
+		co_return mp_DatabaseEnvironment.f_GetPath();
+	}
 }
