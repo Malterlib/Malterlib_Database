@@ -46,6 +46,10 @@ namespace NMib::NDatabase
 		template <typename tf_CKey, typename tf_CValue>
 		bool f_GetDuplicateData(tf_CKey const &_Key, tf_CValue &o_Value);
 
+		bool f_Exists(CDatabaseValue const &_Key);
+		template <typename tf_CKey>
+		bool f_Exists(tf_CKey const &_Key);
+
 		int f_KeyCompare(CDatabaseValue const &_Left, CDatabaseValue const &_Right);
 		int f_DataCompare(CDatabaseValue const &_Left, CDatabaseValue const &_Right);
 

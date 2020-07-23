@@ -51,6 +51,12 @@ namespace NMib::NDatabase
 		return mp_pTransaction->f_Get(mp_DatabaseID, const_cast<CDatabaseValue *>(&_Key), &o_Value);
 	}
 
+	bool CDatabaseSubReadTransaction::f_Exists(CDatabaseValue const &_Key)
+	{
+		CDatabaseValue TempValue;
+		return mp_pTransaction->f_Get(mp_DatabaseID, const_cast<CDatabaseValue *>(&_Key), &TempValue);
+	}
+
 	int CDatabaseSubReadTransaction::f_KeyCompare(CDatabaseValue const &_Left, CDatabaseValue const &_Right)
 	{
 		return mp_pTransaction->f_KeyCompare(mp_DatabaseID, &_Left, &_Right);

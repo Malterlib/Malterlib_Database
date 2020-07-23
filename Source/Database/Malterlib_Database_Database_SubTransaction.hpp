@@ -20,6 +20,13 @@ namespace NMib::NDatabase
 		return true;
 	}
 
+	template <typename tf_CKey>
+	bool CDatabaseSubReadTransaction::f_Exists(tf_CKey const &_Key)
+	{
+		auto &ThreadLocal = **g_DatabaseThreadLocal;
+		return f_Exists(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_KeyCache, _Key));
+	}
+
 	template <typename tf_CKey, typename tf_CValue>
 	bool CDatabaseSubReadTransaction::f_GetDuplicateData(tf_CKey const &_Key, tf_CValue &o_Value)
 	{
