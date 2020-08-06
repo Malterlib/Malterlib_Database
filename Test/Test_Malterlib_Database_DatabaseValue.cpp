@@ -44,9 +44,9 @@ namespace
 		;
 
 		template <bool tf_bDescending>
-		void fp_TestOrder()
+		void fp_TestOrder(CStr const &_Name)
 		{
-			auto Environment = fg_GetTestEnvironment();
+			auto Environment = fg_GetTestEnvironment("TestDatabaseValue" + _Name);
 
 			auto WriteTransaction = Environment.m_Environment.f_BeginWriteTransaction();
 			auto MainDatabase = WriteTransaction.f_OpenDatabase();
@@ -283,11 +283,11 @@ namespace
 		{
 			DMibTestSuite("Order")
 			{
-				fp_TestOrder<false>();
+				fp_TestOrder<false>("Order");
 			};
 			DMibTestSuite("Order Descending")
 			{
-				fp_TestOrder<true>();
+				fp_TestOrder<true>("OrderDescending");
 			};
 			DMibTestSuite("Roundtrip")
 			{

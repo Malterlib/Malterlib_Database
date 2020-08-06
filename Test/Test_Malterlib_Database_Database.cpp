@@ -45,6 +45,7 @@ namespace NMib::NDatabase
 	{
 		CTestEnvironment Environment;
 
+		Environment.m_FileName = _FileName;
 		Environment.m_DatabaseDirectory = CFile::fs_AppendPath(CFile::fs_GetProgramDirectory(), _FileName);
 		if (_bReset)
 		{
@@ -174,10 +175,10 @@ namespace
 				CFile::fs_DeleteDirectoryRecursive(CopyPath);
 			CFile::fs_CreateDirectory(CopyPath);
 			_Environment.m_Environment.f_Copy(CopyPath, _Flags);
-			
+
 			DMibExpectExceptionType(_Environment.m_Environment.f_Copy(CopyPath), NException::CException);
 
-			auto EnvironmentCopy = fg_GetTestEnvironment("TestDatabase" + _Name, false);
+			auto EnvironmentCopy = fg_GetTestEnvironment(_Environment.m_FileName + _Name, false);
 		
 			DMibExpectTrue(fp_EnvironmentsSame(_Environment.m_Environment, EnvironmentCopy.m_Environment));
 		}
@@ -186,7 +187,7 @@ namespace
 		{
 			DMibTestSuite("Basics")
 			{
-				auto Environment = fg_GetTestEnvironment();
+				auto Environment = fg_GetTestEnvironment("TestDatabase0");
 				
 				{
 					auto WriteTransaction = Environment.m_Environment.f_BeginWriteTransaction();
@@ -212,7 +213,7 @@ namespace
 			{
 				DMibTestSuite("Copy")
 				{
-					auto Environment = fg_GetTestEnvironment("TestDatabase");
+					auto Environment = fg_GetTestEnvironment("TestDatabase1");
 					fp_PopulateEnvironment(Environment.m_Environment);
 					fp_DoCopy("Copy", EDatabaseEnvironmentCopyFlag_None, Environment);
 					fp_DeleteEverySecond(Environment.m_Environment);
@@ -220,7 +221,7 @@ namespace
 				};
 				DMibTestSuite("Stats")
 				{
-					auto Environment = fg_GetTestEnvironment("TestDatabase");
+					auto Environment = fg_GetTestEnvironment("TestDatabase2");
 					fp_PopulateEnvironment(Environment.m_Environment, 16, 128);
 					DMibExpect(Environment.m_Environment.f_Statistics().m_nDataItems, ==, 16);
 					
@@ -231,17 +232,17 @@ namespace
 				};
 				DMibTestSuite("Info")
 				{
-					auto Environment = fg_GetTestEnvironment("TestDatabase");
+					auto Environment = fg_GetTestEnvironment("TestDatabase3");
 					auto Info = Environment.m_Environment.f_Info();
 					DMibExpect(Info.m_LastCommittedTransactionID, ==, 0);
 					fp_PopulateEnvironment(Environment.m_Environment, 16, 128);
 					Info = Environment.m_Environment.f_Info();
 					DMibExpect(Info.m_LastCommittedTransactionID, ==, 1);
-					DMibExpect(Environment.m_Environment.f_GetPath(), ==, CFile::fs_GetProgramDirectory() + "/TestDatabase");
+					DMibExpect(Environment.m_Environment.f_GetPath(), ==, CFile::fs_GetProgramDirectory() + "/TestDatabase3");
 					DMibExpect(Environment.m_Environment.f_GetFD(), !=, nullptr);
 					
-					auto ReadOnly0 = fg_GetTestEnvironment("TestDatabase", false, EDatabaseEnvironmentFlag_ReadOnly | EDatabaseEnvironmentFlag_NoTls);
-					auto ReadOnly1 = fg_GetTestEnvironment("TestDatabase", false, EDatabaseEnvironmentFlag_ReadOnly | EDatabaseEnvironmentFlag_NoTls);
+					auto ReadOnly0 = fg_GetTestEnvironment("TestDatabase3", false, EDatabaseEnvironmentFlag_ReadOnly | EDatabaseEnvironmentFlag_NoTls);
+					auto ReadOnly1 = fg_GetTestEnvironment("TestDatabase3", false, EDatabaseEnvironmentFlag_ReadOnly | EDatabaseEnvironmentFlag_NoTls);
 					auto ReadTransaciton00 = ReadOnly0.m_Environment.f_BeginReadTransaction();
 					auto ReadTransaciton01 = ReadOnly0.m_Environment.f_BeginReadTransaction();
 					auto ReadTransaciton10 = ReadOnly1.m_Environment.f_BeginReadTransaction();
@@ -252,19 +253,19 @@ namespace
 				};
 				DMibTestSuite("Sync")
 				{
-					auto Environment = fg_GetTestEnvironment("TestDatabase");
+					auto Environment = fg_GetTestEnvironment("TestDatabase4");
 					fp_PopulateEnvironment(Environment.m_Environment, 16, 128);
 					Environment.m_Environment.f_Sync(true);
 				};
 				DMibTestSuite("Close")
 				{
-					auto Environment = fg_GetTestEnvironment("TestDatabase");
+					auto Environment = fg_GetTestEnvironment("TestDatabase5");
 					Environment.m_Environment.f_Close();
 					DMibExpectException(fp_PopulateEnvironment(Environment.m_Environment, 16, 128), DMibErrorInstance("Environment has not been opened"));
 				};
 				DMibTestSuite("Change Flags")
 				{
-					auto Environment = fg_GetTestEnvironment("TestDatabase");
+					auto Environment = fg_GetTestEnvironment("TestDatabase6");
 					Environment.m_Environment.f_ChangeFlags(EDatabaseEnvironmentFlag_Changable, EDatabaseEnvironmentFlag_Changable);
 					DMibExpect(Environment.m_Environment.f_GetFlags(), ==, EDatabaseEnvironmentFlag_Changable);
 					DMibExpectException
@@ -276,13 +277,13 @@ namespace
 				};
 				DMibTestSuite("Flags-NoSubdir")
 				{
-					fg_GetTestEnvironment("TestDatabase", true, EDatabaseEnvironmentFlag_NoSubdir);
+					fg_GetTestEnvironment("TestDatabase7", true, EDatabaseEnvironmentFlag_NoSubdir);
 				};
 				DMibTestSuite("Flags-ReadOnly")
 				{
-					auto Writable = fg_GetTestEnvironment("TestDatabase", true, EDatabaseEnvironmentFlag_None);
+					auto Writable = fg_GetTestEnvironment("TestDatabase8", true, EDatabaseEnvironmentFlag_None);
 					fp_PopulateEnvironment(Writable.m_Environment);
-					auto ReadOnly = fg_GetTestEnvironment("TestDatabase", false, EDatabaseEnvironmentFlag_ReadOnly);
+					auto ReadOnly = fg_GetTestEnvironment("TestDatabase8", false, EDatabaseEnvironmentFlag_ReadOnly);
 					DMibExpectTrue(fp_EnvironmentsSame(Writable.m_Environment, ReadOnly.m_Environment));
 					
 					DMibExpectException
@@ -294,25 +295,25 @@ namespace
 				};
 				DMibTestSuite("Flags-WriteMap")
 				{
-					auto Environment = fg_GetTestEnvironment("TestDatabase", true, EDatabaseEnvironmentFlag_WriteMap);
+					auto Environment = fg_GetTestEnvironment("TestDatabase9", true, EDatabaseEnvironmentFlag_WriteMap);
 					fp_PopulateEnvironment(Environment.m_Environment);
 					fp_DoCopy("Copy", EDatabaseEnvironmentCopyFlag_None, Environment);
 				};
 				DMibTestSuite("Tls")
 				{
-					auto Environment = fg_GetTestEnvironment("TestDatabase", true, EDatabaseEnvironmentFlag_NoTls);
+					auto Environment = fg_GetTestEnvironment("TestDatabase10", true, EDatabaseEnvironmentFlag_NoTls);
 					fp_PopulateEnvironment(Environment.m_Environment);
 					fp_DoCopy("Copy", EDatabaseEnvironmentCopyFlag_None, Environment);
 				};
 				DMibTestSuite("Lock")
 				{
-					auto Environment = fg_GetTestEnvironment("TestDatabase", true, EDatabaseEnvironmentFlag_NoLock);
+					auto Environment = fg_GetTestEnvironment("TestDatabase11", true, EDatabaseEnvironmentFlag_NoLock);
 					fp_PopulateEnvironment(Environment.m_Environment);
 					fp_DoCopy("Copy", EDatabaseEnvironmentCopyFlag_None, Environment);
 				};
 				DMibTestSuite("ReadAhead")
 				{
-					auto Environment = fg_GetTestEnvironment("TestDatabase", true, EDatabaseEnvironmentFlag_NoReadAhead);
+					auto Environment = fg_GetTestEnvironment("TestDatabase12", true, EDatabaseEnvironmentFlag_NoReadAhead);
 					fp_PopulateEnvironment(Environment.m_Environment);
 					fp_DoCopy("Copy", EDatabaseEnvironmentCopyFlag_None, Environment);
 				};

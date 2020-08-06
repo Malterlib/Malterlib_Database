@@ -888,7 +888,7 @@ namespace NMib::NDatabase
 							rc = ErrCode();
 							if (rc == EINTR)
 								goto retry_seek;
-							DMibDatabaseTrace("lseek: {}", strerror(rc));
+							DMibDatabaseTrace("lseek: {}", mdb_strerror(rc));
 							return rc;
 						}
 						wres = writev(env->me_fd, iov, n);
@@ -899,7 +899,7 @@ namespace NMib::NDatabase
 							rc = ErrCode();
 							if (rc == EINTR)
 								goto retry_write;
-							DMibDatabaseTrace("Write error: {}", strerror(rc));
+							DMibDatabaseTrace("Write error: {}", mdb_strerror(rc));
 						} else {
 							rc = EIO; /* TODO: Use which error code? */
 							DPUTS("short write, filesystem full?");

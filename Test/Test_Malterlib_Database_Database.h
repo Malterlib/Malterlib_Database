@@ -10,6 +10,7 @@ namespace NMib::NDatabase
 	struct CTestEnvironment
 	{
 		NStr::CStr m_DatabaseDirectory;
+		NStr::CStr m_FileName;
 		CDatabaseEnvironment m_Environment;
 		
 		CTestEnvironment(CTestEnvironment &&_Other);
@@ -19,6 +20,6 @@ namespace NMib::NDatabase
 		~CTestEnvironment();
 	};
 	
-	CTestEnvironment fg_GetTestEnvironment(NStr::CStr const &_FileName = "TestDatabase", bool _bReset = true, EDatabaseEnvironmentFlag _OpenFlags = EDatabaseEnvironmentFlag_None);
+	CTestEnvironment fg_GetTestEnvironment(NStr::CStr const &_FileName, bool _bReset = true, EDatabaseEnvironmentFlag _OpenFlags = EDatabaseEnvironmentFlag_None);
 }
 

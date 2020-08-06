@@ -30,7 +30,11 @@
  OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
+#ifdef DPlatformFamily_Windows
 #include <Mib/Core/PlatformSpecific/WindowsError>
+#else
+#include <Mib/Core/PlatformSpecific/PosixErrNo>
+#endif
 
 #include "Malterlib_Database_Database.h"
 #include "Malterlib_Database_Database_Internal.h"
@@ -109,7 +113,7 @@ namespace NMib::NDatabase::NPrivate
 
 		return NPlatform::fg_Win32_GetLastErrorStr(_Error);
 	#else
-		return strerror(_Error);
+		return NPlatform::fg_ErrnoString<NStr::CStr>(_Error);
 	#endif
 	}
 }
