@@ -79,7 +79,7 @@ namespace
 		
 		void fp_PopulateEnvironment(CDatabaseEnvironment &_Environment, mint _nDatabases = 16, mint _nValuesPerDatabase = 4*1024)
 		{
-			_Environment.f_SetMapSize(_nDatabases * _nValuesPerDatabase * 128);
+			_Environment.f_SetMapSize(_nDatabases * _nValuesPerDatabase * 128 * fg_Max(NSys::fg_Mem_PageSize() / 4096u, 1u));
 			auto Transaction = _Environment.f_BeginWriteTransaction();
 			for (uint32 iDatabase = 0; iDatabase < _nDatabases; ++iDatabase)
 			{

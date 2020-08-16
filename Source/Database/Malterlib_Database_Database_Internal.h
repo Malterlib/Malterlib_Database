@@ -425,7 +425,6 @@ namespace NMib::NDatabase
 		#define	MDB_FDATASYNC(fd)	(!FlushFileBuffers(fd))
 		#define	MDB_MSYNC(addr,len,flags)	(!FlushViewOfFile(addr,len))
 		#define	ErrCode()	GetLastError()
-		#define GET_PAGESIZE(x) {SYSTEM_INFO si; GetSystemInfo(&si); (x) = si.dwPageSize;}
 		#define	close(fd)	(CloseHandle(fd) ? 0 : -1)
 		#define	munmap(ptr,len)	UnmapViewOfFile(ptr)
 		#ifdef PROCESS_QUERY_LIMITED_INFORMATION
@@ -524,11 +523,6 @@ namespace NMib::NDatabase
 			 */
 		#define INVALID_HANDLE_VALUE	(-1)
 
-			/** Get the size of a memory page for the system.
-			 *	This is the basic size that the platform's memory manager uses, and is
-			 *	fundamental to the use of memory-mapped files.
-			 */
-		#define	GET_PAGESIZE(x)	((x) = sysconf(_SC_PAGE_SIZE))
 		#endif
 
 		#ifdef MDB_USE_SYSV_SEM
@@ -1591,7 +1585,7 @@ namespace NMib::NDatabase
 	#define	MDB_FSYNCONLY	0x08000000U
 		uint32 	me_flags;		/**< @ref mdb_env */
 		uint32	me_psize;	/**< DB page size, inited from me_os_psize */
-		uint32	me_os_psize;	/**< OS page size, from #GET_PAGESIZE */
+		uint32	me_os_psize;	/**< OS page size */
 		uint32	m_MaxReaders;	/**< size of the reader table */
 		/** Max #CLocksMemoryMap.%mti_numreaders of interest to #f_Close() */
 		volatile int	me_close_readers;

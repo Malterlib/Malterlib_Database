@@ -72,7 +72,7 @@ namespace NMib::NDatabase
 		pEnvironment->me_wmutex->semid = -1;
 	#endif
 		pEnvironment->me_pid = getpid();
-		GET_PAGESIZE(pEnvironment->me_os_psize);
+		pEnvironment->me_os_psize = NSys::fg_Mem_PageSize();
 
 		mp_pEnvironment = fg_Move(pEnvironment);
 	}
