@@ -129,7 +129,7 @@ namespace NMib::NDatabase
 		CProcessID *pids, pid;
 		mint nDead = 0;
 
-		rdrs = m_pLocksMemoryMap->mti_numreaders;
+		rdrs = m_pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Load(NAtomic::EMemoryOrder_Relaxed);
 		pids = (CProcessID *)NMemory::fg_Alloc((rdrs+1) * sizeof(CProcessID));
 		auto Cleanup = g_OnScopeExit > [&]
 			{
@@ -137,9 +137,9 @@ namespace NMib::NDatabase
 			}
 		;
 		pids[0] = 0;
-		mr = m_pLocksMemoryMap->mti_readers;
+		mr = m_pLocksMemoryMap->m_Readers;
 		for (i=0; i<rdrs; i++) {
-			pid = mr[i].m_OwningProcessID;
+			pid = mr[i].m_OwningProcessID.f_Load(NAtomic::EMemoryOrder_Relaxed);
 			if (pid && pid != me_pid) {
 				if (mdb_pid_insert(pids, pid) == 0) {
 					if (!mdb_reader_pid(Pidcheck, pid)) {
@@ -158,9 +158,9 @@ namespace NMib::NDatabase
 							}
 						}
 						for (; j<rdrs; j++)
-								if (mr[j].m_OwningProcessID == pid) {
-									DMibDatabaseTrace("clear stale reader pid {} txn {}", (unsigned) pid, fg_RemoveQualifiers(mr[j].m_BeginReadTransactionID));
-									mr[j].m_OwningProcessID = 0;
+								if (mr[j].m_OwningProcessID.f_Load(NAtomic::EMemoryOrder_Acquire) == pid) {
+									DMibDatabaseTrace("clear stale reader pid {} txn {}", (unsigned) pid, fg_RemoveQualifiers(mr[j].m_BeginReadTransactionID.f_Load()));
+									mr[j].m_OwningProcessID.f_Store(0, NAtomic::EMemoryOrder_Release);
 									nDead++;
 								}
 						if (rmutex)
@@ -192,11 +192,11 @@ namespace NMib::NDatabase
 			bReadLock = (mutex == me_rmutex);
 			if (!bReadLock)
 			{
-				/* Keep mti_txnid updated, otherwise next writer can
+				/* Keep m_TransactionBody.m_TransactionID updated, otherwise next writer can
 				 * overwrite data which latest meta page refers to.
 				 */
 				meta = mdb_env_pick_meta();
-				m_pLocksMemoryMap->mti_txnid = meta->mm_txnid;
+				m_pLocksMemoryMap->m_TransactionBody.m_TransactionID.f_Store(meta->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed), NAtomic::EMemoryOrder_Release);
 				/* env is hosed if the dead thread was ours */
 				if (me_txn)
 				{
@@ -352,7 +352,7 @@ namespace NMib::NDatabase
 			idbuf.volume = stbuf.dwVolumeSerialNumber;
 			idbuf.nhigh  = stbuf.nFileIndexHigh;
 			idbuf.nlow   = stbuf.nFileIndexLow;
-			m_pLocksMemoryMap->mti_mutexid = mdb_hash(&idbuf, sizeof(idbuf));
+			m_pLocksMemoryMap->m_TransactionBody.mtb_mutexid = mdb_hash(&idbuf, sizeof(idbuf));
 			mdb_env_mname_init(this);
 			me_rmutex = CreateMutexA(&mdb_all_sa, FALSE, MUTEXNAME(this, 'r'));
 			if (!me_rmutex) goto fail_errno;
@@ -372,7 +372,7 @@ namespace NMib::NDatabase
 			memset(&idbuf, 0, sizeof(idbuf));
 			idbuf.dev = stbuf.st_dev;
 			idbuf.ino = stbuf.st_ino;
-			m_pLocksMemoryMap->mti_mutexid = mdb_hash(&idbuf, sizeof(idbuf))
+			m_pLocksMemoryMap->m_TransactionBody.mtb_mutexid = mdb_hash(&idbuf, sizeof(idbuf))
 	#ifdef MDB_SHORT_SEMNAMES
 				/* Max 9 base85-digits.  We truncate here instead of in
 				 * mdb_env_mname_init() to keep the latter portable.
@@ -401,9 +401,9 @@ namespace NMib::NDatabase
 			semu.array = vals;
 			if (semctl(semid, 0, SETALL, semu) < 0)
 				goto fail_errno;
-			m_pLocksMemoryMap->mti_semid = semid;
-			m_pLocksMemoryMap->mti_rlocked = 0;
-			m_pLocksMemoryMap->mti_wlocked = 0;
+			m_pLocksMemoryMap->m_TransactionBody.mtb_semid = semid;
+			m_pLocksMemoryMap->m_TransactionBody.mtb_rlocked = 0;
+			m_pLocksMemoryMap->m_WriteLock = 0;
 	#else	/* MDB_USE_POSIX_MUTEX: */
 			pthread_mutexattr_t mattr;
 
@@ -411,8 +411,8 @@ namespace NMib::NDatabase
 			 * it may skip the init and return EBUSY "seems someone already
 			 * inited" or EINVAL "it was inited differently".
 			 */
-			memset(m_pLocksMemoryMap->mti_rmutex, 0, sizeof(*m_pLocksMemoryMap->mti_rmutex));
-			memset(m_pLocksMemoryMap->mti_wmutex, 0, sizeof(*m_pLocksMemoryMap->mti_wmutex));
+			memset(m_pLocksMemoryMap->m_TransactionBody.mtb_rmutex, 0, sizeof(*m_pLocksMemoryMap->m_TransactionBody.mtb_rmutex));
+			memset(m_pLocksMemoryMap->m_WriteLock, 0, sizeof(*m_pLocksMemoryMap->m_WriteLock));
 
 			int rc;
 			if ((rc = pthread_mutexattr_init(&mattr)) != 0)
@@ -421,29 +421,37 @@ namespace NMib::NDatabase
 	#ifdef MDB_ROBUST_SUPPORTED
 			if (!rc) rc = pthread_mutexattr_setrobust(&mattr, PTHREAD_MUTEX_ROBUST);
 	#endif
-			if (!rc) rc = pthread_mutex_init(m_pLocksMemoryMap->mti_rmutex, &mattr);
-			if (!rc) rc = pthread_mutex_init(m_pLocksMemoryMap->mti_wmutex, &mattr);
+			if (!rc) rc = pthread_mutex_init(m_pLocksMemoryMap->m_TransactionBody.mtb_rmutex, &mattr);
+			if (!rc) rc = pthread_mutex_init(m_pLocksMemoryMap->m_WriteLock, &mattr);
 			pthread_mutexattr_destroy(&mattr);
 			if (rc)
 				DMibError(NStr::fg_Format("Error initializing mutex: {}", mdb_strerror(rc)));
 	#endif	/* DPlatformFamily_Windows || ... */
 
-			m_pLocksMemoryMap->mti_magic = MDB_MAGIC;
-			m_pLocksMemoryMap->mti_format = MDB_LOCK_FORMAT;
-			m_pLocksMemoryMap->mti_txnid = 0;
-			m_pLocksMemoryMap->mti_numreaders = 0;
-
+			m_pLocksMemoryMap->m_TransactionBody.mtb_magic = MDB_MAGIC;
+			m_pLocksMemoryMap->m_TransactionBody.mtb_format = MDB_LOCK_FORMAT;
+			m_pLocksMemoryMap->m_TransactionBody.m_TransactionID.f_Store(0, NAtomic::EMemoryOrder_Release);
+			m_pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Store(0, NAtomic::EMemoryOrder_Release);
 		}
 		else
 		{
 	#ifdef MDB_USE_SYSV_SEM
 			struct semid_ds buf;
 	#endif
-			if (m_pLocksMemoryMap->mti_magic != MDB_MAGIC)
+			if (m_pLocksMemoryMap->m_TransactionBody.mtb_magic != MDB_MAGIC)
 				DMibError("Lock region has invalid magic");
 
-			if (m_pLocksMemoryMap->mti_format != MDB_LOCK_FORMAT)
-				DMibError(NStr::fg_Format("Lock region has format+version 0x{nfh,sf0,sj8}, expected 0x{nfh,sf0,sj8}", m_pLocksMemoryMap->mti_format, uint32(MDB_LOCK_FORMAT)));
+			if (m_pLocksMemoryMap->m_TransactionBody.mtb_format != MDB_LOCK_FORMAT)
+			{
+				DMibError
+					(
+						NStr::fg_Format
+						(
+							"Lock region has format+version 0x{nfh,sf0,sj8}, expected 0x{nfh,sf0,sj8}", m_pLocksMemoryMap->m_TransactionBody.mtb_format, uint32(MDB_LOCK_FORMAT)
+						)
+					)
+				;
+			}
 
 			{
 				int rc = ErrCode();
@@ -463,7 +471,7 @@ namespace NMib::NDatabase
 			me_wmutex = sem_open(MUTEXNAME(env, 'w'), 0);
 			if (me_wmutex == SEM_FAILED) goto fail_errno;
 	#elif defined(MDB_USE_SYSV_SEM)
-			semid = m_pLocksMemoryMap->mti_semid;
+			semid = m_pLocksMemoryMap->m_TransactionBody.mtb_semid;
 			semu.buf = &buf;
 			/* check for read access */
 			if (semctl(semid, 0, IPC_STAT, semu) < 0)
@@ -478,8 +486,8 @@ namespace NMib::NDatabase
 		me_wmutex->semid = semid;
 		me_rmutex->semnum = 0;
 		me_wmutex->semnum = 1;
-		me_rmutex->locked = &m_pLocksMemoryMap->mti_rlocked;
-		me_wmutex->locked = &m_pLocksMemoryMap->mti_wlocked;
+		me_rmutex->locked = &m_pLocksMemoryMap->m_TransactionBody.mtb_rlocked;
+		me_wmutex->locked = &m_pLocksMemoryMap->m_WriteLock;
 	#endif
 
 		return;

@@ -288,14 +288,14 @@ namespace NMib::NDatabase
 					memcpy(ndata, data->m_pData, sizeof(pgno_t));
 				else if (F_ISSET(flags, EDatabaseWriteFlag_ReserveSpace))
 					data->m_pData = (uint8 *)ndata;
-				else
+				else if (data->m_Size)
 					memcpy(ndata, data->m_pData, data->m_Size);
 			} else {
 				memcpy(ndata, &ofp->mp_p.p_pgno, sizeof(pgno_t));
 				ndata = METADATA(ofp);
 				if (F_ISSET(flags, EDatabaseWriteFlag_ReserveSpace))
 					data->m_pData = (uint8 *)ndata;
-				else
+				else if (data->m_Size)
 					memcpy(ndata, data->m_pData, data->m_Size);
 			}
 		}

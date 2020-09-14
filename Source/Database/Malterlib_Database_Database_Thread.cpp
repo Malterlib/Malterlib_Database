@@ -44,10 +44,10 @@ namespace NMib::NDatabase
 		MDB_reader *reader = (MDB_reader *)ptr;
 
 #ifndef DPlatformFamily_Windows
-		if (reader->m_OwningProcessID == getpid()) /* catch pthread_exit() in child process */
+		if (reader->m_OwningProcessID.f_Load(NAtomic::EMemoryOrder_Acquire) == getpid()) /* catch pthread_exit() in child process */
 #endif
 			/* We omit the mutex, so do this atomically (i.e. skip mr_txnid) */
-			reader->m_OwningProcessID = 0;
+			reader->m_OwningProcessID.f_Store(0, NAtomic::EMemoryOrder_Release);
 	}
 
 	#ifdef DPlatformFamily_Windows

@@ -847,11 +847,11 @@ namespace NMib::NDatabase
 			 *	started from so we can avoid overwriting any data used in that
 			 *	particular version.
 			 */
-			volatile CTransactionID m_BeginReadTransactionID;
+			NAtomic::TCAtomic<CTransactionID> m_BeginReadTransactionID;
 			/** The process ID of the process owning this reader txn. */
-			volatile CProcessID m_OwningProcessID;
+			NAtomic::TCAtomic<CProcessID> m_OwningProcessID;
 			/** The thread ID of the thread owning this txn. */
-			volatile CThreadID m_OwningThreadID;
+			NAtomic::TCAtomic<CThreadID> m_OwningThreadID;
 		};
 
 			/** The header for the reader table.
@@ -878,12 +878,12 @@ namespace NMib::NDatabase
 				 *	This is recorded here only for convenience; the value can always
 				 *	be determined by reading the main database meta pages.
 				 */
-			volatile CTransactionID		mtb_txnid;
+			NAtomic::TCAtomic<CTransactionID> m_TransactionID;
 				/** The number of slots that have been used in the reader table.
 				 *	This always records the maximum count, it is not decremented
 				 *	when readers release their slots.
 				 */
-			volatile unsigned	mtb_numreaders;
+			NAtomic::TCAtomic<uint32> m_NumReaders;
 		#if defined(DPlatformFamily_Windows) || defined(MDB_USE_POSIX_SEM)
 				/** Binary form of names of the reader/writer locks */
 			mdb_hash_t			mtb_mutexid;
@@ -898,38 +898,19 @@ namespace NMib::NDatabase
 		#endif
 		};
 
-			/** The actual reader table definition. */
+		/** The actual reader table definition. */
 		struct CLocksMemoryMap
 		{
-			union align_cacheline
-			{
-				MDB_txbody mtb;
-		#define mti_magic	mt1.mtb.mtb_magic
-		#define mti_format	mt1.mtb.mtb_format
-		#define mti_rmutex	mt1.mtb.mtb_rmutex
-		#define mti_txnid	mt1.mtb.mtb_txnid
-		#define mti_numreaders	mt1.mtb.mtb_numreaders
-		#define mti_mutexid	mt1.mtb.mtb_mutexid
-		#ifdef MDB_USE_SYSV_SEM
-		#define	mti_semid	mt1.mtb.mtb_semid
-		#define	mti_rlocked	mt1.mtb.mtb_rlocked
-		#endif
-			} mt1;
+			align_cacheline MDB_txbody m_TransactionBody;
 
-		#if !(defined(DPlatformFamily_Windows) || defined(MDB_USE_POSIX_SEM))
-			union align_cacheline
-			{
-		#ifdef MDB_USE_SYSV_SEM
-				int mt2_wlocked;
-		#define mti_wlocked	mt2.mt2_wlocked
-		#else
-				mdb_mutex_t	mt2_wmutex;
-		#define mti_wmutex	mt2.mt2_wmutex
-		#endif
-			} mt2;
-		#endif
-
-			MDB_reader	mti_readers[1];
+#if !(defined(DPlatformFamily_Windows) || defined(MDB_USE_POSIX_SEM))
+#ifdef MDB_USE_SYSV_SEM
+			align_cacheline int m_WriteLock;
+#else
+			align_cacheline mdb_mutex_t	m_WriteLock;
+#endif
+#endif
+			MDB_reader	m_Readers[1];
 		};
 
 			/** Lockfile format signature: version, features and field layout */
@@ -1253,7 +1234,7 @@ namespace NMib::NDatabase
 			 *	Actually the file may be shorter if the freeDB lists the final pages.
 			 */
 			pgno_t		mm_last_pg;
-			volatile CTransactionID	mm_txnid;	/**< txnid that committed this page */
+			NAtomic::TCAtomicAggregate<CTransactionID> mm_txnid;	/**< txnid that committed this page */
 		};
 
 			/** Buffer for a stack-allocated meta page.
@@ -1587,8 +1568,8 @@ namespace NMib::NDatabase
 		uint32	me_psize;	/**< DB page size, inited from me_os_psize */
 		uint32	me_os_psize;	/**< OS page size */
 		uint32	m_MaxReaders;	/**< size of the reader table */
-		/** Max #CLocksMemoryMap.%mti_numreaders of interest to #f_Close() */
-		volatile int	me_close_readers;
+		/** Max #CLocksMemoryMap.%m_TransactionBody.m_NumReaders of interest to #f_Close() */
+		NAtomic::TCAtomic<int32> me_close_readers;
 		CDatabaseSubID		me_numdbs;		/**< number of DBs opened */
 		CDatabaseSubID		me_maxdbs;		/**< size of the DB table */
 		CProcessID	me_pid;		/**< process ID of this env */
@@ -1625,8 +1606,8 @@ namespace NMib::NDatabase
 		int		me_pidquery;		/**< Used in OpenProcess */
 	#endif
 	#ifdef MDB_USE_POSIX_MUTEX	/* Posix mutexes reside in shared mem */
-	#	define		me_rmutex	m_pLocksMemoryMap->mti_rmutex /**< Shared reader lock */
-	#	define		me_wmutex	m_pLocksMemoryMap->mti_wmutex /**< Shared writer lock */
+	#	define		me_rmutex	m_pLocksMemoryMap->m_TransactionBody.mtb_rmutex /**< Shared reader lock */
+	#	define		me_wmutex	m_pLocksMemoryMap->m_WriteLock /**< Shared writer lock */
 	#else
 		NPrivate::mdb_mutex_t	me_rmutex;
 		NPrivate::mdb_mutex_t	me_wmutex;

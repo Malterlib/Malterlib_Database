@@ -371,10 +371,10 @@ namespace NMib::NDatabase
 		int i;
 		CTransactionID mr, oldest = txn->mt_txnid - 1;
 		if (txn->mt_env->m_pLocksMemoryMap) {
-			MDB_reader *r = txn->mt_env->m_pLocksMemoryMap->mti_readers;
-			for (i = txn->mt_env->m_pLocksMemoryMap->mti_numreaders; --i >= 0; ) {
-				if (r[i].m_OwningProcessID) {
-					mr = r[i].m_BeginReadTransactionID;
+			MDB_reader *r = txn->mt_env->m_pLocksMemoryMap->m_Readers;
+			for (i = txn->mt_env->m_pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Load(NAtomic::EMemoryOrder_Relaxed); --i >= 0; ) {
+				if (r[i].m_OwningProcessID.f_Load(NAtomic::EMemoryOrder_Acquire)) {
+					mr = r[i].m_BeginReadTransactionID.f_Load(NAtomic::EMemoryOrder_Relaxed);
 					if (oldest > mr)
 						oldest = mr;
 				}

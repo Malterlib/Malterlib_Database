@@ -104,7 +104,7 @@ namespace NMib::NDatabase::NPrivate
 			DMibConErrOut2("Overflow page {} pages {}{}\n", pgno, mp->mp_pages, state);
 			return;
 		case P_META:
-			DMibConErrOut2("Meta-page {} txnid {}\n", pgno, fg_RemoveQualifiers(((MDB_meta *)METADATA(mp))->mm_txnid));
+			DMibConErrOut2("Meta-page {} txnid {}\n", pgno, fg_RemoveQualifiers(((MDB_meta *)METADATA(mp))->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed)));
 			return;
 		default:
 			DMibConErrOut2("Bad page {} flags 0x{nfh,sf0,sj4}\n", pgno, mp->mp_flags);

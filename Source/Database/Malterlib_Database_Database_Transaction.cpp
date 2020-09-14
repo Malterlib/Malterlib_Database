@@ -734,13 +734,13 @@ namespace NMib::NDatabase
 		if ((flags &= MDB_TXN_RDONLY) != 0) {
 			if (!pLocksMemoryMap) {
 				meta = env->mdb_env_pick_meta();
-				txn->mt_txnid = meta->mm_txnid;
+				txn->mt_txnid = meta->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed);
 				txn->mt_u.reader = nullptr;
 			} else {
 				MDB_reader *r = (env->me_flags & EDatabaseEnvironmentFlag_NoTls) ? txn->mt_u.reader : (MDB_reader *)pthread_getspecific(env->me_txkey);
 				if (r)
 				{
-					if (r->m_OwningProcessID != env->me_pid || r->m_BeginReadTransactionID != (CTransactionID)-1)
+					if (r->m_OwningProcessID.f_Load(NAtomic::EMemoryOrder_Relaxed) != env->me_pid || r->m_BeginReadTransactionID.f_Load(NAtomic::EMemoryOrder_Relaxed) != (CTransactionID)-1)
 						DMibError("Invalid reuse of reader locktable slot");
 				} else {
 					CProcessID pid = env->me_pid;
@@ -764,41 +764,41 @@ namespace NMib::NDatabase
 							UNLOCK_MUTEX(rmutex);
 						}
 					;
-					nr = pLocksMemoryMap->mti_numreaders;
+					nr = pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Load(NAtomic::EMemoryOrder_Relaxed);
 					for (i=0; i<nr; i++)
-						if (pLocksMemoryMap->mti_readers[i].m_OwningProcessID == 0)
+						if (pLocksMemoryMap->m_Readers[i].m_OwningProcessID.f_Load(NAtomic::EMemoryOrder_Acquire) == 0)
 							break;
 					if (i == env->m_MaxReaders)
 						DMibError("Readers full");
-					r = &pLocksMemoryMap->mti_readers[i];
+					r = &pLocksMemoryMap->m_Readers[i];
 					/* Claim the reader slot, carefully since other code
 					 * uses the reader table un-mutexed: First reset the
-					 * slot, next publish it in mti_numreaders.  After
+					 * slot, next publish it in m_TransactionBody.m_NumReaders.  After
 					 * that, it is safe for f_Close() to touch it.
 					 * When it will be closed, we can finally claim it.
 					 */
-					r->m_OwningProcessID = 0;
-					r->m_BeginReadTransactionID = (CTransactionID)-1;
-					r->m_OwningThreadID = tid;
+					r->m_OwningProcessID.f_Store(0, NAtomic::EMemoryOrder_Relaxed);
+					r->m_BeginReadTransactionID.f_Store((CTransactionID)-1, NAtomic::EMemoryOrder_Relaxed);
+					r->m_OwningThreadID.f_Store(tid, NAtomic::EMemoryOrder_Relaxed);
 					if (i == nr)
-						pLocksMemoryMap->mti_numreaders = ++nr;
-					env->me_close_readers = nr;
-					r->m_OwningProcessID = pid;
+						pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Store(++nr, NAtomic::EMemoryOrder_Relaxed);
+					env->me_close_readers.f_Store(nr, NAtomic::EMemoryOrder_Relaxed);
+					r->m_OwningProcessID.f_Store(pid, NAtomic::EMemoryOrder_Release);
 
 					new_notls = (env->me_flags & EDatabaseEnvironmentFlag_NoTls);
 					{
 						int rc;
 						if (!new_notls && (rc=pthread_setspecific(env->me_txkey, r)))
 						{
-							r->m_OwningProcessID = 0;
+							r->m_OwningProcessID.f_Store(0, NAtomic::EMemoryOrder_Release);
 							DMibError(NStr::fg_Format("pthread_setspecific failed: {}", mdb_strerror(rc)));
 						}
 					}
 				}
 				do /* LY: Retry on a race, ITS#7970. */
-					r->m_BeginReadTransactionID = pLocksMemoryMap->mti_txnid;
-				while(r->m_BeginReadTransactionID != pLocksMemoryMap->mti_txnid);
-				txn->mt_txnid = r->m_BeginReadTransactionID;
+					r->m_BeginReadTransactionID.f_Store(pLocksMemoryMap->m_TransactionBody.m_TransactionID.f_Load(NAtomic::EMemoryOrder_Acquire), NAtomic::EMemoryOrder_Release);
+				while (r->m_BeginReadTransactionID.f_Load(NAtomic::EMemoryOrder_Acquire) != pLocksMemoryMap->m_TransactionBody.m_TransactionID.f_Load(NAtomic::EMemoryOrder_Acquire));
+				txn->mt_txnid = r->m_BeginReadTransactionID.f_Load(NAtomic::EMemoryOrder_Relaxed);
 				txn->mt_u.reader = r;
 				meta = env->me_metas[txn->mt_txnid & 1];
 			}
@@ -815,13 +815,13 @@ namespace NMib::NDatabase
 						DMibError(NStr::fg_Format("Write mutex lock failed: {}", mdb_strerror(rc)));
 					env->m_LockedThreadID = NSys::fg_Thread_GetCurrentUID();
 				}
-				txn->mt_txnid = pLocksMemoryMap->mti_txnid;
+				txn->mt_txnid = pLocksMemoryMap->m_TransactionBody.m_TransactionID.f_Load(NAtomic::EMemoryOrder_Acquire);
 				meta = env->me_metas[txn->mt_txnid & 1];
 			}
 			else
 			{
 				meta = env->mdb_env_pick_meta();
-				txn->mt_txnid = meta->mm_txnid;
+				txn->mt_txnid = meta->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed);
 			}
 			txn->mt_txnid++;
 	#if DMibDatabaseDebug
@@ -934,11 +934,11 @@ namespace NMib::NDatabase
 
 		if (F_ISSET(txn->mt_flags, MDB_TXN_RDONLY)) {
 			if (txn->mt_u.reader) {
-				txn->mt_u.reader->m_BeginReadTransactionID = (CTransactionID)-1;
+				txn->mt_u.reader->m_BeginReadTransactionID.f_Store((CTransactionID)-1, NAtomic::EMemoryOrder_Release);
 				if (!(env->me_flags & EDatabaseEnvironmentFlag_NoTls)) {
 					txn->mt_u.reader = nullptr; /* txn does not own reader */
 				} else if (mode & MDB_END_SLOT) {
-					txn->mt_u.reader->m_OwningProcessID = 0;
+					txn->mt_u.reader->m_OwningProcessID.f_Store(0, NAtomic::EMemoryOrder_Release);
 					txn->mt_u.reader = nullptr;
 				} /* else txn owns the slot until it does MDB_END_SLOT */
 			}

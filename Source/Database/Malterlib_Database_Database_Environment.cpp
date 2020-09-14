@@ -452,11 +452,11 @@ namespace NMib::NDatabase
 		meta = Environment.mdb_env_pick_meta();
 		Info.m_pMapAddress = meta->mm_address;
 		Info.m_LastPageID = meta->mm_last_pg;
-		Info.m_LastCommittedTransactionID = meta->mm_txnid;
+		Info.m_LastCommittedTransactionID = meta->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed);
 
 		Info.m_MapSize = Environment.m_MapSize;
 		Info.m_MaxReaders = Environment.m_MaxReaders;
-		Info.m_nReaders = Environment.m_pLocksMemoryMap ? Environment.m_pLocksMemoryMap->mti_numreaders : 0;
+		Info.m_nReaders = Environment.m_pLocksMemoryMap ? Environment.m_pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Load(NAtomic::EMemoryOrder_Relaxed) : 0;
 		return Info;
 	}
 
@@ -785,20 +785,21 @@ namespace NMib::NDatabase
 			return {};
 
 		NContainer::TCVector<CDatabaseReaderInfo> ReaderInfos;
-		mint nReaders = Environment.m_pLocksMemoryMap->mti_numreaders;
-		MDB_reader *pReaders = Environment.m_pLocksMemoryMap->mti_readers;
+		mint nReaders = Environment.m_pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Load(NAtomic::EMemoryOrder_Relaxed);
+		MDB_reader *pReaders = Environment.m_pLocksMemoryMap->m_Readers;
 		for (mint i = 0; i < nReaders; i++)
 		{
 			auto &Reader = pReaders[i];
-			if (Reader.m_OwningProcessID)
+			auto OwningProcessID = Reader.m_OwningProcessID.f_Load();
+			if (OwningProcessID)
 			{
-				CTransactionID TransactionID = Reader.m_BeginReadTransactionID;
+				CTransactionID TransactionID = Reader.m_BeginReadTransactionID.f_Load();
 
 				NStr::CStr Data;
 				if (TransactionID == (CTransactionID)-1)
-					Data = NStr::fg_Format("{sj10} {} -\n",(int)Reader.m_OwningProcessID, (void *)(mint)Reader.m_OwningThreadID);
+					Data = NStr::fg_Format("{sj10} {} -\n", OwningProcessID, (void *)(mint)OwningProcessID);
 				else
-					Data = NStr::fg_Format("{sj10} {} {}\n",(int)Reader.m_OwningProcessID, (void *)(mint)Reader.m_OwningThreadID, TransactionID);
+					Data = NStr::fg_Format("{sj10} {} {}\n", OwningProcessID, (void *)(mint)OwningProcessID, TransactionID);
 				auto &Info = ReaderInfos.f_Insert();
 				Info.m_Description = fg_Move(Data);
 				Info.m_iReaderSlot = i;
@@ -909,7 +910,16 @@ namespace NMib::NDatabase
 			if (m->mm_version != MDB_DATA_VERSION)
 				DMibError(NStr::fg_Format("Header page '{}' has invalid data version: 0x{nfh,sf0,sj8} expected 0x{nfh,sf0,sj8}", p->mp_p.p_pgno, m->mm_version, uint32(MDB_DATA_VERSION)));
 
-			if (off == 0 || (prev ? m->mm_txnid < meta->mm_txnid : m->mm_txnid > meta->mm_txnid))
+			if
+				(
+					off == 0
+					||
+					(
+						prev
+						? m->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed) < meta->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed)
+						: m->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed) > meta->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed)
+					)
+				)
 				*meta = *m;
 		}
 		return false;
@@ -1038,7 +1048,7 @@ namespace NMib::NDatabase
 			/* LY: issue a memory barrier, if not x86. ITS#7969 */
 			__sync_synchronize();
 	#endif
-			mp->mm_txnid = txn->mt_txnid;
+			mp->mm_txnid.f_Store(txn->mt_txnid, NAtomic::EMemoryOrder_Relaxed);
 			if (!(flags & (EDatabaseEnvironmentFlag_NoMetaSync|EDatabaseEnvironmentFlag_NoSync))) {
 				unsigned meta_size = env->me_psize;
 				rc = (env->me_flags & EDatabaseEnvironmentFlag_WriteMapAsync) ? MS_ASYNC : MS_SYNC;
@@ -1055,14 +1065,14 @@ namespace NMib::NDatabase
 			}
 			goto done;
 		}
-		metab.mm_txnid = mp->mm_txnid;
+		metab.mm_txnid.f_Store(mp->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed), NAtomic::EMemoryOrder_Relaxed);
 		metab.mm_last_pg = mp->mm_last_pg;
 
 		meta.mm_mapsize = mapsize;
 		meta.mm_dbs[FREE_DBI] = txn->mt_dbs[FREE_DBI];
 		meta.mm_dbs[MAIN_DBI] = txn->mt_dbs[MAIN_DBI];
 		meta.mm_last_pg = txn->mt_next_pgno - 1;
-		meta.mm_txnid = txn->mt_txnid;
+		meta.mm_txnid.f_Store(txn->mt_txnid, NAtomic::EMemoryOrder_Relaxed);
 
 		off = offsetof(MDB_meta, mm_mapsize);
 		ptr = (char *)&meta + off;
@@ -1097,7 +1107,7 @@ namespace NMib::NDatabase
 			 * Use the non-SYNC fd; we know it will fail anyway.
 			 */
 			meta.mm_last_pg = metab.mm_last_pg;
-			meta.mm_txnid = metab.mm_txnid;
+			meta.mm_txnid.f_Store(metab.mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed), NAtomic::EMemoryOrder_Relaxed);
 	#ifdef DPlatformFamily_Windows
 			memset(&ov, 0, sizeof(ov));
 			ov.Offset = off;
@@ -1120,7 +1130,7 @@ namespace NMib::NDatabase
 		 * how stale their view of these values is.
 		 */
 		if (env->m_pLocksMemoryMap)
-			env->m_pLocksMemoryMap->mti_txnid = txn->mt_txnid;
+			env->m_pLocksMemoryMap->m_TransactionBody.m_TransactionID.f_Store(txn->mt_txnid, NAtomic::EMemoryOrder_Release);
 
 		return MDB_SUCCESS;
 	}
@@ -1131,7 +1141,7 @@ namespace NMib::NDatabase
 	NPrivate::MDB_meta *CDatabaseEnvironment_Internal::mdb_env_pick_meta() const
 	{
 		MDB_meta *const *metas = me_metas;
-		return metas[ (metas[0]->mm_txnid < metas[1]->mm_txnid) ^
+		return metas[ (metas[0]->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed) < metas[1]->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed)) ^
 			((me_flags & EDatabaseEnvironmentFlag_PreviousSnapshot) != 0) ]
 		;
 	}
@@ -1476,7 +1486,7 @@ namespace NMib::NDatabase
 		me_maxpg = m_MapSize / me_psize;
 
 		if (m_pLocksMemoryMap)
-			m_pLocksMemoryMap->mti_txnid = meta.mm_txnid;
+			m_pLocksMemoryMap->m_TransactionBody.m_TransactionID.f_Store(meta.mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed), NAtomic::EMemoryOrder_Release);
 
 	#if DMibDatabaseDebug
 		{
@@ -1484,7 +1494,7 @@ namespace NMib::NDatabase
 			MDB_db *db = &meta->mm_dbs[MAIN_DBI];
 
 			DMibDatabaseTrace("opened database version {}, pagesize {}", meta->mm_version, me_psize);
-			DMibDatabaseTrace("using meta page {}",    (int) (meta->mm_txnid & 1));
+			DMibDatabaseTrace("using meta page {}",    (int) (meta->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed) & 1));
 			DMibDatabaseTrace("depth: {}",             db->md_depth);
 			DMibDatabaseTrace("entries: {}",        db->md_entries);
 			DMibDatabaseTrace("branch pages: {}",   db->md_branch_pages);
@@ -1563,9 +1573,9 @@ namespace NMib::NDatabase
 			 * data owned by this process (me_close_readers and
 			 * our readers), and clear each reader atomically.
 			 */
-			for (i = me_close_readers; --i >= 0; )
-				if (m_pLocksMemoryMap->mti_readers[i].m_OwningProcessID == pid)
-					m_pLocksMemoryMap->mti_readers[i].m_OwningProcessID = 0;
+			for (i = me_close_readers.f_Load(NAtomic::EMemoryOrder_Relaxed); --i >= 0; )
+				if (m_pLocksMemoryMap->m_Readers[i].m_OwningProcessID.f_Load() == pid)
+					m_pLocksMemoryMap->m_Readers[i].m_OwningProcessID.f_Store(0);
 	#ifdef DPlatformFamily_Windows
 			if (me_rmutex) {
 				CloseHandle(me_rmutex);

@@ -193,7 +193,7 @@ namespace NMib::NDatabase
 		char *namedup;
 		{
 			mint NameLen = NStr::fg_StrLen(_pName);
-			namedup = (char *)NMemory::fg_Alloc(NameLen);
+			namedup = (char *)NMemory::fg_Alloc(NameLen + 1);
 			NStr::fg_StrCopy(namedup, _pName, NameLen + 1);
 		}
 		auto Cleanup = g_OnScopeExit > [&]

@@ -50,6 +50,8 @@ namespace NMib::NDatabase::NPrivate
 
 		~CCompactingCopyState()
 		{
+			if (m_ProcessingActor)
+				fg_Move(m_ProcessingActor)->f_BlockDestroy();
 			if (m_WriteBuffers[0])
 				NMemory::fg_FreeNoSize(m_WriteBuffers[0]);
 		}
@@ -372,7 +374,7 @@ namespace NMib::NDatabase
 		}
 
 		if (root != P_INVALID || mm->mm_dbs[MAIN_DBI].md_flags)
-			mm->mm_txnid = 1;		/* use metapage 1 */
+			mm->mm_txnid.f_Store(1, NAtomic::EMemoryOrder_Relaxed);		/* use metapage 1 */
 
 		CopyState.m_WriteBuffersLength[0] = me_psize * NUM_METAS;
 		CopyState.m_pInternalTransaction = pInternalTransaction;

@@ -116,7 +116,7 @@ namespace NMib::NDatabase::NPrivate
 	{
 		char *nm = env->me_mutexname;
 		strcpy(nm, MUTEXNAME_PREFIX);
-		mdb_pack85(env->m_pLocksMemoryMap->mti_mutexid, nm + sizeof(MUTEXNAME_PREFIX));
+		mdb_pack85(env->m_pLocksMemoryMap->m_TransactionBody.mtb_mutexid, nm + sizeof(MUTEXNAME_PREFIX));
 	}
 
 	/** Return env->me_mutexname after filling in ch ('r'/'w') for convenience */
