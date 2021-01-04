@@ -308,7 +308,7 @@ namespace NMib::NDatabase
 		# error "Two's complement, reasonably sized integer types, please"
 		#endif
 
-#			ifdef DMibDebug
+#			if defined(DMibDebug) || defined(DArchitecture_arm64) || defined(DArchitecture_arm64e)
 #				define DMibDatabaseInfrequentSection
 #			else
 			#ifdef __GNUC__
