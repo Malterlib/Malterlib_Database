@@ -24,21 +24,21 @@ Import "../Core/Lib_Malterlib.MTarget"
 			{
 				Compile.Disabled true
 				{
-					!Documentation ""
+					!Documentation undefined
 				}
 			}
 			%File "Source/Database/*IDList.*"
 			{
 				Compile.Disabled true
 				{
-					!Documentation ""
+					!Documentation undefined
 				}
 			}
 			%File "Source/Database/*Internal.h"
 			{
 				Compile.Disabled true
 				{
-					!Documentation ""
+					!Documentation undefined
 				}
 			}
 		}
@@ -52,21 +52,14 @@ Import "../Core/Lib_Malterlib.MTarget"
 
 Property
 {
-	MalterlibLibrary_Database true
-	{
-		&
-		{
-			MalterlibLibrary_Database ""
-			MalterlibLibrary_All true
-		}
-	}
-	MalterlibSubLibraries "Database;@(MalterlibSubLibraries)"
+	MalterlibLibrary_Database define bool = MalterlibLibrary_All
+	MalterlibSubLibraries =+ "Database"
 	{
 		!!MalterlibLibrary_Database true
 	}
-	MalterlibLibrarySeparate_Lib_Malterlib_Database true
-//	MalterlibSubLibrarySeparate_Lib_Malterlib_Database true
-	MalterlibIncludeRoots "@('Include'->MakeAbsolute());@(MalterlibIncludeRoots)"
+	MalterlibLibrarySeparate_Lib_Malterlib_Database define bool = true
+//	MalterlibSubLibrarySeparate_Lib_Malterlib_Database define bool = true
+	MalterlibIncludeRoots =+ "Include"->MakeAbsolute()
 	{
 		!!MalterlibLibrary_Database true
 	}
@@ -76,8 +69,7 @@ Property
 {
 	!!MalterlibEnableInternalTests true
 	
-	MalterlibTests "Malterlib_Database;@(MalterlibTests)"
-	MalterlibTestFiles_Malterlib_Database "@('Test/*'->MakeAbsolute())"
-	MalterlibTestDependencies_Malterlib_Database "Lib_Malterlib_Database"
+	MalterlibTests =+ "Malterlib_Database"
+	MalterlibTestFiles_Malterlib_Database define [type(CEntity)] = ["Test/*"->MakeAbsolute()]
+	MalterlibTestDependencies_Malterlib_Database define [type(CEntity)] = ["Lib_Malterlib_Database"]
 }
-
