@@ -21,13 +21,8 @@ namespace NMib::NDatabase::NPrivate
 				[&]
 				{
 					using CDecodedDescending = TCGetDescending<typename NTraits::TCRemoveQualifiers<tfp_CValue>::CType>;
-					if constexpr (CDecodedDescending::mc_bDescending)
-					{
-						auto Descending = fg_Descending<CDecodedDescending::mc_bDescending>(fg_Get<tfp_Indices>(Values));
-						CDatabaseValue::fs_ConsumeLexicographic(Stream, Descending);
-					}
-					else
-						CDatabaseValue::fs_ConsumeLexicographic(Stream, fg_Get<tfp_Indices>(Values));
+					auto Descending = fg_Descending<CDecodedDescending::mc_bDescending>(fg_Get<tfp_Indices>(Values));
+					CDatabaseValue::fs_ConsumeLexicographic(Stream, Descending);
 
 					return true;
 				}
