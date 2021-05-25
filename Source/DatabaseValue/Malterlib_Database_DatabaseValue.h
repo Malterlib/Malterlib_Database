@@ -5,6 +5,7 @@
 
 #include <Mib/Core/Core>
 #include <Mib/Type/Traits>
+
 namespace NMib::NDatabase
 {
 	using CDatabaseValueCache = NContainer::TCGrowingVector<uint8>;
