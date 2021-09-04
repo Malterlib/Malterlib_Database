@@ -27,7 +27,7 @@ namespace NMib::NDatabase
 		CDatabaseValue(CDatabaseValueCache const &_Value);
 		CDatabaseValue(CDatabaseValueCache &_ValueCache, CDatabaseValue const &_CopyFromValue);
 
-		bool operator < (CDatabaseValue const &_Right) const;
+		COrdering_Weak operator <=> (CDatabaseValue const &_Right) const;
 		bool operator == (CDatabaseValue const &_Right) const;
 		bool f_HasPrefix(CDatabaseValue const &_Right) const;
 

@@ -50,7 +50,7 @@ namespace NMib::NDatabase
 		, EDatabaseSubFlag_Create = 0x40000						///< Create DB if not already existing
 	};
 
-	using FDatabaseCompare = NFunction::TCFunction<int (CDatabaseValue const &_Left, CDatabaseValue const &_Right), NFunction::CFunctionSupportCompareTag>;
+	using FDatabaseCompare = NFunction::TCFunction<int (CDatabaseValue const &_Left, CDatabaseValue const &_Right), NFunction::CFunctionSupportEqualityCompareTag>;
 
 	/** @brief A handle for an individual database in the DB environment. */
 	using CDatabaseSubID = uint32;

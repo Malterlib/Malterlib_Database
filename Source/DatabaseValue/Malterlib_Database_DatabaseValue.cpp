@@ -5,22 +5,13 @@
 
 namespace NMib::NDatabase
 {
-	bool CDatabaseValue::operator < (CDatabaseValue const &_Right) const
+	COrdering_Weak CDatabaseValue::operator <=> (CDatabaseValue const &_Right) const
 	{
 		mint nData = fg_Min(m_Size, _Right.m_Size);
-		auto Diff = NMemory::fg_MemCmp(m_pData, _Right.m_pData, nData);
-		if (Diff)
-		{
-			if (Diff < 0)
-				return true;
-			else
-				return false;
-		}
-		if (m_Size < _Right.m_Size)
-			return true;
-		else if (m_Size > _Right.m_Size)
-			return false;
-		return false;
+		if (auto Diff = NMemory::fg_MemCmp(m_pData, _Right.m_pData, nData); Diff != 0)
+			return Diff <=> 0;
+		
+		return m_Size <=> _Right.m_Size;
 	}
 
 	bool CDatabaseValue::operator == (CDatabaseValue const &_Right) const
