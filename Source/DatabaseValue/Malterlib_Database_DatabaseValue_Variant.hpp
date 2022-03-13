@@ -34,7 +34,7 @@ namespace NMib::NDatabase
 			CTypeID TypeID;
 			CDatabaseValue::fs_ConsumeLexicographic(_Stream, TypeID);
 
-			_Variant.f_VisitCreate
+			bool bSuccess = _Variant.f_TryVisitCreate
 				(
 				 	TypeID
 					, [&](auto &&_Value) -> void
@@ -43,6 +43,9 @@ namespace NMib::NDatabase
 					}
 				)
 			;
+
+			if (!bSuccess)
+				DMibErrorStream(NStr::CStr::CFormat("Unsupported type '{}' in variant") << TypeID);
 		}
 	};
 }
