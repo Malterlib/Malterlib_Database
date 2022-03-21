@@ -35,7 +35,7 @@
 
 namespace NMib::NDatabase
 {
-	///	\enum	f_OpenDatabase	Database Flags
+	///	Sub Database Flags
 	enum EDatabaseSubFlag : uint32
 	{
 		EDatabaseSubFlag_None = 0

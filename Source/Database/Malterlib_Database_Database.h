@@ -72,7 +72,7 @@ namespace NMib::NDatabase
 
 namespace NMib::NDatabase
 {
-	/// \enum Environment Flags
+	/// Database Flags
 	enum EDatabaseEnvironmentFlag : uint32
 	{
 		EDatabaseEnvironmentFlag_None = 0
@@ -83,7 +83,7 @@ namespace NMib::NDatabase
 		, EDatabaseEnvironmentFlag_NoMetaSync = 0x40000			///< Don't fsync metapage after commit
 		, EDatabaseEnvironmentFlag_WriteMap = 0x80000			///< Use writable mmap
 		, EDatabaseEnvironmentFlag_WriteMapAsync = 0x100000		///< Use asynchronous msync when #EDatabaseEnvironmentFlag_WriteMap is used
-		, EDatabaseEnvironmentFlag_NoTls = 0x200000				///< Tie reader locktable slots to #MDB_txn objects instead of to threads
+		, EDatabaseEnvironmentFlag_NoTls = 0x200000				///< Tie reader locktable slots to #NMib::NDatabase::CDatabaseReadTransaction objects instead of to threads
 		, EDatabaseEnvironmentFlag_NoLock = 0x400000			///< Don't do any locking, caller must manage their own locks
 		, EDatabaseEnvironmentFlag_NoReadAhead = 0x800000		///< Don't do readahead (no effect on Windows)
 		, EDatabaseEnvironmentFlag_NoMemoryInit = 0x1000000		///< Don't initialize malloc'd memory before writing to datafile
@@ -109,7 +109,7 @@ namespace NMib::NDatabase
 		)
 	};
 
-	///	\enum Copy Flags
+	///	Database Copy Flags
 	enum EDatabaseEnvironmentCopyFlag
 	{
 		EDatabaseEnvironmentCopyFlag_None = 0
@@ -133,6 +133,7 @@ namespace NMib::NDatabase
 		NStr::CStr m_Description;
 	};
 
+	/// Database environment
 	struct CDatabaseEnvironment
 	{
 		CDatabaseEnvironment();
@@ -154,7 +155,7 @@ namespace NMib::NDatabase
 
 		CDatabaseStatistics f_Statistics();
 		CDatabaseEnvironmentInfo f_Info();
-		mint f_MaxKeySize();
+		mint f_MaxKeySize(); ///< The maximum key size supported by the database
 
 		NStr::CStr f_GetPath();
 		void *f_GetFD();

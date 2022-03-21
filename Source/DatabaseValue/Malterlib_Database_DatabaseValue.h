@@ -17,7 +17,7 @@ namespace NMib::NDatabase
 	 * update operation, or the end of the transaction. Do not modify or
 	 * free them, they commonly point into the database itself.
 	 *
-	 * Key sizes must be between 1 and #f_MaxKeySize() inclusive.
+	 * Key sizes must be between 1 and #NMib::NDatabase::CDatabaseEnvironment::f_MaxKeySize() inclusive.
 	 * The same applies to data sizes in databases with the #EDatabaseSubFlag_SortedDuplicates flag.
 	 * Other data items can in theory be from 0 to 0xffffffff bytes long.
 	 */
@@ -77,8 +77,8 @@ namespace NMib::NDatabase
 
 		NContainer::CByteVector f_ToVector() const;
 
-		mint m_Size = 0;				///< Size of the data item */
-		uint8 const *m_pData = nullptr;	///< Address of the data item */
+		mint m_Size = 0;				///< Size of the data item
+		uint8 const *m_pData = nullptr;	///< Address of the data item
 	};
 
 	template <typename t_CType, typename t_CEnableIf = void>

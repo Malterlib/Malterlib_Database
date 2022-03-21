@@ -35,7 +35,7 @@
 
 namespace NMib::NDatabase
 {
-	/// \enum Write transaction flags
+	/// Database Write Transaction Flags
 	enum EDatabaseWriteTrasactionFlag
 	{
 		EDatabaseWriteTrasactionFlag_None
@@ -80,6 +80,7 @@ namespace NMib::NDatabase
 		NStorage::TCUniquePointer<CDatabaseTransactionCommon::CInternal> mp_pTransaction;
 	};
 
+	/// Read transaction
 	struct CDatabaseReadTransaction : protected CDatabaseTransactionCommon
 	{
 		CDatabaseReadTransaction();
