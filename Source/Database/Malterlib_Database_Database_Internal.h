@@ -923,9 +923,9 @@ namespace NMib::NDatabase
 			 *	Some low values are reserved for future tweaks.
 			 */
 		#ifdef DPlatformFamily_Windows
-		# define MDB_LOCK_TYPE	(0 + NTraits::TCAlignmentOf<mdb_hash_t>::mc_Value/8 % 2)
+		# define MDB_LOCK_TYPE	(0 + alignof(mdb_hash_t)/8 % 2)
 		#elif defined MDB_USE_POSIX_SEM
-		# define MDB_LOCK_TYPE	(4 + NTraits::TCAlignmentOf<mdb_hash_t>::mc_Value/8 % 2)
+		# define MDB_LOCK_TYPE	(4 + alignof(mdb_hash_t)/8 % 2)
 		#elif defined MDB_USE_SYSV_SEM
 		# define MDB_LOCK_TYPE	(8)
 		#elif defined MDB_USE_POSIX_MUTEX
@@ -933,7 +933,7 @@ namespace NMib::NDatabase
 		 * used by two executables are compatible. Just check alignment and size.
 		 */
 		# define MDB_LOCK_TYPE	(10 + \
-				LOG2_MOD(NTraits::TCAlignmentOf<pthread_mutex_t>::mc_Value, 5) + \
+				LOG2_MOD(alignof(pthread_mutex_t), 5) + \
 				sizeof(pthread_mutex_t) / 4U % 22 * 5)
 		#endif
 

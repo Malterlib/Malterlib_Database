@@ -387,7 +387,8 @@ namespace NMib::NDatabase
 	void NPrivate::mdb_page_dirty(MDB_txn *txn, MDB_page *mp)
 	{
 		MDB_ID2 mid;
-		int rc, (*insert)(MDB_ID2L, MDB_ID2 *);
+		[[maybe_unused]] int rc;
+		int (*insert)(MDB_ID2L, MDB_ID2 *);
 
 		if (txn->mt_flags & MDB_TXN_WRITEMAP) {
 			insert = mdb_mid2l_append;
