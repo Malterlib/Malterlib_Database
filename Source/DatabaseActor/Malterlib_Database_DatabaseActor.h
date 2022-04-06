@@ -75,6 +75,8 @@ namespace NMib::NDatabase
 		NConcurrency::TCFuture<CDatabaseEnvironmentInfo> f_Info();
 		NConcurrency::TCFuture<NStr::CStr> f_GetPath();
 
+		NConcurrency::TCFuture<CDatabaseStatistics> f_GetAggregateStatistics();
+
 	private:
 		NConcurrency::TCFuture<void> fp_Destroy();
 

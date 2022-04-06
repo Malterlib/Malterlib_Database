@@ -100,6 +100,7 @@ namespace NMib::NDatabase
 	{
 		if (!mp_bOpened)
 			co_return DMibErrorInstance("Database has not been opened");
+
 		if (f_IsDestroyed())
 			co_return DMibErrorInstance("Database actor destroyed");
 
@@ -136,6 +137,7 @@ namespace NMib::NDatabase
 	{
 		if (!mp_bOpened)
 			co_return DMibErrorInstance("Database has not been opened");
+
 		if (f_IsDestroyed())
 			co_return DMibErrorInstance("Database actor destroyed");
 
@@ -178,6 +180,44 @@ namespace NMib::NDatabase
 		;
 	}
 
+	NConcurrency::TCFuture<CDatabaseStatistics> CDatabaseActor::f_GetAggregateStatistics()
+	{
+		if (!mp_bOpened)
+			co_return DMibErrorInstance("Database has not been opened");
+
+		if (f_IsDestroyed())
+			co_return DMibErrorInstance("Database actor destroyed");
+
+		try
+		{
+			CDatabaseStatistics Stats;
+			Stats = mp_DatabaseEnvironment.f_Statistics();
+
+			auto ReadTransaction = co_await f_OpenTransactionRead();
+
+			if (!ReadTransaction.f_HasDatabases())
+				co_return Stats;
+
+			auto Databases = ReadTransaction.f_EnumDatabases();
+			for (auto &Database : Databases)
+			{
+				auto DatabaseTransaction = ReadTransaction.f_OpenDatabaseTransaction(Database);
+				auto DbStats = DatabaseTransaction.f_DatabaseStatistics();
+				Stats.m_PageSize = fg_Max(Stats.m_PageSize, DbStats.m_PageSize);
+				Stats.m_nLeafPages += DbStats.m_nLeafPages;
+				Stats.m_nBranchPages += DbStats.m_nBranchPages;
+				Stats.m_nOverflowPages += DbStats.m_nOverflowPages;
+				Stats.m_nDataItems += DbStats.m_nDataItems;
+			}
+
+			co_return Stats;
+		}
+		catch (NException::CException const &_Exception)
+		{
+			co_return _Exception.f_ExceptionPointer();
+		}
+	}
+
 	NConcurrency::TCFuture<void> CDatabaseActor::f_CommitWriteTransaction(CTransactionWrite &&_WriteTransaction)
 	{
 		return TCFuture<void>::fs_RunProtected() / [&]
@@ -191,6 +231,7 @@ namespace NMib::NDatabase
 	{
 		if (!mp_bOpened)
 			co_return DMibErrorInstance("Database has not been opened");
+
 		if (f_IsDestroyed())
 			co_return DMibErrorInstance("Database actor destroyed");
 
@@ -201,6 +242,7 @@ namespace NMib::NDatabase
 	{
 		if (!mp_bOpened)
 			co_return DMibErrorInstance("Database has not been opened");
+
 		if (f_IsDestroyed())
 			co_return DMibErrorInstance("Database actor destroyed");
 
@@ -211,6 +253,7 @@ namespace NMib::NDatabase
 	{
 		if (!mp_bOpened)
 			co_return DMibErrorInstance("Database has not been opened");
+
 		if (f_IsDestroyed())
 			co_return DMibErrorInstance("Database actor destroyed");
 		

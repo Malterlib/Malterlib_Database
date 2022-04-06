@@ -54,4 +54,9 @@ namespace NMib::NDatabase
 
 		return Stats;
 	}
+
+	CDatabaseOffset CDatabaseStatistics::f_GetTotalUsedSize() const
+	{
+		return (m_nBranchPages + m_nLeafPages + m_nOverflowPages) * m_PageSize;
+	}
 }
