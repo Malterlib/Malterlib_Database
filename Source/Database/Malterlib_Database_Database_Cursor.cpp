@@ -545,7 +545,7 @@ namespace NMib::NDatabase
 			size += sizeof(MDB_xcursor);
 
 		mc = (MDB_cursor *)NMemory::fg_Alloc(size);
-		auto Cleanup = g_OnScopeExit > [&]()
+		auto Cleanup = g_OnScopeExit / [&]()
 			{
 				mdb_cursor_close(mc);
 			}

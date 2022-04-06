@@ -233,7 +233,7 @@ namespace NMib::NDatabase
 
 		flags |= Environment.me_flags;
 
-		auto Cleanup = g_OnScopeExit > [&]()
+		auto Cleanup = g_OnScopeExit / [&]()
 			{
 				Environment.mdb_env_close0(excl);
 			}
@@ -322,7 +322,7 @@ namespace NMib::NDatabase
 			int tsize = sizeof(MDB_txn), size = tsize + Environment.me_maxdbs * (sizeof(MDB_db)+sizeof(MDB_cursor *)+sizeof(uint32)+1);
 			Environment.me_pbuf = NMemory::fg_AllocInitZero(Environment.me_psize);
 			txn = (MDB_txn *)NMemory::fg_AllocInitZero(size);
-			auto Cleanup1 = g_OnScopeExit > [&]()
+			auto Cleanup1 = g_OnScopeExit / [&]()
 				{
 					NMemory::fg_FreeNoSize(txn);
 				}
@@ -379,7 +379,7 @@ namespace NMib::NDatabase
 		if (rc)
 			DMibError(NStr::fg_Format("Error opening file {}", mdb_strerror(rc)));
 
-		auto Cleanup = g_OnScopeExit > [&]()
+		auto Cleanup = g_OnScopeExit / [&]()
 			{
 				int Error = close(newfd);
 				(void)Error;
@@ -978,7 +978,7 @@ namespace NMib::NDatabase
 		psize = me_psize;
 
 		p = (MDB_page *)NMemory::fg_AllocInitZero(NUM_METAS * psize);
-		auto Cleanup = g_OnScopeExit > [&]()
+		auto Cleanup = g_OnScopeExit / [&]()
 			{
 				NMemory::fg_FreeNoSize(p);
 			}
@@ -1663,7 +1663,7 @@ namespace NMib::NDatabase
 		txn = Transaction.fp_GetInternal();
 
 		{
-			auto UnlockMutex = g_OnScopeExit > [&]
+			auto UnlockMutex = g_OnScopeExit / [&]
 				{
 					if (wmutex)
 						UNLOCK_MUTEX(wmutex);

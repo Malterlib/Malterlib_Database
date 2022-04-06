@@ -131,7 +131,7 @@ namespace NMib::NDatabase
 
 		rdrs = m_pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Load(NAtomic::EMemoryOrder_Relaxed);
 		pids = (CProcessID *)NMemory::fg_Alloc((rdrs+1) * sizeof(CProcessID));
-		auto Cleanup = g_OnScopeExit > [&]
+		auto Cleanup = g_OnScopeExit / [&]
 			{
 				NMemory::fg_FreeNoSize(pids);
 			}

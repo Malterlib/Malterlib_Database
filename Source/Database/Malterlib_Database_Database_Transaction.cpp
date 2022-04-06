@@ -228,7 +228,7 @@ namespace NMib::NDatabase
 			 */
 			txn = me_txn0;
 		}
-		auto Cleanup = g_OnScopeExit > [&]
+		auto Cleanup = g_OnScopeExit / [&]
 			{
 				if (txn && txn != me_txn0)
 					NMemory::fg_FreeNoSize(txn);
@@ -255,7 +255,7 @@ namespace NMib::NDatabase
 		}
 
 #ifdef DMibDatabase_Always64BitSupport
-		auto Cleanup2 = g_OnScopeExit > [&]
+		auto Cleanup2 = g_OnScopeExit / [&]
 			{
 				if (txn->mt_rpages)
 					NMemory::fg_FreeNoSize(txn->mt_rpages);
@@ -268,13 +268,13 @@ namespace NMib::NDatabase
 			txn->mt_cursors = (MDB_cursor **)(txn->mt_dbs + me_maxdbs);
 			txn->mt_dbiseqs = parent->mt_dbiseqs;
 			txn->mt_u.dirty_list = (MDB_ID2L)NMemory::fg_Alloc(sizeof(MDB_ID2)*MDB_IDL_UM_SIZE);
-			auto Cleanup3 = g_OnScopeExit > [&]
+			auto Cleanup3 = g_OnScopeExit / [&]
 				{
 					NMemory::fg_FreeNoSize(txn->mt_u.dirty_list);
 				}
 			;
 			txn->mt_free_pgs = mdb_midl_alloc(MDB_IDL_UM_MAX);
-			auto Cleanup4 = g_OnScopeExit > [&]
+			auto Cleanup4 = g_OnScopeExit / [&]
 				{
 					mdb_txn_end(txn, MDB_END_FAIL_BEGINCHILD);
 				}
@@ -382,7 +382,7 @@ namespace NMib::NDatabase
 		/* mdb_txn_end() mode for a commit which writes nothing */
 		end_mode = NPrivate::MDB_END_EMPTY_COMMIT|MDB_END_UPDATE|MDB_END_SLOT|MDB_END_FREE;
 
-		auto Cleanup = g_OnScopeExit > [&]
+		auto Cleanup = g_OnScopeExit / [&]
 			{
 				NPrivate::mdb_txn_abort(txn);
 			}
@@ -534,7 +534,7 @@ namespace NMib::NDatabase
 				{
 					/* TODO: Prevent failure here, so parent does not fail */
 					{
-						auto Cleanup = g_OnScopeExit > [&]()
+						auto Cleanup = g_OnScopeExit / [&]()
 							{
 								parent->mt_flags |= MDB_TXN_ERROR;
 							}
@@ -759,7 +759,7 @@ namespace NMib::NDatabase
 						if (LOCK_MUTEX(rc, env, rmutex))
 							DMibError(NStr::fg_Format("Read mutex lock failed: {}", mdb_strerror(rc)));
 					}
-					auto Unlock = g_OnScopeExit > [&]()
+					auto Unlock = g_OnScopeExit / [&]()
 						{
 							UNLOCK_MUTEX(rmutex);
 						}
@@ -862,7 +862,7 @@ namespace NMib::NDatabase
 		txn->mt_dbflags[MAIN_DBI] = DB_VALID|DB_USRVALID;
 		txn->mt_dbflags[FREE_DBI] = DB_VALID;
 
-		auto Cleanup = g_OnScopeExit > [&]
+		auto Cleanup = g_OnScopeExit / [&]
 			{
 				NPrivate::mdb_txn_end(txn, new_notls /*0 or MDB_END_SLOT*/ | NPrivate::MDB_END_FAIL_BEGIN);
 			}

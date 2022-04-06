@@ -196,7 +196,7 @@ namespace NMib::NDatabase
 			namedup = (char *)NMemory::fg_Alloc(NameLen + 1);
 			NStr::fg_StrCopy(namedup, _pName, NameLen + 1);
 		}
-		auto Cleanup = g_OnScopeExit > [&]
+		auto Cleanup = g_OnScopeExit / [&]
 			{
 				NMemory::fg_FreeNoSize(namedup);
 			}
@@ -392,7 +392,7 @@ namespace NMib::NDatabase
 
 		mc = f_Cursor(dbi);
 
-		auto Cleanup = g_OnScopeExit > [&]()
+		auto Cleanup = g_OnScopeExit / [&]()
 			{
 				mdb_cursor_close(mc);
 			}
