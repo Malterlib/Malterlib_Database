@@ -26,6 +26,7 @@ namespace NMib::NDatabase
 			CTransactionRead(CTransactionRead &&) = default;
 			CTransactionRead(CTransactionRead const &) = delete;
 
+			bool f_HasDatabases() const;
 			CDatabaseSubReadTransaction f_OpenDatabaseTransaction
 				(
 					ch8 const *_pName = nullptr
@@ -50,6 +51,7 @@ namespace NMib::NDatabase
 			CTransactionWrite(CTransactionWrite &&) = default;
 			CTransactionWrite(CTransactionWrite const &) = delete;
 
+			bool f_HasDatabases() const;
 			CDatabaseSub f_OpenDatabase
 				(
 					ch8 const *_pName = nullptr

@@ -45,6 +45,11 @@ namespace NMib::NDatabase
 		return mp_MainTransaction.f_OpenDatabaseTransaction(_pName, _Flags, _Properties);
 	}
 
+	bool CDatabaseActor::CTransactionRead::f_HasDatabases() const
+	{
+		return mp_MainTransaction.f_HasDatabases();
+	}
+
 	NContainer::TCSet<NStr::CStr> CDatabaseActor::CTransactionRead::f_EnumDatabases()
 	{
 		return mp_MainTransaction.f_EnumDatabases();
@@ -65,6 +70,11 @@ namespace NMib::NDatabase
 		)
 	{
 		return mp_MainTransaction.f_OpenDatabase(_pName, _Flags, _Properties);
+	}
+
+	bool CDatabaseActor::CTransactionWrite::f_HasDatabases() const
+	{
+		return mp_MainTransaction.f_HasDatabases();
 	}
 
 	NContainer::TCSet<NStr::CStr> CDatabaseActor::CTransactionWrite::f_EnumDatabases()

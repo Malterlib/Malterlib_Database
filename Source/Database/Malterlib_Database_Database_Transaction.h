@@ -53,6 +53,7 @@ namespace NMib::NDatabase
 		CDatabaseTransactionCommon &operator =(CDatabaseTransactionCommon &&_Other);
 
 		CDatabaseOffset f_TransactionID();
+		bool f_HasDatabases() const;
 
 	protected:
 		friend struct CDatabaseEnvironment_Internal;
@@ -87,6 +88,9 @@ namespace NMib::NDatabase
 		CDatabaseReadTransaction(CDatabaseReadTransaction &&_Other);
 		CDatabaseReadTransaction &operator =(CDatabaseReadTransaction &&_Other);
 
+		using CDatabaseTransactionCommon::f_HasDatabases;
+		using CDatabaseTransactionCommon::f_TransactionID;
+
 		CDatabaseResetReadTransaction f_Reset();
 		CDatabaseSubReadTransaction f_OpenDatabaseTransaction
 			(
@@ -112,6 +116,9 @@ namespace NMib::NDatabase
 		CDatabaseWriteTransaction();
 		CDatabaseWriteTransaction(CDatabaseWriteTransaction &&_Other);
 		CDatabaseWriteTransaction &operator =(CDatabaseWriteTransaction &&_Other);
+
+		using CDatabaseTransactionCommon::f_HasDatabases;
+		using CDatabaseTransactionCommon::f_TransactionID;
 
 		void f_Commit();
 		CDatabaseSub f_OpenDatabase

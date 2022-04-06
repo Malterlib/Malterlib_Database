@@ -243,12 +243,18 @@ namespace NMib::NDatabase
 			, CDatabaseSubProperties const &_Properties
 		)
 	{
+		if (_pName && !f_HasDatabases())
+			DMibError("The database doesn't support sub-databases");
+
 		auto Database = fp_OpenDatabase(_pName, _Flags, _Properties);
 		return Database.f_Transaction(*this);
 	}
 
 	NContainer::TCSet<NStr::CStr> CDatabaseReadTransaction::f_EnumDatabases()
 	{
+		if (!f_HasDatabases())
+			DMibError("The database doesn't support sub-databases");
+
 		auto DatabaseTransaction = f_OpenDatabaseTransaction();
 		auto iCursor = DatabaseTransaction.f_ReadCursor();
 		iCursor.f_First();
@@ -268,6 +274,9 @@ namespace NMib::NDatabase
 
 	NContainer::TCSet<NStr::CStr> CDatabaseWriteTransaction::f_EnumDatabases()
 	{
+		if (!f_HasDatabases())
+			DMibError("The database doesn't support sub-databases");
+
 		auto DatabaseTransaction = f_OpenDatabase().f_Transaction(*this);
 		auto iCursor = DatabaseTransaction.f_ReadCursor();
 		iCursor.f_First();
@@ -287,6 +296,9 @@ namespace NMib::NDatabase
 
 	CDatabaseSub CDatabaseWriteTransaction::f_OpenDatabase(ch8 const *_pName, EDatabaseSubFlag _Flags, CDatabaseSubProperties const &_Properties)
 	{
+		if (_pName && !f_HasDatabases())
+			DMibError("The database doesn't support sub-databases");
+
 		return fp_OpenDatabase(_pName, _Flags, _Properties);
 	}
 

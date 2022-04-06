@@ -351,6 +351,12 @@ namespace NMib::NDatabase
 		return mp_pTransaction->mt_txnid;
 	}
 
+	bool CDatabaseTransactionCommon::f_HasDatabases() const
+	{
+		auto &Environment = *this->mp_pTransaction->mt_env;
+		return Environment.me_maxdbs > CORE_DBS;
+	}
+
 	CDatabaseTransactionCommon::CInternal *CDatabaseTransactionCommon::fp_GetInternal()
 	{
 		return mp_pTransaction.f_Get();
