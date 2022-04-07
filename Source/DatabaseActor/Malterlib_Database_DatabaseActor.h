@@ -78,6 +78,7 @@ namespace NMib::NDatabase
 		NConcurrency::TCFuture<CTransactionRead> f_OpenTransactionRead();
 		NConcurrency::TCFuture<CTransactionWrite> f_OpenTransactionWrite();
 		NConcurrency::TCFuture<void> f_CommitWriteTransaction(CTransactionWrite &&_WriteTransaction);
+		NConcurrency::TCFuture<void> f_WaitForAllReaders();
 
 		NConcurrency::TCFuture<CDatabaseStatistics> f_Statistics();
 		NConcurrency::TCFuture<CDatabaseSizeStatistics> f_SizeStatistics();
@@ -94,6 +95,8 @@ namespace NMib::NDatabase
 		CDatabaseSub mp_Database;
 		NStorage::TCSharedPointer<NConcurrency::CCanDestroyTracker> mp_pCanDestroyTracker = fg_Construct();
 		NConcurrency::TCActorSequencerAsync<CTransactionWrite> mp_WriteSequencer;
+		NContainer::TCVector<NConcurrency::TCPromise<void>> mp_WaitingForReaders;
+		mint mp_nReaders = 0;
 		bool mp_bOpened = false;
 	};
 }

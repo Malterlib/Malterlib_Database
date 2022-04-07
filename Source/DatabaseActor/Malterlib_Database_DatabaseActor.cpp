@@ -139,6 +139,17 @@ namespace NMib::NDatabase
 		co_return {};
 	}
 
+	NConcurrency::TCFuture<void> CDatabaseActor::f_WaitForAllReaders()
+	{
+		if (mp_nReaders == 0)
+			co_return {};
+
+		auto Future = mp_WaitingForReaders.f_Insert().f_Future();
+		co_await fg_Move(Future);
+
+		co_return {};
+	}
+
 	auto CDatabaseActor::f_OpenTransactionRead() -> TCFuture<CTransactionRead>
 	{
 		if (!mp_bOpened)
@@ -159,11 +170,21 @@ namespace NMib::NDatabase
 			pState->m_MainTransaction = this->mp_DatabaseEnvironment.f_BeginReadTransaction();
 			auto Transaction = this->mp_Database.f_Transaction(pState->m_MainTransaction);
 
+			++mp_nReaders;
+
 			co_return CTransactionRead
 				{
-					g_ActorSubscription / [pState, pCanDestroy = mp_pCanDestroyTracker]() mutable
+					g_ActorSubscription / [this, pState, pCanDestroy = mp_pCanDestroyTracker]() mutable
 					{
 						pState.f_Clear();
+						--mp_nReaders;
+						if (mp_nReaders == 0)
+						{
+							for (auto &Waiting : mp_WaitingForReaders)
+								Waiting.f_SetResult();
+
+							mp_WaitingForReaders.f_Clear();
+						}
 					}
 					, pState->m_MainTransaction
 					, fg_Move(Transaction)
