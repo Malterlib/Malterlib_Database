@@ -16,15 +16,12 @@ namespace NMib::NDatabase
 
 		struct CTransactionRead
 		{
-		private:
-			friend struct CDatabaseActor;
-			
-			NConcurrency::CActorSubscription mp_Subscription;
-			CDatabaseReadTransaction &mp_MainTransaction;
-		public:
 			CTransactionRead(NConcurrency::CActorSubscription &&_Subscription, CDatabaseReadTransaction &_MainTransaction, CDatabaseSubReadTransaction &&_Transaction);
-			CTransactionRead(CTransactionRead &&) = default;
-			CTransactionRead(CTransactionRead const &) = delete;
+			~CTransactionRead();
+			CTransactionRead(CTransactionRead &&_Other);
+			CTransactionRead(CTransactionRead const &_Other) = delete;
+			CTransactionRead &operator = (CTransactionRead &&_Other);
+			CTransactionRead &operator = (CTransactionRead const &_Other) = delete;
 
 			bool f_HasDatabases() const;
 			CDatabaseSubReadTransaction f_OpenDatabaseTransaction
@@ -37,19 +34,24 @@ namespace NMib::NDatabase
 			NContainer::TCSet<NStr::CStr> f_EnumDatabases();
 
 			CDatabaseSubReadTransaction m_Transaction; // Transaction for the unnamed main database
-		};
 
-		struct CTransactionWrite
-		{
 		private:
 			friend struct CDatabaseActor;
 
 			NConcurrency::CActorSubscription mp_Subscription;
-			CDatabaseWriteTransaction &mp_MainTransaction;
-		public:
+			CDatabaseReadTransaction *mp_pMainTransaction;
+		};
+
+		struct CTransactionWrite
+		{
 			CTransactionWrite(NConcurrency::CActorSubscription &&_Subscription, CDatabaseWriteTransaction &_MainTransaction, CDatabaseSubWriteTransaction &&_Transaction);
-			CTransactionWrite(CTransactionWrite &&) = default;
-			CTransactionWrite(CTransactionWrite const &) = delete;
+			~CTransactionWrite();
+			CTransactionWrite(CTransactionWrite &&_Other);
+			CTransactionWrite(CTransactionWrite const &_Other) = delete;
+			CTransactionWrite &operator = (CTransactionWrite &&_Other);
+			CTransactionWrite &operator = (CTransactionWrite const &_Other) = delete;
+
+			void f_Clear();
 
 			bool f_HasDatabases() const;
 			CDatabaseSub f_OpenDatabase
@@ -63,6 +65,12 @@ namespace NMib::NDatabase
 			CDatabaseWriteTransaction f_BeginChildTransaction();
 
 			CDatabaseSubWriteTransaction m_Transaction; // Transaction for the unnamed main database
+
+		private:
+			friend struct CDatabaseActor;
+
+			NConcurrency::CActorSubscription mp_Subscription;
+			CDatabaseWriteTransaction *mp_pMainTransaction = nullptr;
 		};
 
 		NConcurrency::TCFuture<void> f_OpenDatabase(NStr::CStr const &_Directory, uint64 _MaxSize);

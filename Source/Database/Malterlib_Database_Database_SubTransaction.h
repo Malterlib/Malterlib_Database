@@ -66,6 +66,8 @@ namespace NMib::NDatabase
 		template <typename ...tfp_CKeys>
 		CDatabaseCursorDuplicateData f_ReadCursorDuplicateData(tfp_CKeys const & ...p_Prefixes);
 
+		void f_Clear();
+
 	protected:
 		friend struct CDatabaseSub;
 

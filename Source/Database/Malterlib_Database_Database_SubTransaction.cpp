@@ -36,6 +36,11 @@
 
 namespace NMib::NDatabase
 {
+	void CDatabaseSubReadTransaction::f_Clear()
+	{
+		mp_pTransaction = nullptr;
+	}
+
 	CDatabaseStatistics CDatabaseSubReadTransaction::f_DatabaseStatistics()
 	{
 		return mp_pTransaction->f_DatabaseStatistics(mp_DatabaseID);

@@ -30,10 +30,28 @@ namespace NMib::NDatabase
 
 	CDatabaseActor::CTransactionRead::CTransactionRead(CActorSubscription &&_Subscription, CDatabaseReadTransaction &_MainTransaction, CDatabaseSubReadTransaction &&_Transaction)
 		: mp_Subscription(fg_Move(_Subscription))
-		, mp_MainTransaction(_MainTransaction)
+		, mp_pMainTransaction(&_MainTransaction)
 		, m_Transaction(fg_Move(_Transaction))
 	{
 	}
+
+	CDatabaseActor::CTransactionRead::CTransactionRead(CTransactionRead &&_Other)
+		: mp_Subscription(fg_Move(_Other.mp_Subscription))
+		, mp_pMainTransaction(fg_Exchange(_Other.mp_pMainTransaction, nullptr))
+		, m_Transaction(fg_Move(_Other.m_Transaction))
+	{
+	}
+
+	CDatabaseActor::CTransactionRead &CDatabaseActor::CTransactionRead::operator = (CTransactionRead &&_Other)
+	{
+		mp_Subscription = fg_Move(_Other.mp_Subscription);
+		m_Transaction = fg_Move(_Other.m_Transaction);
+		mp_pMainTransaction = fg_Exchange(_Other.mp_pMainTransaction, nullptr);
+
+		return *this;
+	}
+
+	CDatabaseActor::CTransactionRead::~CTransactionRead() = default;
 
 	CDatabaseSubReadTransaction CDatabaseActor::CTransactionRead::f_OpenDatabaseTransaction
 		(
@@ -42,25 +60,50 @@ namespace NMib::NDatabase
 			, CDatabaseSubProperties const &_Properties
 		)
 	{
-		return mp_MainTransaction.f_OpenDatabaseTransaction(_pName, _Flags, _Properties);
+		return mp_pMainTransaction->f_OpenDatabaseTransaction(_pName, _Flags, _Properties);
 	}
 
 	bool CDatabaseActor::CTransactionRead::f_HasDatabases() const
 	{
-		return mp_MainTransaction.f_HasDatabases();
+		return mp_pMainTransaction->f_HasDatabases();
 	}
 
 	NContainer::TCSet<NStr::CStr> CDatabaseActor::CTransactionRead::f_EnumDatabases()
 	{
-		return mp_MainTransaction.f_EnumDatabases();
+		return mp_pMainTransaction->f_EnumDatabases();
 	}
 
 	CDatabaseActor::CTransactionWrite::CTransactionWrite(CActorSubscription &&_Subscription, CDatabaseWriteTransaction &_MainTransaction, CDatabaseSubWriteTransaction &&_Transaction)
 		: mp_Subscription(fg_Move(_Subscription))
-		, mp_MainTransaction(_MainTransaction)
+		, mp_pMainTransaction(&_MainTransaction)
 		, m_Transaction(fg_Move(_Transaction))
 	{
 	}
+
+	CDatabaseActor::CTransactionWrite::CTransactionWrite(CTransactionWrite &&_Other)
+		: mp_Subscription(fg_Move(_Other.mp_Subscription))
+		, mp_pMainTransaction(fg_Exchange(_Other.mp_pMainTransaction, nullptr))
+		, m_Transaction(fg_Move(_Other.m_Transaction))
+	{
+	}
+
+	CDatabaseActor::CTransactionWrite &CDatabaseActor::CTransactionWrite::operator = (CTransactionWrite &&_Other)
+	{
+		mp_Subscription = fg_Move(_Other.mp_Subscription);
+		m_Transaction = fg_Move(_Other.m_Transaction);
+		mp_pMainTransaction = fg_Exchange(_Other.mp_pMainTransaction, nullptr);
+
+		return *this;
+	}
+
+	void CDatabaseActor::CTransactionWrite::f_Clear()
+	{
+		mp_Subscription.f_Clear();
+		m_Transaction.f_Clear();
+		mp_pMainTransaction = nullptr;
+	}
+
+	CDatabaseActor::CTransactionWrite::~CTransactionWrite() = default;
 
 	CDatabaseSub CDatabaseActor::CTransactionWrite::f_OpenDatabase
 		(
@@ -69,17 +112,17 @@ namespace NMib::NDatabase
 			, CDatabaseSubProperties const &_Properties
 		)
 	{
-		return mp_MainTransaction.f_OpenDatabase(_pName, _Flags, _Properties);
+		return mp_pMainTransaction->f_OpenDatabase(_pName, _Flags, _Properties);
 	}
 
 	bool CDatabaseActor::CTransactionWrite::f_HasDatabases() const
 	{
-		return mp_MainTransaction.f_HasDatabases();
+		return mp_pMainTransaction->f_HasDatabases();
 	}
 
 	NContainer::TCSet<NStr::CStr> CDatabaseActor::CTransactionWrite::f_EnumDatabases()
 	{
-		return mp_MainTransaction.f_EnumDatabases();
+		return mp_pMainTransaction->f_EnumDatabases();
 	}
 
 	TCFuture<void> CDatabaseActor::fp_Destroy()
@@ -220,11 +263,19 @@ namespace NMib::NDatabase
 
 	NConcurrency::TCFuture<void> CDatabaseActor::f_CommitWriteTransaction(CTransactionWrite &&_WriteTransaction)
 	{
-		return TCFuture<void>::fs_RunProtected() / [&]
-			{
-				_WriteTransaction.mp_MainTransaction.f_Commit();
-			}
-		;
+		try
+		{
+			_WriteTransaction.mp_pMainTransaction->f_Commit();
+		}
+		catch (NException::CException const &_Exception)
+		{
+			co_return _Exception.f_ExceptionPointer();
+		}
+
+		if (_WriteTransaction.mp_Subscription)
+			co_await _WriteTransaction.mp_Subscription->f_Destroy();
+
+		co_return {};
 	}
 
 	NConcurrency::TCFuture<CDatabaseStatistics> CDatabaseActor::f_Statistics()
