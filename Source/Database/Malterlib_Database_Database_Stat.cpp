@@ -55,6 +55,34 @@ namespace NMib::NDatabase
 		return Stats;
 	}
 
+	CDatabaseSizeStatistics DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_SizeStatistics(MDB_db *db)
+	{
+		CDatabaseSizeStatistics Stats;
+		Stats.m_UsedBytes = (db->md_branch_pages + db->md_leaf_pages + db->md_overflow_pages) * me_psize;
+		Stats.m_MapSize = m_MapSize;
+		Stats.m_PageSize = me_psize;
+
+		return Stats;
+	}
+
+	CDatabaseEnvironmentInfo CDatabaseEnvironment_Internal::f_EnvironmentInfo()
+	{
+		using namespace NPrivate;
+		MDB_meta *meta;
+		CDatabaseEnvironmentInfo Info;
+
+		meta = mdb_env_pick_meta();
+		Info.m_pMapAddress = meta->mm_address;
+		Info.m_LastPageID = meta->mm_last_pg;
+		Info.m_LastCommittedTransactionID = meta->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed);
+
+		Info.m_MapSize = m_MapSize;
+		Info.m_MaxReaders = m_MaxReaders;
+		Info.m_nReaders = m_pLocksMemoryMap ? m_pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Load(NAtomic::EMemoryOrder_Relaxed) : 0;
+
+		return Info;
+	}
+
 	CDatabaseOffset CDatabaseStatistics::f_GetTotalUsedSize() const
 	{
 		return (m_nBranchPages + m_nLeafPages + m_nOverflowPages) * m_PageSize;

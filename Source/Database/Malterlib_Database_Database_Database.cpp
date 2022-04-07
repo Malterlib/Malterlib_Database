@@ -96,7 +96,7 @@ namespace NMib::NDatabase
 	 *		Create the named database if it doesn't exist. This option is not
 	 *		allowed in a read-only transaction or a read-only environment.
 	 * </ul>
-	 * @param[out] dbi Address where the new #CDatabaseSubID handle will be stored
+	 * @param[out] Sub database handle where the new #CDatabaseSubID handle will be stored
 	 * @return A non-zero error value on failure and 0 on success. Some possible
 	 * errors are:
 	 * <ul>
@@ -302,10 +302,27 @@ namespace NMib::NDatabase
 		return fp_OpenDatabase(_pName, _Flags, _Properties);
 	}
 
+	void DMibDatabaseInfrequentSection CDatabaseTransactionCommon::CInternal::f_PrepareStatisticsQuery(CDatabaseSubID _DatabaseID)
+	{
+		using namespace NPrivate;
+		if (!TXN_DBI_EXIST(this, _DatabaseID, DB_VALID))
+			DMibError("Database does not exist");
+
+		f_CheckBlocked();
+
+		if (mt_dbflags[_DatabaseID] & DB_STALE)
+		{
+			MDB_cursor mc;
+			MDB_xcursor mx;
+			/* Stale, must read the DB's root. cursor_init does it for us. */
+			mdb_cursor_init(&mc, this, _DatabaseID, &mx);
+		}
+	}
+
 	/** @brief Retrieve statistics for a database.
 	 *
 	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
-	 * @param[in] dbi A database handle returned by #f_OpenDatabase()
+	 * @param[in] _DatabaseID A database handle returned by #f_OpenDatabase()
 	 * @param[out] stat The address of an #CDatabaseStatistics structure
 	 * 	where the statistics will be copied
 	 * @return A non-zero error value on failure and 0 on success. Some possible
@@ -314,36 +331,38 @@ namespace NMib::NDatabase
 	 *	<li>EINVAL - an invalid parameter was specified.
 	 * </ul>
 	 */
-	CDatabaseStatistics DMibDatabaseInfrequentSection CDatabaseTransactionCommon::CInternal::f_DatabaseStatistics(CDatabaseSubID dbi)
+	CDatabaseStatistics DMibDatabaseInfrequentSection CDatabaseTransactionCommon::CInternal::f_DatabaseStatistics(CDatabaseSubID _DatabaseID)
 	{
-		using namespace NPrivate;
-		if (!TXN_DBI_EXIST(this, dbi, DB_VALID))
-			DMibError("Database does not exist");
+		f_PrepareStatisticsQuery(_DatabaseID);
 
-		f_CheckBlocked();
+		return mt_env->f_DatabaseStatistics(&mt_dbs[_DatabaseID]);
+	}
 
-		if (mt_dbflags[dbi] & DB_STALE) {
-			MDB_cursor mc;
-			MDB_xcursor mx;
-			/* Stale, must read the DB's root. cursor_init does it for us. */
-			mdb_cursor_init(&mc, this, dbi, &mx);
-		}
-		return mt_env->f_DatabaseStatistics(&mt_dbs[dbi]);
+	CDatabaseSizeStatistics DMibDatabaseInfrequentSection CDatabaseTransactionCommon::CInternal::f_SizeStatistics(CDatabaseSubID _DatabaseID)
+	{
+		f_PrepareStatisticsQuery(_DatabaseID);
+
+		return mt_env->f_SizeStatistics(&mt_dbs[_DatabaseID]);
+	}
+
+	CDatabaseEnvironmentInfo DMibDatabaseInfrequentSection CDatabaseTransactionCommon::CInternal::f_EnvironmentInfo()
+	{
+		return mt_env->f_EnvironmentInfo();
 	}
 
 	/** @brief Retrieve the DB flags for a database handle.
 	 *
 	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
-	 * @param[in] dbi A database handle returned by #f_OpenDatabase()
+	 * @param[in] _DatabaseID A database handle returned by #f_OpenDatabase()
 	 * @param[out] flags Address where the flags will be returned.
 	 * @return A non-zero error value on failure and 0 on success.
 	 */
-	uint32 CDatabaseTransactionCommon::CInternal::f_DatabaseFlags(CDatabaseSubID dbi)
+	uint32 CDatabaseTransactionCommon::CInternal::f_DatabaseFlags(CDatabaseSubID _DatabaseID)
 	{
 		/* We could return the flags for the FREE_DBI too but what's the point? */
-		if (!TXN_DBI_EXIST(this, dbi, DB_USRVALID))
+		if (!TXN_DBI_EXIST(this, _DatabaseID, DB_USRVALID))
 			DMibError("Database does not exists");
-		return mt_dbs[dbi].md_flags & PERSISTENT_FLAGS;
+		return mt_dbs[_DatabaseID].md_flags & PERSISTENT_FLAGS;
 	}
 
 	/** @brief Close a database handle. Normally unnecessary. Use with care:
@@ -360,21 +379,21 @@ namespace NMib::NDatabase
 	 * #f_SetMaxDatabases(), unless that value would be large.
 	 *
 	 * @param[in] env An environment handle returned by #CDatabaseEnvironment::CDatabaseEnvironment()
-	 * @param[in] dbi A database handle returned by #f_OpenDatabase()
+	 * @param[in] _DatabaseID A database handle returned by #f_OpenDatabase()
 	 */
-	void CDatabaseEnvironment::fp_CloseDatabase(CDatabaseSubID dbi)
+	void CDatabaseEnvironment::fp_CloseDatabase(CDatabaseSubID _DatabaseID)
 	{
 		auto &Environment = *mp_pEnvironment;
 		char *ptr;
-		if (dbi < CORE_DBS || dbi >= Environment.me_maxdbs)
+		if (_DatabaseID < CORE_DBS || _DatabaseID >= Environment.me_maxdbs)
 			return;
-		ptr = (char *)Environment.m_StaticDasabaseInfo[dbi].m_DatabaseName.m_pData;
+		ptr = (char *)Environment.m_StaticDasabaseInfo[_DatabaseID].m_DatabaseName.m_pData;
 		/* If there was no name, this was already closed */
 		if (ptr) {
-			Environment.m_StaticDasabaseInfo[dbi].m_DatabaseName.m_pData = nullptr;
-			Environment.m_StaticDasabaseInfo[dbi].m_DatabaseName.m_Size = 0;
-			Environment.me_dbflags[dbi] = 0;
-			Environment.me_dbiseqs[dbi]++;
+			Environment.m_StaticDasabaseInfo[_DatabaseID].m_DatabaseName.m_pData = nullptr;
+			Environment.m_StaticDasabaseInfo[_DatabaseID].m_DatabaseName.m_Size = 0;
+			Environment.me_dbflags[_DatabaseID] = 0;
+			Environment.me_dbiseqs[_DatabaseID]++;
 			NMemory::fg_FreeNoSize(ptr);
 		}
 	}
@@ -383,26 +402,26 @@ namespace NMib::NDatabase
 	 *
 	 * See #fp_CloseDatabase() for restrictions about closing the DB handle.
 	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
-	 * @param[in] dbi A database handle returned by #f_OpenDatabase()
+	 * @param[in] _DatabaseID A database handle returned by #f_OpenDatabase()
 	 * @param[in] del 0 to empty the DB, 1 to delete it from the
 	 * environment and close the DB handle.
 	 * @return A non-zero error value on failure and 0 on success.
 	 */
-	void CDatabaseTransactionCommon::CInternal::f_DropDatabase(CDatabaseSubID dbi, bool _bDelete)
+	void CDatabaseTransactionCommon::CInternal::f_DropDatabase(CDatabaseSubID _DatabaseID, bool _bDelete)
 	{
 		using namespace NPrivate;
 		MDB_cursor *mc, *m2;
 
-		if (!TXN_DBI_EXIST(this, dbi, DB_USRVALID))
+		if (!TXN_DBI_EXIST(this, _DatabaseID, DB_USRVALID))
 			DMibError("Database does not exists");
 
 		if (F_ISSET(mt_flags, MDB_TXN_RDONLY))
 			DMibError("Cannot drop database with read only transaction");
 
-		if (TXN_DBI_CHANGED(this, dbi))
+		if (TXN_DBI_CHANGED(this, _DatabaseID))
 			DMibError("Stale write transaction");
 
-		mc = f_Cursor(dbi);
+		mc = f_Cursor(_DatabaseID);
 
 		auto Cleanup = g_OnScopeExit / [&]()
 			{
@@ -413,20 +432,20 @@ namespace NMib::NDatabase
 		{
 			int rc = mdb_drop0(mc, mc->mc_db->md_flags & EDatabaseSubFlag_SortedDuplicates);
 			/* Invalidate the dropped DB's cursors */
-			for (m2 = mt_cursors[dbi]; m2; m2 = m2->mc_next)
+			for (m2 = mt_cursors[_DatabaseID]; m2; m2 = m2->mc_next)
 				m2->mc_flags &= ~(C_INITIALIZED|C_EOF);
 			if (rc)
 				DMibError(NStr::fg_Format("Error dropping database: {}", mdb_strerror(rc)));
 		}
 
 		/* Can't delete the main DB */
-		if (_bDelete && dbi >= CORE_DBS)
+		if (_bDelete && _DatabaseID >= CORE_DBS)
 		{
 			int rc = mdb_del0(this, MAIN_DBI, &mc->mc_dbx->m_DatabaseName, nullptr, (EDatabaseWriteFlag)F_SUBDATA);
 			if (!rc)
 			{
-				mt_dbflags[dbi] = DB_STALE;
-				mt_env->mdb_dbi_close(dbi);
+				mt_dbflags[_DatabaseID] = DB_STALE;
+				mt_env->mdb_dbi_close(_DatabaseID);
 			}
 			else
 			{
@@ -437,13 +456,13 @@ namespace NMib::NDatabase
 		else
 		{
 			/* reset the DB record, mark it dirty */
-			mt_dbflags[dbi] |= DB_DIRTY;
-			mt_dbs[dbi].md_depth = 0;
-			mt_dbs[dbi].md_branch_pages = 0;
-			mt_dbs[dbi].md_leaf_pages = 0;
-			mt_dbs[dbi].md_overflow_pages = 0;
-			mt_dbs[dbi].md_entries = 0;
-			mt_dbs[dbi].md_root = P_INVALID;
+			mt_dbflags[_DatabaseID] |= DB_DIRTY;
+			mt_dbs[_DatabaseID].md_depth = 0;
+			mt_dbs[_DatabaseID].md_branch_pages = 0;
+			mt_dbs[_DatabaseID].md_leaf_pages = 0;
+			mt_dbs[_DatabaseID].md_overflow_pages = 0;
+			mt_dbs[_DatabaseID].md_entries = 0;
+			mt_dbs[_DatabaseID].md_root = P_INVALID;
 
 			mt_flags |= MDB_TXN_DIRTY;
 		}
@@ -460,7 +479,7 @@ namespace NMib::NDatabase
 	 * otherwise data corruption may occur. The same comparison function must be used by every
 	 * program accessing the database, every time the database is used.
 	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
-	 * @param[in] dbi A database handle returned by #f_OpenDatabase()
+	 * @param[in] _DatabaseID A database handle returned by #f_OpenDatabase()
 	 * @param[in] cmp A #FDatabaseCompare function
 	 * @return A non-zero error value on failure and 0 on success. Some possible
 	 * errors are:
@@ -468,12 +487,12 @@ namespace NMib::NDatabase
 	 *	<li>EINVAL - an invalid parameter was specified.
 	 * </ul>
 	 */
-	void CDatabaseTransactionCommon::CInternal::f_SetDatabaseKeyCompare(CDatabaseSubID dbi, FDatabaseCompare &&_fCompare)
+	void CDatabaseTransactionCommon::CInternal::f_SetDatabaseKeyCompare(CDatabaseSubID _DatabaseID, FDatabaseCompare &&_fCompare)
 	{
-		if (!TXN_DBI_EXIST(this, dbi, DB_USRVALID))
+		if (!TXN_DBI_EXIST(this, _DatabaseID, DB_USRVALID))
 			DMibError("Database does not exists");
 
-		mt_dbxs[dbi].m_fKeyCompare = fg_Move(_fCompare);
+		mt_dbxs[_DatabaseID].m_fKeyCompare = fg_Move(_fCompare);
 	}
 
 	/** @brief Set a custom data comparison function for a #EDatabaseSubFlag_SortedDuplicates database.
@@ -489,7 +508,7 @@ namespace NMib::NDatabase
 	 * otherwise data corruption may occur. The same comparison function must be used by every
 	 * program accessing the database, every time the database is used.
 	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
-	 * @param[in] dbi A database handle returned by #f_OpenDatabase()
+	 * @param[in] _DatabaseID A database handle returned by #f_OpenDatabase()
 	 * @param[in] cmp A #FDatabaseCompare function
 	 * @return A non-zero error value on failure and 0 on success. Some possible
 	 * errors are:
@@ -497,11 +516,11 @@ namespace NMib::NDatabase
 	 *	<li>EINVAL - an invalid parameter was specified.
 	 * </ul>
 	 */
-	void CDatabaseTransactionCommon::CInternal::f_SetDatabaseDataCompare(CDatabaseSubID dbi, FDatabaseCompare &&_fCompare)
+	void CDatabaseTransactionCommon::CInternal::f_SetDatabaseDataCompare(CDatabaseSubID _DatabaseID, FDatabaseCompare &&_fCompare)
 	{
-		if (!TXN_DBI_EXIST(this, dbi, DB_USRVALID))
+		if (!TXN_DBI_EXIST(this, _DatabaseID, DB_USRVALID))
 			DMibError("Database does not exists");
 
-		mt_dbxs[dbi].m_fDataCompare = fg_Move(_fCompare);
+		mt_dbxs[_DatabaseID].m_fDataCompare = fg_Move(_fCompare);
 	}
 }

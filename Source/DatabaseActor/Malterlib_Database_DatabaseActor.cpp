@@ -238,6 +238,17 @@ namespace NMib::NDatabase
 		co_return mp_DatabaseEnvironment.f_Statistics();
 	}
 
+	NConcurrency::TCFuture<CDatabaseSizeStatistics> CDatabaseActor::f_SizeStatistics()
+	{
+		if (!mp_bOpened)
+			co_return DMibErrorInstance("Database has not been opened");
+
+		if (f_IsDestroyed())
+			co_return DMibErrorInstance("Database actor destroyed");
+
+		co_return mp_DatabaseEnvironment.f_SizeStatistics();
+	}
+
 	NConcurrency::TCFuture<CDatabaseEnvironmentInfo> CDatabaseActor::f_Info()
 	{
 		if (!mp_bOpened)

@@ -1270,19 +1270,22 @@ namespace NMib::NDatabase
 		static void fs_CheckBlocked(uint32 _Flags);
 		void f_CheckBlocked() const;
 
-		CDatabaseStatistics f_DatabaseStatistics(CDatabaseSubID dbi);
-		uint32 f_DatabaseFlags(CDatabaseSubID dbi);
-		void f_DropDatabase(CDatabaseSubID dbi, bool _bDelete);
-		void f_SetDatabaseKeyCompare(CDatabaseSubID dbi, FDatabaseCompare &&_fCompare);
-		void f_SetDatabaseDataCompare(CDatabaseSubID dbi, FDatabaseCompare &&_fCompare);
+		void f_PrepareStatisticsQuery(CDatabaseSubID _DatabaseID);
+		CDatabaseEnvironmentInfo f_EnvironmentInfo();
+		CDatabaseStatistics f_DatabaseStatistics(CDatabaseSubID _DatabaseID);
+		CDatabaseSizeStatistics f_SizeStatistics(CDatabaseSubID _DatabaseID);
+		uint32 f_DatabaseFlags(CDatabaseSubID _DatabaseID);
+		void f_DropDatabase(CDatabaseSubID _DatabaseID, bool _bDelete);
+		void f_SetDatabaseKeyCompare(CDatabaseSubID _DatabaseID, FDatabaseCompare &&_fCompare);
+		void f_SetDatabaseDataCompare(CDatabaseSubID _DatabaseID, FDatabaseCompare &&_fCompare);
 
-		bool f_Get(CDatabaseSubID dbi, CDatabaseValue *key, CDatabaseValue *data);
-		void f_Put(CDatabaseSubID dbi, CDatabaseValue *key, CDatabaseValue *data, EDatabaseWriteFlag _WriteFlags);
-		void f_Delete(CDatabaseSubID dbi, CDatabaseValue const *key, CDatabaseValue const *data);
-		int f_KeyCompare(CDatabaseSubID dbi, const CDatabaseValue *a, const CDatabaseValue *b);
-		int f_DataCompare(CDatabaseSubID dbi, const CDatabaseValue *a, const CDatabaseValue *b);
+		bool f_Get(CDatabaseSubID _DatabaseID, CDatabaseValue *key, CDatabaseValue *data);
+		void f_Put(CDatabaseSubID _DatabaseID, CDatabaseValue *key, CDatabaseValue *data, EDatabaseWriteFlag _WriteFlags);
+		void f_Delete(CDatabaseSubID _DatabaseID, CDatabaseValue const *key, CDatabaseValue const *data);
+		int f_KeyCompare(CDatabaseSubID _DatabaseID, const CDatabaseValue *a, const CDatabaseValue *b);
+		int f_DataCompare(CDatabaseSubID _DatabaseID, const CDatabaseValue *a, const CDatabaseValue *b);
 
-		NPrivate::MDB_cursor *f_Cursor(CDatabaseSubID dbi);
+		NPrivate::MDB_cursor *f_Cursor(CDatabaseSubID _DatabaseID);
 
 		NPrivate::MDB_txn		*mt_parent;		/**< parent of a nested txn */
 		/** Nested txn under this txn, set together with flag #MDB_TXN_HAS_CHILD */
@@ -1632,6 +1635,8 @@ namespace NMib::NDatabase
 		void f_CopyCompact(HANDLE fd);
 		void f_Copy(HANDLE fd);
 		CDatabaseStatistics f_DatabaseStatistics(NPrivate::MDB_db *db);
+		CDatabaseSizeStatistics f_SizeStatistics(NPrivate::MDB_db *db);
+		CDatabaseEnvironmentInfo f_EnvironmentInfo();
 		bool mdb_env_read_header(int prev, NPrivate::MDB_meta *meta);
 		NPrivate::MDB_meta *mdb_env_pick_meta() const;
 		void mdb_env_close0(int excl);

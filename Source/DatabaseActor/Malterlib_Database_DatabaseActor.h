@@ -72,6 +72,8 @@ namespace NMib::NDatabase
 		NConcurrency::TCFuture<void> f_CommitWriteTransaction(CTransactionWrite &&_WriteTransaction);
 
 		NConcurrency::TCFuture<CDatabaseStatistics> f_Statistics();
+		NConcurrency::TCFuture<CDatabaseSizeStatistics> f_SizeStatistics();
+
 		NConcurrency::TCFuture<CDatabaseEnvironmentInfo> f_Info();
 		NConcurrency::TCFuture<NStr::CStr> f_GetPath();
 

@@ -19,4 +19,11 @@ namespace NMib::NDatabase
 		CDatabaseOffset m_nOverflowPages;	///< Number of overflow pages
 		CDatabaseOffset m_nDataItems;		///< Number of data items
 	};
+
+	struct CDatabaseSizeStatistics
+	{
+		CDatabaseOffset m_UsedBytes;
+		CDatabaseOffset m_MapSize;
+		uint32 m_PageSize = 0;
+	};
 }

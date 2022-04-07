@@ -434,6 +434,18 @@ namespace NMib::NDatabase
 		return Environment.f_DatabaseStatistics(&meta->mm_dbs[MAIN_DBI]);
 	}
 
+	CDatabaseSizeStatistics CDatabaseEnvironment::f_SizeStatistics()
+	{
+		fp_CheckOpened();
+
+		auto &Environment = *mp_pEnvironment;
+		using namespace NPrivate;
+		MDB_meta *meta;
+		meta = Environment.mdb_env_pick_meta();
+
+		return Environment.f_SizeStatistics(&meta->mm_dbs[MAIN_DBI]);
+	}
+
 	/** @brief Return information about the LMDB environment.
 	 *
 	 * @param[out] stat The address of an #CDatabaseEnvironmentInfo structure
@@ -443,21 +455,8 @@ namespace NMib::NDatabase
 	{
 		fp_CheckOpened();
 
-		using namespace NPrivate;
-		MDB_meta *meta;
 		auto &Environment = *mp_pEnvironment;
-
-		CDatabaseEnvironmentInfo Info;
-
-		meta = Environment.mdb_env_pick_meta();
-		Info.m_pMapAddress = meta->mm_address;
-		Info.m_LastPageID = meta->mm_last_pg;
-		Info.m_LastCommittedTransactionID = meta->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed);
-
-		Info.m_MapSize = Environment.m_MapSize;
-		Info.m_MaxReaders = Environment.m_MaxReaders;
-		Info.m_nReaders = Environment.m_pLocksMemoryMap ? Environment.m_pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Load(NAtomic::EMemoryOrder_Relaxed) : 0;
-		return Info;
+		return Environment.f_EnvironmentInfo();
 	}
 
 	/** @brief Flush the data buffers to disk.

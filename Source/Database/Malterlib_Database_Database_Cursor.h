@@ -134,6 +134,8 @@ namespace NMib::NDatabase
 		template <typename tf_CKey>
 		CDatabaseValue f_UpsertInplace(tf_CKey const &_Key, mint _DataSize, bool _bAppend = false);
 
+		static CDatabaseCursorWrite fs_InitEmpty();
+
 	protected:
 		friend struct CDatabaseSubWriteTransaction;
 

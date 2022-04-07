@@ -41,6 +41,16 @@ namespace NMib::NDatabase
 		return mp_pTransaction->f_DatabaseStatistics(mp_DatabaseID);
 	}
 
+	CDatabaseSizeStatistics CDatabaseSubReadTransaction::f_SizeStatistics()
+	{
+		return mp_pTransaction->f_SizeStatistics(mp_DatabaseID);
+	}
+
+	CDatabaseEnvironmentInfo CDatabaseSubReadTransaction::f_EnvironmentInfo()
+	{
+		return mp_pTransaction->f_EnvironmentInfo();
+	}
+
 	uint32 CDatabaseSubReadTransaction::f_DatabaseFlags()
 	{
 		return mp_pTransaction->f_DatabaseFlags(mp_DatabaseID);

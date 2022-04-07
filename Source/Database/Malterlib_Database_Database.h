@@ -51,6 +51,7 @@ namespace NMib::NDatabase
 
 	struct CDatabaseEnvironment;
 	struct CDatabaseEnvironment_Internal;
+	struct CDatabaseEnvironmentInfo;
 	struct CDatabaseSub;
 	struct CDatabaseSubReadTransaction;
 	struct CDatabaseSubWriteTransaction;
@@ -129,6 +130,12 @@ namespace NMib::NDatabase
 
 	struct CDatabaseReaderInfo
 	{
+		template <typename tf_CStr>
+		void f_Format(tf_CStr &o_Str) const
+		{
+			o_Str += typename tf_CStr::CFormat("{}: {}") << m_iReaderSlot << m_Description;
+		}
+		
 		mint m_iReaderSlot;
 		NStr::CStr m_Description;
 	};
@@ -154,6 +161,7 @@ namespace NMib::NDatabase
 		void f_Copy(void *_FileHandle, EDatabaseEnvironmentCopyFlag _Flags = EDatabaseEnvironmentCopyFlag_None);
 
 		CDatabaseStatistics f_Statistics();
+		CDatabaseSizeStatistics f_SizeStatistics();
 		CDatabaseEnvironmentInfo f_Info();
 		mint f_MaxKeySize(); ///< The maximum key size supported by the database
 

@@ -38,6 +38,8 @@ namespace NMib::NDatabase
 	struct CDatabaseSubReadTransaction
 	{
 		CDatabaseStatistics f_DatabaseStatistics();
+		CDatabaseSizeStatistics f_SizeStatistics();
+		CDatabaseEnvironmentInfo f_EnvironmentInfo();
 		uint32 f_DatabaseFlags();
 
 		bool f_Get(CDatabaseValue const &_Key, CDatabaseValue &o_Value);

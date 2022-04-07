@@ -67,6 +67,11 @@ namespace NMib::NDatabase
 	{
 	}
 
+	CDatabaseCursorWrite CDatabaseCursorWrite::fs_InitEmpty()
+	{
+		return CDatabaseCursorWrite(nullptr);
+	}
+
 	void CDatabaseCursorCommon::f_SetPrefix(CDatabaseValue const &_Prefix)
 	{
 		mp_Prefix = _Prefix;
