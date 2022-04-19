@@ -61,7 +61,9 @@ namespace NMib::NDatabase
 			{
 				NEncoding::TCBinaryStream_Bin128<> Stream(true);
 				Stream.f_Open(&_Stream, NFile::EFileOpen_Write);
-				Stream.f_FeedBytes(_Values.f_GetArray(), _Values.f_GetLen());
+				mint ValuesLen = _Values.f_GetLen();
+				if (ValuesLen != 0)
+					Stream.f_FeedBytes(_Values.f_GetArray(), ValuesLen);
 			}
 			_Stream << uint8(0);
 		}
@@ -87,7 +89,9 @@ namespace NMib::NDatabase
 				NEncoding::TCBinaryStream_Bin128<> Stream(true);
 				Stream.f_Open(&_Stream, NFile::EFileOpen_Read, (EndPos - StartPos) - 1);
 				auto Length = Stream.f_GetLength();
-				Stream.f_ConsumeBytes(o_Values.f_GetArray(Length), Length);
+				auto pArray = o_Values.f_GetArray(Length);
+				if (Length)
+					Stream.f_ConsumeBytes(pArray, Length);
 			}
 			uint8 EndMarker;
 			_Stream >> EndMarker;
