@@ -862,7 +862,7 @@ namespace NMib::NDatabase
 			 *	mapped file. On Windows, mutexes are named objects allocated by the
 			 *	kernel; we store the mutex names in this mapped file so that other
 			 *	processes can grab them. This same approach is also used on
-			 *	MacOSX/Darwin (using named semaphores) since MacOSX doesn't support
+			 *	macOS/Darwin (using named semaphores) since macOS doesn't support
 			 *	process-shared POSIX mutexes. For these cases where a named object
 			 *	is used, the object name is derived from a 64 bit FNV hash of the
 			 *	environment pathname. As such, naming collisions are extremely
