@@ -80,6 +80,14 @@ namespace NMib::NDatabase
 		me_dpages = mp;
 	}
 
+	void CDatabaseEnvironment_Internal::mdb_dpage_free_memory(MDB_page *dp)
+	{
+		if (!IS_OVERFLOW(dp) || dp->mp_pages == 1)
+			NMemory::fg_Free(dp, me_psize);
+		else
+			NMemory::fg_Free(dp, dp->mp_pages * me_psize);
+	}
+
 	/** Free a dirty page */
 	void CDatabaseEnvironment_Internal::mdb_dpage_free(MDB_page *dp)
 	{
@@ -87,7 +95,7 @@ namespace NMib::NDatabase
 			mdb_page_free(dp);
 		} else {
 			/* large pages just get freed directly */
-			NMemory::fg_FreeNoSize(dp);
+			NMemory::fg_Free(dp, dp->mp_pages * me_psize);
 		}
 	}
 

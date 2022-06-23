@@ -191,14 +191,14 @@ namespace NMib::NDatabase
 
 		/* Done here so we cannot fail after creating a new DB */
 		char *namedup;
+		mint NameLen = NStr::fg_StrLen(_pName);
 		{
-			mint NameLen = NStr::fg_StrLen(_pName);
 			namedup = (char *)NMemory::fg_Alloc(NameLen + 1);
 			NStr::fg_StrCopy(namedup, _pName, NameLen + 1);
 		}
 		auto Cleanup = g_OnScopeExit / [&]
 			{
-				NMemory::fg_FreeNoSize(namedup);
+				NMemory::fg_Free(namedup, NameLen + 1);
 			}
 		;
 
@@ -384,17 +384,18 @@ namespace NMib::NDatabase
 	void CDatabaseEnvironment::fp_CloseDatabase(CDatabaseSubID _DatabaseID)
 	{
 		auto &Environment = *mp_pEnvironment;
-		char *ptr;
 		if (_DatabaseID < CORE_DBS || _DatabaseID >= Environment.me_maxdbs)
 			return;
-		ptr = (char *)Environment.m_StaticDasabaseInfo[_DatabaseID].m_DatabaseName.m_pData;
+		auto &StaticDatabaseInfo = Environment.m_StaticDasabaseInfo[_DatabaseID];
+		char *pNamePointer = (char *)StaticDatabaseInfo.m_DatabaseName.m_pData;
+		mint NameSize = StaticDatabaseInfo.m_DatabaseName.m_Size;
 		/* If there was no name, this was already closed */
-		if (ptr) {
-			Environment.m_StaticDasabaseInfo[_DatabaseID].m_DatabaseName.m_pData = nullptr;
-			Environment.m_StaticDasabaseInfo[_DatabaseID].m_DatabaseName.m_Size = 0;
+		if (pNamePointer) {
+			StaticDatabaseInfo.m_DatabaseName.m_pData = nullptr;
+			StaticDatabaseInfo.m_DatabaseName.m_Size = 0;
 			Environment.me_dbflags[_DatabaseID] = 0;
 			Environment.me_dbiseqs[_DatabaseID]++;
-			NMemory::fg_FreeNoSize(ptr);
+			NMemory::fg_Free(pNamePointer, NameSize + 1);
 		}
 	}
 

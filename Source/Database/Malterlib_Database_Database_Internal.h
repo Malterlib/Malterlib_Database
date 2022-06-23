@@ -1630,6 +1630,7 @@ namespace NMib::NDatabase
 		// Publics
 		NDatabase::CDatabaseTransactionCommon mdb_txn_begin(NPrivate::MDB_txn *parent, uint32 flags);
 		void mdb_dbi_close(CDatabaseSubID dbi);
+		void mdb_txn_free(NPrivate::MDB_txn *_pTransaction);
 
 		// Privates
 		void f_CopyCompact(HANDLE fd);
@@ -1645,6 +1646,7 @@ namespace NMib::NDatabase
 		void mdb_reader_check0(bool _bReadLock, mint *_pDead);
 		void mdb_page_free(NPrivate::MDB_page *mp);
 		void mdb_dpage_free(NPrivate::MDB_page *dp);
+		void mdb_dpage_free_memory(NPrivate::MDB_page *dp);
 		int mdb_reader_pid(NPrivate::Pidlock_op op, CProcessID pid);
 		void mdb_env_sync0(bool _bForce, NPrivate::pgno_t numpgs);
 		void mdb_env_init_meta0(NPrivate::MDB_meta *meta);

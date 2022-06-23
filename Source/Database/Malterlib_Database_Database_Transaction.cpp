@@ -65,6 +65,9 @@ namespace NMib::NDatabase
 
 	void CDatabaseWriteTransaction::f_Commit()
 	{
+		if (mp_pTransaction.f_Get()->mt_child)
+			DMibError("Transaction still has a child transaction");
+
 		NPrivate::mdb_txn_commit(mp_pTransaction.f_Detach());
 	}
 
@@ -179,16 +182,40 @@ namespace NMib::NDatabase
 
 		auto pStaticDasabaseInfo = m_StaticDasabaseInfo.f_GetArray();
 
-		ptr = (ch8 *)pStaticDasabaseInfo[dbi].m_DatabaseName.m_pData;
+		auto &StaticDasabaseInfo = pStaticDasabaseInfo[dbi];
+
+		ptr = (ch8 *)StaticDasabaseInfo.m_DatabaseName.m_pData;
+		auto Size = StaticDasabaseInfo.m_DatabaseName.m_Size;
 		/* If there was no name, this was already closed */
 		if (ptr)
 		{
-			pStaticDasabaseInfo[dbi].m_DatabaseName.m_pData = NULL;
-			pStaticDasabaseInfo[dbi].m_DatabaseName.m_Size = 0;
+			StaticDasabaseInfo.m_DatabaseName.m_pData = NULL;
+			StaticDasabaseInfo.m_DatabaseName.m_Size = 0;
 			me_dbflags[dbi] = 0;
 			me_dbiseqs[dbi]++;
-			free(ptr);
+			NMemory::fg_Free(ptr, Size + 1);
 		}
+	}
+
+	void CDatabaseEnvironment_Internal::mdb_txn_free(NPrivate::MDB_txn *_pTransaction)
+	{
+		using namespace NPrivate;
+
+		mint Size = 0;
+		if (_pTransaction->mt_parent)
+		{
+			Size = me_maxdbs * (sizeof(MDB_db)+sizeof(MDB_cursor *)+1);
+			Size += sizeof(MDB_ntxn);
+		}
+		else if (_pTransaction->mt_flags & EDatabaseEnvironmentFlag_ReadOnly)
+		{
+			Size = me_maxdbs * (sizeof(MDB_db)+1);
+			Size += sizeof(MDB_txn);
+		}
+		else
+			DMibNeverGetHere;
+
+		NMemory::fg_Free(_pTransaction, Size);
 	}
 
 	CDatabaseTransactionCommon CDatabaseEnvironment_Internal::mdb_txn_begin(NPrivate::MDB_txn *parent, uint32 flags)
@@ -231,7 +258,7 @@ namespace NMib::NDatabase
 		auto Cleanup = g_OnScopeExit / [&]
 			{
 				if (txn && txn != me_txn0)
-					NMemory::fg_FreeNoSize(txn);
+					NMemory::fg_Free(txn, size);
 			}
 		;
 
@@ -258,7 +285,7 @@ namespace NMib::NDatabase
 		auto Cleanup2 = g_OnScopeExit / [&]
 			{
 				if (txn->mt_rpages)
-					NMemory::fg_FreeNoSize(txn->mt_rpages);
+					NMemory::fg_Free(txn->mt_rpages, MDB_TRPAGE_SIZE * sizeof(MDB_ID3));
 			}
 		;
 #endif
@@ -270,7 +297,7 @@ namespace NMib::NDatabase
 			txn->mt_u.dirty_list = (MDB_ID2L)NMemory::fg_Alloc(sizeof(MDB_ID2)*MDB_IDL_UM_SIZE);
 			auto Cleanup3 = g_OnScopeExit / [&]
 				{
-					NMemory::fg_FreeNoSize(txn->mt_u.dirty_list);
+					NMemory::fg_Free(txn->mt_u.dirty_list, sizeof(MDB_ID2)*MDB_IDL_UM_SIZE);
 				}
 			;
 			txn->mt_free_pgs = mdb_midl_alloc(MDB_IDL_UM_MAX);
@@ -300,7 +327,7 @@ namespace NMib::NDatabase
 			ntxn->mnt_pgstate = me_pgstate; /* save parent me_pgstate.mf_pghead & co */
 			if (me_pgstate.mf_pghead)
 			{
-				size = MDB_IDL_SIZEOF(me_pgstate.mf_pghead);
+				mint size = MDB_IDL_SIZEOF(me_pgstate.mf_pghead);
 				me_pgstate.mf_pghead = mdb_midl_alloc(me_pgstate.mf_pghead[0]);
 				memcpy(me_pgstate.mf_pghead, ntxn->mnt_pgstate.mf_pghead, size);
 			}
@@ -388,14 +415,14 @@ namespace NMib::NDatabase
 		/* mdb_txn_end() mode for a commit which writes nothing */
 		end_mode = NPrivate::MDB_END_EMPTY_COMMIT|MDB_END_UPDATE|MDB_END_SLOT|MDB_END_FREE;
 
+		if (txn->mt_child)
+			DMibError("Transaction still has a child transaction");
+
 		auto Cleanup = g_OnScopeExit / [&]
 			{
 				NPrivate::mdb_txn_abort(txn);
 			}
 		;
-
-		if (txn->mt_child)
-			mdb_txn_commit(txn->mt_child);
 
 		env = txn->mt_env;
 
@@ -485,7 +512,7 @@ namespace NMib::NDatabase
 					y = mdb_mid2l_search(dst, pn);
 					if (y <= dst[0].mid && dst[y].mid == pn)
 					{
-						NMemory::fg_FreeNoSize(dst[y].mptr);
+						env->mdb_dpage_free_memory((MDB_page *)dst[y].mptr);
 						while (y < dst[0].mid)
 						{
 							dst[y] = dst[y+1];
@@ -528,11 +555,11 @@ namespace NMib::NDatabase
 				while (yp < dst[x].mid)
 					dst[i--] = dst[x--];
 				if (yp == dst[x].mid)
-					NMemory::fg_FreeNoSize(dst[x--].mptr);
+					env->mdb_dpage_free_memory((MDB_page *)dst[x--].mptr);
 			}
 			DMibCheck(i == x);
 			dst[0].mid = len;
-			NMemory::fg_FreeNoSize(txn->mt_u.dirty_list);
+			NMemory::fg_Free(txn->mt_u.dirty_list, sizeof(MDB_ID2)*MDB_IDL_UM_SIZE);
 			parent->mt_dirty_room = txn->mt_dirty_room;
 			if (txn->mt_spill_pgs)
 			{
@@ -563,7 +590,8 @@ namespace NMib::NDatabase
 
 			parent->mt_child = nullptr;
 			mdb_midl_free(((MDB_ntxn *)txn)->mnt_pgstate.mf_pghead);
-			NMemory::fg_FreeNoSize(txn);
+			env->mdb_txn_free(txn);
+			Cleanup.f_Clear();
 			return;
 		}
 
@@ -896,13 +924,15 @@ namespace NMib::NDatabase
 				if (keep) {
 					env->me_dbflags[i] = txn->mt_dbs[i].md_flags | MDB_VALID;
 				} else {
-					char *ptr = (char *)pStaticDatabasesInfos[i].m_DatabaseName.m_pData;
+					auto &StaticDatabaseInfo = pStaticDatabasesInfos[i];
+					char *ptr = (char *)StaticDatabaseInfo.m_DatabaseName.m_pData;
+					mint Size = StaticDatabaseInfo.m_DatabaseName.m_Size;
 					if (ptr) {
-						pStaticDatabasesInfos[i].m_DatabaseName.m_pData = nullptr;
-						pStaticDatabasesInfos[i].m_DatabaseName.m_Size = 0;
+						StaticDatabaseInfo.m_DatabaseName.m_pData = nullptr;
+						StaticDatabaseInfo.m_DatabaseName.m_Size = 0;
 						env->me_dbflags[i] = 0;
 						env->me_dbiseqs[i]++;
-						NMemory::fg_FreeNoSize(ptr);
+						NMemory::fg_Free(ptr, Size + 1);
 					}
 				}
 			}
@@ -985,7 +1015,7 @@ namespace NMib::NDatabase
 				env->me_pgstate = ((MDB_ntxn *)txn)->mnt_pgstate;
 				mdb_midl_free(txn->mt_free_pgs);
 				mdb_midl_free(txn->mt_spill_pgs);
-				NMemory::fg_FreeNoSize(txn->mt_u.dirty_list);
+				NMemory::fg_Free(txn->mt_u.dirty_list, sizeof(MDB_ID2)*MDB_IDL_UM_SIZE);
 			}
 
 			mdb_midl_free(pghead);
@@ -1013,11 +1043,11 @@ namespace NMib::NDatabase
 			pthread_mutex_unlock(&env->me_rpmutex);
 			tl[0].mid = 0;
 			if (mode & MDB_END_FREE)
-				NMemory::fg_FreeNoSize(tl);
+				NMemory::fg_Free(tl, MDB_TRPAGE_SIZE * sizeof(MDB_ID3));
 		}
 	#endif
 		if (mode & MDB_END_FREE)
-			NMemory::fg_FreeNoSize(txn);
+			env->mdb_txn_free(txn);
 	}
 
 	/** Save the freelist as of this transaction to the freeDB.

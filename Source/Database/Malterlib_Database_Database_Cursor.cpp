@@ -592,7 +592,11 @@ namespace NMib::NDatabase::NPrivate
 				if (*prev == mc)
 					*prev = mc->mc_next;
 			}
-			NMemory::fg_FreeNoSize(mc);
+			mint Size = sizeof(MDB_cursor);
+			if (mc->mc_xcursor)
+				Size += sizeof(MDB_xcursor);
+
+			NMemory::fg_Free(mc, Size);
 		}
 	}
 
@@ -1659,7 +1663,11 @@ namespace NMib::NDatabase::NPrivate
 					mc = bk;
 				}
 				/* Only malloced cursors are permanently tracked. */
-				NMemory::fg_FreeNoSize(mc);
+				mint Size = sizeof(MDB_cursor);
+				if (mc->mc_xcursor)
+					Size += sizeof(MDB_xcursor);
+
+				NMemory::fg_Free(mc, Size);
 			}
 			cursors[i] = nullptr;
 		}

@@ -319,12 +319,13 @@ namespace NMib::NDatabase
 		if (!(flags & EDatabaseEnvironmentFlag_ReadOnly))
 		{
 			MDB_txn *txn;
-			int tsize = sizeof(MDB_txn), size = tsize + Environment.me_maxdbs * (sizeof(MDB_db)+sizeof(MDB_cursor *)+sizeof(uint32)+1);
+			mint tsize = sizeof(MDB_txn);
+			mint size = tsize + Environment.me_maxdbs * (sizeof(MDB_db)+sizeof(MDB_cursor *)+sizeof(uint32)+1);
 			Environment.me_pbuf = NMemory::fg_AllocInitZero(Environment.me_psize);
 			txn = (MDB_txn *)NMemory::fg_AllocInitZero(size);
 			auto Cleanup1 = g_OnScopeExit / [&]()
 				{
-					NMemory::fg_FreeNoSize(txn);
+					NMemory::fg_Free(txn, size);
 				}
 			;
 			txn->mt_dbs = (MDB_db *)((char *)txn + tsize);
@@ -526,7 +527,7 @@ namespace NMib::NDatabase
 		while ((dp = Environment.me_dpages) != nullptr)
 		{
 			Environment.me_dpages = dp->mp_p.p_next;
-			NMemory::fg_FreeNoSize(dp);
+			NMemory::fg_Free(dp, Environment.me_psize);
 		}
 
 		Environment.mdb_env_close0(0);
@@ -979,7 +980,7 @@ namespace NMib::NDatabase
 		p = (MDB_page *)NMemory::fg_AllocInitZero(NUM_METAS * psize);
 		auto Cleanup = g_OnScopeExit / [&]()
 			{
-				NMemory::fg_FreeNoSize(p);
+				NMemory::fg_Free(p, NUM_METAS * psize);
 			}
 		;
 		p->mp_p.p_pgno = 0;
@@ -1516,27 +1517,33 @@ namespace NMib::NDatabase
 		if (!m_StaticDasabaseInfo.f_IsEmpty())
 		{
 			for (i = me_maxdbs; --i >= CORE_DBS; )
-				NMemory::fg_FreeNoSize((ch8 *)m_StaticDasabaseInfo[i].m_DatabaseName.m_pData);
+			{
+				auto &StaticInfo = m_StaticDasabaseInfo[i];
+				NMemory::fg_Free((void *)StaticInfo.m_DatabaseName.m_pData, StaticInfo.m_DatabaseName.m_Size + 1);
+			}
 			m_StaticDasabaseInfo.f_Clear();
 		}
 
-		NMemory::fg_FreeNoSize(me_pbuf);
-		NMemory::fg_FreeNoSize(me_dbiseqs);
-		NMemory::fg_FreeNoSize(me_dbflags);
+		NMemory::fg_Free(me_pbuf, me_psize);
+		NMemory::fg_Free(me_dbiseqs, me_maxdbs * sizeof(uint32));
+		NMemory::fg_Free(me_dbflags, me_maxdbs * sizeof(uint16));
 		me_path.f_Clear();
-		NMemory::fg_FreeNoSize(me_dirty_list);
+		NMemory::fg_Free(me_dirty_list, MDB_IDL_UM_SIZE * sizeof(MDB_ID2));
 	#ifdef DMibDatabase_Always64BitSupport
 		if (me_txn0 && me_txn0->mt_rpages)
-			NMemory::fg_FreeNoSize(me_txn0->mt_rpages);
+			NMemory::fg_Free(me_txn0->mt_rpages, MDB_TRPAGE_SIZE * sizeof(MDB_ID3));
 		if (me_rpages) {
 			MDB_ID3L el = me_rpages;
 			unsigned int x;
 			for (x=1; x<=el[0].mid; x++)
 				munmap(el[x].mptr, el[x].mcnt * me_psize);
-			NMemory::fg_FreeNoSize(el);
+			NMemory::fg_Free(el, MDB_ERPAGE_SIZE * sizeof(NPrivate::MDB_ID3));
 		}
 	#endif
-		NMemory::fg_FreeNoSize(me_txn0);
+		{
+			mint size = sizeof(MDB_txn) + me_maxdbs * (sizeof(MDB_db)+sizeof(MDB_cursor *)+sizeof(uint32)+1);
+			NMemory::fg_Free(me_txn0, size);
+		}
 		mdb_midl_free(me_free_pgs);
 
 		if (me_flags & MDB_ENV_TXKEY) {

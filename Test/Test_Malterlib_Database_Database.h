@@ -20,6 +20,13 @@ namespace NMib::NDatabase
 		~CTestEnvironment();
 	};
 	
-	CTestEnvironment fg_GetTestEnvironment(NStr::CStr const &_FileName, bool _bReset = true, EDatabaseEnvironmentFlag _OpenFlags = EDatabaseEnvironmentFlag_None);
+	CTestEnvironment fg_GetTestEnvironment
+		(
+			NStr::CStr const &_FileName
+			, bool _bReset = true
+			, EDatabaseEnvironmentFlag _OpenFlags = EDatabaseEnvironmentFlag_None
+			, uint64 _MapSize = 0
+		)
+	;
 }
 

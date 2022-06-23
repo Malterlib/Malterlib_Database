@@ -53,14 +53,13 @@ namespace NMib::NDatabase::NPrivate
 			if (m_ProcessingActor)
 				fg_Move(m_ProcessingActor)->f_BlockDestroy();
 			if (m_WriteBuffers[0])
-				NMemory::fg_FreeNoSize(m_WriteBuffers[0]);
+				NMemory::fg_Free(m_WriteBuffers[0], gc_CopyBufferSize*2);
 		}
 
 		void f_Init(mint _PageSize)
 		{
 			m_ProcessingActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Low level DB Copy"));
-			mint Size = gc_CopyBufferSize*2;
-			m_WriteBuffers[0] = (uint8 *)NMemory::fg_AllocAligned(Size, _PageSize);
+			m_WriteBuffers[0] = (uint8 *)NMemory::fg_AllocAligned(gc_CopyBufferSize*2, _PageSize);
 			NMemory::fg_MemClear(m_WriteBuffers[0], gc_CopyBufferSize*2);
 			m_WriteBuffers[1] = m_WriteBuffers[0] + gc_CopyBufferSize;
 		}
@@ -178,7 +177,8 @@ namespace NMib::NDatabase::NPrivate
 			return rc;
 
 		/* Make cursor pages writable */
-		buf = ptr = (char *)NMemory::fg_Alloc(CopyState.m_pEnvironment->me_psize * mc.mc_snum);
+		mint BuffAllocSize = CopyState.m_pEnvironment->me_psize * mc.mc_snum;
+		buf = ptr = (char *)NMemory::fg_Alloc(BuffAllocSize);
 
 		for (i=0; i<mc.mc_top; i++) {
 			mdb_page_copy((MDB_page *)ptr, mc.mc_pg[i], CopyState.m_pEnvironment->me_psize);
@@ -305,7 +305,7 @@ namespace NMib::NDatabase::NPrivate
 			}
 		}
 	done:
-		NMemory::fg_FreeNoSize(buf);
+		NMemory::fg_Free(buf, BuffAllocSize);
 		return rc;
 	}
 }

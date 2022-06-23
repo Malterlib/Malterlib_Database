@@ -41,7 +41,7 @@ namespace NMib::NDatabase
 		}
 	}
 
-	CTestEnvironment fg_GetTestEnvironment(CStr const &_FileName, bool _bReset, EDatabaseEnvironmentFlag _OpenFlags)
+	CTestEnvironment fg_GetTestEnvironment(CStr const &_FileName, bool _bReset, EDatabaseEnvironmentFlag _OpenFlags, uint64 _MapSize)
 	{
 		CTestEnvironment Environment;
 
@@ -65,6 +65,8 @@ namespace NMib::NDatabase
 		}
 
 		Environment.m_Environment.f_SetMaxDatabases(32);
+		if (_MapSize)
+			Environment.m_Environment.f_SetMapSize(_MapSize);
 		Environment.m_Environment.f_Open(Environment.m_DatabaseDirectory, _OpenFlags, EFileAttrib_None);
 		
 		return fg_Move(Environment);
@@ -79,7 +81,7 @@ namespace
 		
 		void fp_PopulateEnvironment(CDatabaseEnvironment &_Environment, mint _nDatabases = 16, mint _nValuesPerDatabase = 4*1024)
 		{
-			_Environment.f_SetMapSize(_nDatabases * _nValuesPerDatabase * 128 * fg_Max(NSys::fg_Mem_PageSize() / 4096u, 1u));
+			_Environment.f_SetMapSize(_nDatabases * _nValuesPerDatabase * 256 * fg_Max(NSys::fg_Mem_PageSize() / 4096u, 1u));
 			auto Transaction = _Environment.f_BeginWriteTransaction();
 			for (uint32 iDatabase = 0; iDatabase < _nDatabases; ++iDatabase)
 			{
@@ -188,7 +190,7 @@ namespace
 			DMibTestSuite("Basics")
 			{
 				auto Environment = fg_GetTestEnvironment("TestDatabase0");
-				
+
 				{
 					auto WriteTransaction = Environment.m_Environment.f_BeginWriteTransaction();
 					auto MainDatabase = WriteTransaction.f_OpenDatabase();
@@ -209,11 +211,90 @@ namespace
 					}
 				}
 			};
+			DMibTestSuite("Write Transaction")
+			{
+				auto Environment = fg_GetTestEnvironment("TestDatabase13");
+
+				{
+					{
+						auto WriteTransaction = Environment.m_Environment.f_BeginWriteTransaction();
+						{
+							auto MainDatabase = WriteTransaction.f_OpenDatabase();
+							auto DatabaseTransaction = MainDatabase.f_Transaction(WriteTransaction);
+							DatabaseTransaction.f_Insert("TestKey", "TestValue");
+						}
+						WriteTransaction.f_Commit();
+					}
+
+					{
+						auto ReadTransaction = Environment.m_Environment.f_BeginReadTransaction();
+						auto DatabaseTransaction = ReadTransaction.f_OpenDatabaseTransaction();
+						auto iData = DatabaseTransaction.f_ReadCursor();
+						iData.f_First();
+						{
+							DMibTestPath("Found");
+							DMibExpectTrue(iData);
+							++iData;
+							DMibExpectFalse(iData);
+						}
+						{
+							DMibTestPath("Not found");
+							DMibExpectFalse(iData);
+							++iData;
+						}
+					}
+				}
+			};
+			DMibTestSuite("Child Write Transaction")
+			{
+				auto Environment = fg_GetTestEnvironment("TestDatabase14", true, EDatabaseEnvironmentFlag_None, 128*1024*1024);
+
+				{
+					{
+						auto WriteTransaction = Environment.m_Environment.f_BeginWriteTransaction();
+						{
+							auto MainDatabase = WriteTransaction.f_OpenDatabase();
+							auto DatabaseTransaction = MainDatabase.f_Transaction(WriteTransaction);
+							DatabaseTransaction.f_Insert("TestKey", "TestValue");
+						}
+						{
+							auto ChildTransaction = WriteTransaction.f_BeginChildTransaction();
+							DMibExpectException(WriteTransaction.f_BeginChildTransaction(), DMibErrorInstance("Transtion has a child"));
+							auto MainDatabase = ChildTransaction.f_OpenDatabase();
+							auto DatabaseTransaction = MainDatabase.f_Transaction(ChildTransaction);
+							DatabaseTransaction.f_Insert("TestKey2", "TestValue2");
+							DMibExpectException(WriteTransaction.f_Commit(), DMibErrorInstance("Transaction still has a child transaction"));
+							ChildTransaction.f_Commit();
+						}
+						WriteTransaction.f_Commit();
+					}
+
+					{
+						auto ReadTransaction = Environment.m_Environment.f_BeginReadTransaction();
+						auto DatabaseTransaction = ReadTransaction.f_OpenDatabaseTransaction();
+						auto iData = DatabaseTransaction.f_ReadCursor();
+						iData.f_First();
+						{
+							DMibTestPath("Found");
+							DMibExpectTrue(iData && "1");
+							++iData;
+							DMibExpectTrue(iData && "2");
+							++iData;
+							DMibExpectFalse(iData);
+						}
+						{
+							DMibTestPath("Not found");
+							DMibExpectFalse(iData);
+							++iData;
+						}
+					}
+				}
+			};
 			DMibTestCategory("Environment")
 			{
 				DMibTestSuite("Copy")
 				{
-					auto Environment = fg_GetTestEnvironment("TestDatabase1");
+					auto Environment = fg_GetTestEnvironment("TestDatabase1", true, EDatabaseEnvironmentFlag_None);
 					fp_PopulateEnvironment(Environment.m_Environment);
 					fp_DoCopy("Copy", EDatabaseEnvironmentCopyFlag_None, Environment);
 					fp_DeleteEverySecond(Environment.m_Environment);

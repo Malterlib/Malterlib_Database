@@ -133,7 +133,7 @@ namespace NMib::NDatabase
 		pids = (CProcessID *)NMemory::fg_Alloc((rdrs+1) * sizeof(CProcessID));
 		auto Cleanup = g_OnScopeExit / [&]
 			{
-				NMemory::fg_FreeNoSize(pids);
+				NMemory::fg_Free(pids, (rdrs+1) * sizeof(CProcessID));
 			}
 		;
 		pids[0] = 0;

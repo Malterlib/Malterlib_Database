@@ -67,7 +67,7 @@ namespace NMib::NDatabase::NPrivate
 
 	MDB_IDL mdb_midl_alloc(int num)
 	{
-		MDB_IDL ids = (MDB_IDL)NMib::NMemory::fg_Alloc((num+2) * sizeof(MDB_ID));
+		MDB_IDL ids = (MDB_IDL)NMib::NMemory::fg_Alloc((num + 2) * sizeof(MDB_ID));
 		*ids++ = num;
 		*ids = 0;
 		return ids;
@@ -76,7 +76,11 @@ namespace NMib::NDatabase::NPrivate
 	void mdb_midl_free(MDB_IDL ids)
 	{
 		if (ids)
-			NMib::NMemory::fg_FreeNoSize(ids-1);
+		{
+			--ids;
+			mint nIds = *ids;
+			NMib::NMemory::fg_Free(ids, (nIds + 2) * sizeof(MDB_ID));
+		}
 	}
 
 	void mdb_midl_shrink( MDB_IDL *idp )
