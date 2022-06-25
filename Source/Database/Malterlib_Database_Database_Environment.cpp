@@ -611,6 +611,12 @@ namespace NMib::NDatabase
 		return (void *)(mint)Environment.me_fd;
 	}
 
+	mint *CDatabaseEnvironment::f_GetReferencesPointer()
+	{
+		auto &Environment = *mp_pEnvironment;
+		return &Environment.m_nReferences;
+	}
+
 	/** @brief Set the size of the memory map to use for this environment.
 	 *
 	 * The size should be a multiple of the OS page size. The default is
@@ -1311,7 +1317,7 @@ namespace NMib::NDatabase
 
 	#ifdef DPlatformFamily_Windows
 		acc = GENERIC_READ|GENERIC_WRITE;
-		share = FILE_SHARE_READ|FILE_SHARE_WRITE;
+		share = FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE;
 		disp = OPEN_ALWAYS;
 		attrs = FILE_ATTRIBUTE_NORMAL;
 		switch (which) {

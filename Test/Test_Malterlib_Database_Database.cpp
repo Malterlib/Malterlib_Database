@@ -4,6 +4,7 @@
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/String/String>
 #include <Mib/Database/Database>
+#include <Mib/Database/DatabaseActor>
 #include <Mib/Database/DatabaseValue>
 #include <Mib/Test/Exception>
 
@@ -34,10 +35,17 @@ namespace NMib::NDatabase
 
 		if (!(Flags & EDatabaseEnvironmentFlag_ReadOnly))
 		{
-			if (CFile::fs_FileExists(m_DatabaseDirectory))
-				CFile::fs_DeleteDirectoryRecursive(m_DatabaseDirectory, true);
-			if (CFile::fs_FileExists(m_DatabaseDirectory + ".lock"))
-				CFile::fs_DeleteDirectoryRecursive(m_DatabaseDirectory + ".lock", true);
+			try
+			{
+				if (CFile::fs_FileExists(m_DatabaseDirectory))
+					CFile::fs_DeleteDirectoryRecursive(m_DatabaseDirectory, true);
+				if (CFile::fs_FileExists(m_DatabaseDirectory + ".lock"))
+					CFile::fs_DeleteDirectoryRecursive(m_DatabaseDirectory + ".lock", true);
+			}
+			catch (NException::CException const &_Exception)
+			{
+				DMibConOut2("Exception deleting test database: {}\n", _Exception);
+			}
 		}
 	}
 
@@ -96,6 +104,24 @@ namespace
 						)
 					;
 				}
+			}
+			Transaction.f_Commit();
+		}
+
+		void fp_PopulateEnvironmentSingleDB(CDatabaseEnvironment &_Environment, mint _nValuesPerDatabase = 4*1024)
+		{
+			_Environment.f_SetMapSize(_nValuesPerDatabase * 256 * fg_Max(NSys::fg_Mem_PageSize() / 4096u, 1u));
+			auto Transaction = _Environment.f_BeginWriteTransaction();
+			auto Database = Transaction.f_OpenDatabase();
+			for (uint32 iValue = 0; iValue < _nValuesPerDatabase; ++iValue)
+			{
+				auto DatabaseTransaction = Database.f_Transaction(Transaction);
+				DatabaseTransaction.f_Insert
+					(
+						NStorage::fg_TupleReferences("TestKey", iValue)
+						, NStorage::fg_TupleReferences("TestValue", iValue, iValue, iValue, iValue)
+					)
+				;
 			}
 			Transaction.f_Commit();
 		}
@@ -398,7 +424,7 @@ namespace
 					fp_PopulateEnvironment(Environment.m_Environment);
 					fp_DoCopy("Copy", EDatabaseEnvironmentCopyFlag_None, Environment);
 				};
-					
+
 	/*			
 				TODO
 				void f_SetMapSize(CDatabaseSize size);
@@ -411,6 +437,56 @@ namespace
 				CDatabaseReadTransaction f_BeginReadTransaction();
 				CDatabaseWriteTransaction f_BeginWriteTransaction(EDatabaseWriteTrasactionFlag _Flags = EDatabaseWriteTrasactionFlag_None);
 	*/
+			};
+			DMibTestSuite("Actor Compact") -> NConcurrency::TCFuture<void>
+			{
+				auto TestEnvironment = fg_GetTestEnvironment("TestDatabase13", true, EDatabaseEnvironmentFlag_NoReadAhead);
+				fp_PopulateEnvironmentSingleDB(TestEnvironment.m_Environment);
+				TestEnvironment.m_Environment.f_Close();
+
+				NConcurrency::TCActor<CDatabaseActor> DatabaseActor{fg_Construct(), "Test Database"};
+
+				{
+					co_await DatabaseActor(&CDatabaseActor::f_OpenDatabase, CFile::fs_GetProgramDirectory() / "TestDatabase13", 0);
+
+					auto WriteTrasaction = co_await DatabaseActor(&CDatabaseActor::f_OpenTransactionWrite);
+
+					mint nStartEntries = 0;
+					{
+						auto iData = WriteTrasaction.m_Transaction.f_ReadCursor();
+						iData.f_First();
+						while (iData)
+						{
+							++nStartEntries;
+							++iData;
+						}
+					}
+					{
+						auto iData = WriteTrasaction.m_Transaction.f_WriteCursor();
+						iData.f_First();
+						iData.f_Delete();
+					}
+
+					co_await DatabaseActor(&CDatabaseActor::f_Compact, fg_Move(WriteTrasaction), 0);
+
+					WriteTrasaction = co_await DatabaseActor(&CDatabaseActor::f_OpenTransactionWrite);
+					mint nEndEntries = 0;
+					{
+						auto iData = WriteTrasaction.m_Transaction.f_ReadCursor();
+						iData.f_First();
+						while (iData)
+						{
+							++nEndEntries;
+							++iData;
+						}
+					}
+
+					DMibExpect(nEndEntries, == , nStartEntries - 1);
+				}
+
+				co_await fg_Move(DatabaseActor).f_Destroy();
+
+				co_return {};
 			};
 		}
 	};

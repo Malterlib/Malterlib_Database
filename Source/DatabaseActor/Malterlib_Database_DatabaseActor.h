@@ -79,6 +79,8 @@ namespace NMib::NDatabase
 		NConcurrency::TCFuture<CTransactionWrite> f_OpenTransactionWrite();
 		NConcurrency::TCFuture<void> f_CommitWriteTransaction(CTransactionWrite &&_WriteTransaction);
 		NConcurrency::TCFuture<void> f_WaitForAllReaders();
+		NConcurrency::TCFuture<mint> f_CheckForStaleReaders();
+		NConcurrency::TCFuture<void> f_Compact(CTransactionWrite &&_WriteTransaction, uint64 _MaxSize);
 
 		NConcurrency::TCFuture<CDatabaseStatistics> f_Statistics();
 		NConcurrency::TCFuture<CDatabaseSizeStatistics> f_SizeStatistics();
@@ -89,9 +91,18 @@ namespace NMib::NDatabase
 		NConcurrency::TCFuture<CDatabaseStatistics> f_GetAggregateStatistics();
 
 	private:
+		struct COldEnvironment
+		{
+			CDatabaseEnvironment m_DatabaseEnvironment;
+			NStr::CStr m_TempDeletePath;
+		};
+
 		NConcurrency::TCFuture<void> fp_Destroy();
 
+		void fp_TryDeletePending();
+
 		CDatabaseEnvironment mp_DatabaseEnvironment;
+		NContainer::TCVector<COldEnvironment> mp_OldDatabaseEnvironments;
 		CDatabaseSub mp_Database;
 		NStorage::TCSharedPointer<NConcurrency::CCanDestroyTracker> mp_pCanDestroyTracker = fg_Construct();
 		NConcurrency::TCActorSequencerAsync<CTransactionWrite> mp_WriteSequencer;

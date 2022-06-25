@@ -28,6 +28,139 @@ namespace NMib::NDatabase
 		;
 	}
 
+	NConcurrency::TCFuture<void> CDatabaseActor::f_Compact(CTransactionWrite &&_WriteTransaction, uint64 _MaxSize)
+	{
+		if (!mp_bOpened)
+			co_return DMibErrorInstance("Database has not been opened");
+
+		if (f_IsDestroyed())
+			co_return DMibErrorInstance("Database actor destroyed");
+
+		using namespace NStr;
+
+		CStr OriginalPath = mp_DatabaseEnvironment.f_GetPath();
+		CStr CompactTempPath = OriginalPath + ".compact";
+		CStr TempDeletePath = OriginalPath + ".tempdelete";
+
+		if (!_MaxSize)
+			_MaxSize = mp_DatabaseEnvironment.f_SizeStatistics().m_MapSize;
+
+		CDatabaseEnvironment NewDatabaseEnvironment;
+		CDatabaseWriteTransaction OutTransaction;
+		CDatabaseSub OutDatabase;
+		try
+		{
+			if (CFile::fs_FileExists(CompactTempPath))
+				CFile::fs_DeleteDirectoryRecursive(CompactTempPath);
+
+			mint iDisambiguate = 0;
+			while (CFile::fs_FileExists(TempDeletePath))
+				TempDeletePath = OriginalPath + CStr(".tempdelete{}"_f << iDisambiguate++);
+
+			CFile::fs_CreateDirectory(CompactTempPath);
+
+			NewDatabaseEnvironment.f_SetMapSize(_MaxSize);
+			auto Attribs = EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid;
+			NewDatabaseEnvironment.f_Open(CompactTempPath, EDatabaseEnvironmentFlag_NoTls, Attribs);
+			OutTransaction = NewDatabaseEnvironment.f_BeginWriteTransaction();
+			OutDatabase = OutTransaction.f_OpenDatabase();
+
+		}
+		catch (CExceptionFile const &_Exception)
+		{
+			co_return _Exception.f_ExceptionPointer();
+		}
+
+		try
+		{
+			{
+				auto Transaction = OutDatabase.f_Transaction(OutTransaction);
+				auto iOut = Transaction.f_WriteCursor();
+				auto iSource = _WriteTransaction.m_Transaction.f_ReadCursor();
+				iSource.f_First();
+				for (; iSource; ++iSource)
+					iOut.f_Insert(iSource.f_Key(), iSource.f_Value());
+			}
+
+			OutTransaction.f_Commit();
+		}
+		catch (NException::CException const &_Exception)
+		{
+			co_return _Exception.f_ExceptionPointer();
+		}
+		NewDatabaseEnvironment.f_Close();
+
+		try
+		{
+			CFile::fs_CreateDirectory(TempDeletePath);
+
+			CFile::fs_RenameFile(OriginalPath / "MalterlibDB.lock", TempDeletePath / "MalterlibDB.lock");
+			CFile::fs_RenameFile(OriginalPath / "MalterlibDB.mibdb", TempDeletePath / "MalterlibDB.mibdb");
+
+			CFile::fs_RenameFile(CompactTempPath / "MalterlibDB.lock", OriginalPath / "MalterlibDB.lock");
+			CFile::fs_RenameFile(CompactTempPath / "MalterlibDB.mibdb", OriginalPath / "MalterlibDB.mibdb");
+
+			CFile::fs_DeleteDirectory(CompactTempPath);
+		}
+		catch (CExceptionFile const &_Exception)
+		{
+			co_return _Exception.f_ExceptionPointer();
+		}
+
+		auto &OldEnvironment = mp_OldDatabaseEnvironments.f_Insert();
+		OldEnvironment.m_DatabaseEnvironment = fg_Move(fg_Move(mp_DatabaseEnvironment));
+		OldEnvironment.m_TempDeletePath = TempDeletePath;
+
+		try
+		{
+			mp_DatabaseEnvironment = {};
+			mp_DatabaseEnvironment.f_SetMapSize(_MaxSize);
+			auto Attribs = EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid;
+			mp_DatabaseEnvironment.f_Open(OriginalPath, EDatabaseEnvironmentFlag_NoTls, Attribs);
+			auto Transaction = mp_DatabaseEnvironment.f_BeginWriteTransaction();
+			mp_Database = Transaction.f_OpenDatabase();
+			Transaction.f_Commit();
+		}
+		catch (NException::CException const &_Exception)
+		{
+			co_return _Exception.f_ExceptionPointer();
+		}
+
+		co_return {};
+	}
+
+	void CDatabaseActor::fp_TryDeletePending()
+	{
+		if (mp_OldDatabaseEnvironments.f_IsEmpty())
+			return;
+
+		NContainer::TCSet<mint> ToRemove;
+		mint iEnv = 0;
+		for (auto &Enviroment : mp_OldDatabaseEnvironments)
+		{
+			if (*Enviroment.m_DatabaseEnvironment.f_GetReferencesPointer() != 0)
+				continue;
+
+			Enviroment.m_DatabaseEnvironment.f_Close();
+			ToRemove[iEnv];
+			if (CFile::fs_FileExists(Enviroment.m_TempDeletePath))
+			{
+				try
+				{
+					CFile::fs_DeleteDirectoryRecursive(Enviroment.m_TempDeletePath);
+				}
+				catch (CExceptionFile const &)
+				{
+				}
+			}
+
+			++iEnv;
+		}
+
+		for (auto iToRemove = ToRemove.f_GetIteratorBidirectionalReverse(); iToRemove; ++iToRemove)
+			mp_OldDatabaseEnvironments.f_Remove(*iToRemove);
+	}
+
 	CDatabaseActor::CTransactionRead::CTransactionRead(CActorSubscription &&_Subscription, CDatabaseReadTransaction &_MainTransaction, CDatabaseSubReadTransaction &&_Transaction)
 		: mp_Subscription(fg_Move(_Subscription))
 		, mp_pMainTransaction(&_MainTransaction)
@@ -136,6 +269,8 @@ namespace NMib::NDatabase
 
 		co_await Destroys.f_GetResults();
 
+		fp_TryDeletePending();
+
 		co_return {};
 	}
 
@@ -148,6 +283,11 @@ namespace NMib::NDatabase
 		co_await fg_Move(Future);
 
 		co_return {};
+	}
+
+	NConcurrency::TCFuture<mint> CDatabaseActor::f_CheckForStaleReaders()
+	{
+		co_return mp_DatabaseEnvironment.f_CheckForStaleReaders();
 	}
 
 	auto CDatabaseActor::f_OpenTransactionRead() -> TCFuture<CTransactionRead>
@@ -171,19 +311,23 @@ namespace NMib::NDatabase
 			auto Transaction = this->mp_Database.f_Transaction(pState->m_MainTransaction);
 
 			++mp_nReaders;
+			auto *pReferences = mp_DatabaseEnvironment.f_GetReferencesPointer();
+			++(*pReferences);
 
 			co_return CTransactionRead
 				{
-					g_ActorSubscription / [this, pState, pCanDestroy = mp_pCanDestroyTracker]() mutable
+					g_ActorSubscription / [this, pReferences, pState, pCanDestroy = mp_pCanDestroyTracker]() mutable
 					{
 						pState.f_Clear();
 						--mp_nReaders;
+						--(*pReferences);
 						if (mp_nReaders == 0)
 						{
 							for (auto &Waiting : mp_WaitingForReaders)
 								Waiting.f_SetResult();
 
 							mp_WaitingForReaders.f_Clear();
+							fp_TryDeletePending();
 						}
 					}
 					, pState->m_MainTransaction
@@ -224,11 +368,16 @@ namespace NMib::NDatabase
 						pState->m_MainTransaction = this->mp_DatabaseEnvironment.f_BeginWriteTransaction();
 						auto Transaction = this->mp_Database.f_Transaction(pState->m_MainTransaction);
 
+						auto *pReferences = mp_DatabaseEnvironment.f_GetReferencesPointer();
+						++(*pReferences);
+
 						co_return CTransactionWrite
 							{
-								g_ActorSubscription / [pState, SequencerSubscription = fg_Move(_SequencerSubscription), pCanDestroy = mp_pCanDestroyTracker]() mutable
+								g_ActorSubscription / [this, pReferences, pState, SequencerSubscription = fg_Move(_SequencerSubscription), pCanDestroy = mp_pCanDestroyTracker]() mutable
 								{
 									pState.f_Clear();
+									--(*pReferences);
+									fp_TryDeletePending();
 								}
 								, pState->m_MainTransaction
 								, fg_Move(Transaction)
