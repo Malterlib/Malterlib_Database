@@ -2,7 +2,9 @@
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include "Malterlib_Database_DatabaseActor.h"
+
 #include <Mib/Concurrency/ActorSubscription>
+#include <Mib/Concurrency/ActorFunctor>
 
 namespace NMib::NDatabase
 {
@@ -126,6 +128,8 @@ namespace NMib::NDatabase
 			co_return _Exception.f_ExceptionPointer();
 		}
 
+		++mp_CompactionSequence;
+
 		co_return {};
 	}
 
@@ -211,6 +215,21 @@ namespace NMib::NDatabase
 		, mp_pMainTransaction(&_MainTransaction)
 		, m_Transaction(fg_Move(_Transaction))
 	{
+	}
+
+	CDatabaseActor::CTransactionWrite::CTransactionWrite()
+		: m_Transaction(CDatabaseSubWriteTransaction::fs_Empty())
+	{
+	}
+
+	CDatabaseActor::CTransactionWrite CDatabaseActor::CTransactionWrite::fs_Empty()
+	{
+		return {};
+	}
+
+	bool CDatabaseActor::CTransactionWrite::f_IsEmpty() const
+	{
+		return mp_pMainTransaction == nullptr;
 	}
 
 	CDatabaseActor::CTransactionWrite::CTransactionWrite(CTransactionWrite &&_Other)
@@ -429,6 +448,43 @@ namespace NMib::NDatabase
 		{
 			co_return _Exception.f_ExceptionPointer();
 		}
+	}
+
+	NConcurrency::TCFuture<bool> CDatabaseActor::f_WriteWithCompaction
+		(
+			NConcurrency::TCActorFunctorWeak<NConcurrency::TCFuture<CTransactionWrite> (CTransactionWrite &&_Transaction, bool _bCompacting)> &&_fDoWork
+		)
+	{
+		auto fDoWrite = g_ActorFunctor / [OriginalCompactionSequence = mp_CompactionSequence, this, fDoWork = fg_Move(_fDoWork)](bool _bCompact) -> TCFuture<bool>
+			{
+				auto Transaction = co_await self(&CDatabaseActor::f_OpenTransactionWrite);
+				Transaction = co_await fDoWork(fg_Move(Transaction), _bCompact);
+				if (Transaction.f_IsEmpty())
+					co_return false;
+
+				if (_bCompact && OriginalCompactionSequence == mp_CompactionSequence)
+					co_await self(&CDatabaseActor::f_Compact, fg_Move(Transaction), 0);
+				else
+					co_await self(&CDatabaseActor::f_CommitWriteTransaction, fg_Move(Transaction));
+
+				co_return true;
+			}
+		;
+
+		auto Result = co_await fDoWrite(false).f_Wrap();
+
+		if (!Result)
+		{
+			if (Result.f_GetExceptionStr().f_Find("MDB_MAP_FULL") >= 0)
+			{
+				DMibLogWithCategory(Database, Warning, "Compacting database at '{}' due to MDB_MAP_FULL", mp_DatabaseEnvironment.f_GetPath());
+				co_return co_await fDoWrite(true);
+			}
+			else
+				co_return Result.f_GetException();
+		}
+
+		co_return *Result;
 	}
 
 	NConcurrency::TCFuture<void> CDatabaseActor::f_CommitWriteTransaction(CTransactionWrite &&_WriteTransaction)

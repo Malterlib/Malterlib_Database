@@ -120,6 +120,8 @@ namespace NMib::NDatabase
 		template <typename ...tfp_CKeys>
 		CDatabaseCursorDuplicateDataWrite f_WriteCursorDuplicateData(tfp_CKeys const & ...p_Prefixes);
 
+		static CDatabaseSubWriteTransaction fs_Empty();
+
 	private:
 		friend struct CDatabaseSub;
 

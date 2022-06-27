@@ -176,6 +176,11 @@ namespace NMib::NDatabase
 	{
 	}
 
+	CDatabaseSubWriteTransaction CDatabaseSubWriteTransaction::fs_Empty()
+	{
+		return {nullptr, 0};
+	}
+
 	CDatabaseCursorWrite CDatabaseSubWriteTransaction::f_WriteCursor()
 	{
 		NStorage::TCUniquePointer<CDatabaseCursorCommon::CInternal> pCursor = fg_Explicit(mp_pTransaction->f_Cursor(mp_DatabaseID));

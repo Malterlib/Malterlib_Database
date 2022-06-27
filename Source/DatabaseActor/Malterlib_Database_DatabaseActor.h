@@ -6,6 +6,7 @@
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ConcurrencyManager>
 #include <Mib/Concurrency/ActorSequencerAsync>
+#include <Mib/Concurrency/ActorFunctorWeak>
 #include <Mib/Database/Database>
 
 namespace NMib::NDatabase
@@ -64,10 +65,15 @@ namespace NMib::NDatabase
 			NContainer::TCSet<NStr::CStr> f_EnumDatabases();
 			CDatabaseWriteTransaction f_BeginChildTransaction();
 
+			static CTransactionWrite fs_Empty();
+
+			bool f_IsEmpty() const;
+
 			CDatabaseSubWriteTransaction m_Transaction; // Transaction for the unnamed main database
 
 		private:
 			friend struct CDatabaseActor;
+			CTransactionWrite();
 
 			NConcurrency::CActorSubscription mp_Subscription;
 			CDatabaseWriteTransaction *mp_pMainTransaction = nullptr;
@@ -90,6 +96,12 @@ namespace NMib::NDatabase
 
 		NConcurrency::TCFuture<CDatabaseStatistics> f_GetAggregateStatistics();
 
+		NConcurrency::TCFuture<bool> f_WriteWithCompaction
+			(
+				NConcurrency::TCActorFunctorWeak<NConcurrency::TCFuture<CTransactionWrite> (CTransactionWrite &&_Transaction, bool _bCompacting)> &&_fDoWork
+			)
+		;
+
 	private:
 		struct COldEnvironment
 		{
@@ -107,6 +119,7 @@ namespace NMib::NDatabase
 		NStorage::TCSharedPointer<NConcurrency::CCanDestroyTracker> mp_pCanDestroyTracker = fg_Construct();
 		NConcurrency::TCActorSequencerAsync<CTransactionWrite> mp_WriteSequencer;
 		NContainer::TCVector<NConcurrency::TCPromise<void>> mp_WaitingForReaders;
+		mint mp_CompactionSequence = 0;
 		mint mp_nReaders = 0;
 		bool mp_bOpened = false;
 	};
