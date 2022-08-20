@@ -239,7 +239,7 @@ namespace
 			};
 			DMibTestSuite("Write Transaction")
 			{
-				auto Environment = fg_GetTestEnvironment("TestDatabase13");
+				auto Environment = fg_GetTestEnvironment("TestDatabase15");
 
 				{
 					{
