@@ -5,7 +5,7 @@
 
 namespace NMib::NDatabase
 {
-	COrdering_Weak CDatabaseValue::operator <=> (CDatabaseValue const &_Right) const
+	COrdering_Strong CDatabaseValue::operator <=> (CDatabaseValue const &_Right) const
 	{
 		mint nData = fg_Min(m_Size, _Right.m_Size);
 		if (auto Diff = NMemory::fg_MemCmp(m_pData, _Right.m_pData, nData); Diff != 0)
