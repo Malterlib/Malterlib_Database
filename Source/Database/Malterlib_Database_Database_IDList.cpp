@@ -99,7 +99,7 @@ namespace NMib::NDatabase::NPrivate
 		MDB_IDL idn = *idp-1;
 		/* grow it */
 		mint NewSize = (*idn + num + 2) * sizeof(MDB_ID);
-		idn = (MDB_IDL)NMib::NMemory::fg_Resize(idn, NewSize, 0);
+		idn = (MDB_IDL)NMib::NMemory::fg_Resize(idn, NewSize, 0, EAllocationFlag_SizeNotNeeded);
 		*idn++ += num;
 		*idp = idn;
 	}
@@ -111,7 +111,7 @@ namespace NMib::NDatabase::NPrivate
 		if (num > ids[-1]) {
 			num = (num + num/4 + (256 + 2)) & -256;
 			mint NewSize = num * sizeof(MDB_ID);
-			ids = (MDB_IDL)NMib::NMemory::fg_Resize(ids-1, NewSize, 0);
+			ids = (MDB_IDL)NMib::NMemory::fg_Resize(ids-1, NewSize, 0, EAllocationFlag_SizeNotNeeded);
 			*ids++ = num - 2;
 			*idp = ids;
 		}
