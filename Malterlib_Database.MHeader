@@ -5,8 +5,6 @@ Import "../Core/Lib_Malterlib.MTarget"
 
 %Group "{Malterlib}/{Lib_Malterlib_Database}"
 {
-	Property.MalterlibConcurrency_DistributedActors true
-
 	%Group "Database"
 	{
 		%Group "Include"
@@ -47,18 +45,24 @@ Import "../Core/Lib_Malterlib.MTarget"
 			%File "Documentation/*"
 		}
 	}
+	%Dependency "Lib_Malterlib_Concurrency"
+	{
+		!DocumentationEnabled true
+
+		Dependency.Indirect true
+	}
 }
 
 
 Property
 {
-	MalterlibLibrary_Database define bool = MalterlibLibrary_All
+	MalterlibLibrary_Database: bool = MalterlibLibrary_All
 	MalterlibSubLibraries =+ "Database"
 	{
 		!!MalterlibLibrary_Database true
 	}
-	MalterlibLibrarySeparate_Lib_Malterlib_Database define bool = true
-//	MalterlibSubLibrarySeparate_Lib_Malterlib_Database define bool = true
+	MalterlibLibrarySeparate_Lib_Malterlib_Database: bool = true
+//	MalterlibSubLibrarySeparate_Lib_Malterlib_Database: bool = true
 	MalterlibIncludeRoots =+ "Include"->MakeAbsolute()
 	{
 		!!MalterlibLibrary_Database true
@@ -70,6 +74,6 @@ Property
 	!!MalterlibEnableInternalTests true
 	
 	MalterlibTests =+ "Malterlib_Database"
-	MalterlibTestFiles_Malterlib_Database define [type(CEntity)] = ["Test/*"->MakeAbsolute()]
-	MalterlibTestDependencies_Malterlib_Database define [type(CEntity)] = ["Lib_Malterlib_Database"]
+	MalterlibTestFiles_Malterlib_Database: [type(CEntity)] = ["Test/*"->MakeAbsolute()]
+	MalterlibTestDependencies_Malterlib_Database: [type(CEntity)] = ["Lib_Malterlib_Database"]
 }
