@@ -685,10 +685,10 @@ namespace NMib::NDatabase
 					 * If it happens to be the last page, truncate the spill list.
 					 * Otherwise mark it as deleted by setting the LSB.
 					 */
-					if (x == txn->mt_spill_pgs[0])
-						txn->mt_spill_pgs[0]--;
+					if (x == tx2->mt_spill_pgs[0])
+						tx2->mt_spill_pgs[0]--;
 					else
-						txn->mt_spill_pgs[x] |= 1;
+						tx2->mt_spill_pgs[x] |= 1;
 				}	/* otherwise, if belonging to a parent txn, the
 					 * page remains spilled until child commits
 					 */
@@ -2034,6 +2034,7 @@ namespace NMib::NDatabase
 			for (i=0; i<mc->mc_top; i++)
 				mc->mc_ki[i] = mn.mc_ki[i];
 		} else if (!IS_LEAF2(mp)) {
+			DMibFastCheck(copy);
 			/* Move nodes */
 			mc->mc_pg[mc->mc_top] = rp;
 			i = split_indx;

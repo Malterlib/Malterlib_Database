@@ -1771,6 +1771,8 @@ namespace NMib::NDatabase::NPrivate
 	/** Move the cursor to the next data item. */
 	int mdb_cursor_next(MDB_cursor *mc, CDatabaseValue *key, CDatabaseValue *data, EDatabaseCursorGet op)
 	{
+		DMibFastCheck(key);
+		DMibFastCheck(data);
 		MDB_page	*mp;
 		MDB_node	*leaf;
 		int rc;
@@ -1860,6 +1862,9 @@ namespace NMib::NDatabase::NPrivate
 	/** Move the cursor to the previous data item. */
 	int mdb_cursor_prev(MDB_cursor *mc, CDatabaseValue *key, CDatabaseValue *data, EDatabaseCursorGet op)
 	{
+		DMibFastCheck(key);
+		DMibFastCheck(data);
+
 		MDB_page	*mp;
 		MDB_node	*leaf;
 		int rc;
@@ -2101,6 +2106,7 @@ namespace NMib::NDatabase::NPrivate
 			return MDB_SUCCESS;
 		}
 
+		DMibFastCheck(leaf);
 		if (F_ISSET(leaf->mn_flags, F_DUPDATA)) {
 			mdb_xcursor_init1(mc, leaf);
 		}

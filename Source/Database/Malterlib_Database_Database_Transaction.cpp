@@ -1058,6 +1058,7 @@ namespace NMib::NDatabase
 	 */
 	int NPrivate::mdb_freelist_save(MDB_txn *txn)
 	{
+#ifndef DMibClangAnalyzerWorkaround
 		/* env->me_pgstate.mf_pghead[] can grow and shrink during this call.
 		 * env->me_pgstate.mf_pglast and txn->mt_free_pgs[] can only grow.
 		 * Page numbers cannot disappear from txn->mt_free_pgs[].
@@ -1262,7 +1263,8 @@ namespace NMib::NDatabase
 					len = mop_len;
 					data.m_Size = (len + 1) * sizeof(MDB_ID);
 				}
-				data.m_pData = (uint8 *)(mop -= len);
+				mop -= len;
+				data.m_pData = (uint8 *)mop;
 				save = mop[0];
 				mop[0] = len;
 				rc = mdb_cursor_put(&mc, &key, &data, EDatabaseWriteFlag_OverwriteAtCurrentCursorPos);
@@ -1272,5 +1274,8 @@ namespace NMib::NDatabase
 			}
 		}
 		return rc;
+#else
+		return 0;
+#endif
 	}
 }

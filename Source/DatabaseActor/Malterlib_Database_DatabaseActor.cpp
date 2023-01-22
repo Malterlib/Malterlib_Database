@@ -333,6 +333,7 @@ namespace NMib::NDatabase
 			auto *pReferences = mp_DatabaseEnvironment.f_GetReferencesPointer();
 			++(*pReferences);
 
+#ifndef DMibClangAnalyzerWorkaround
 			co_return CTransactionRead
 				{
 					g_ActorSubscription / [this, pReferences, pState, pCanDestroy = mp_pCanDestroyTracker]() mutable
@@ -353,6 +354,10 @@ namespace NMib::NDatabase
 					, fg_Move(Transaction)
 				}
 			;
+#else
+			(void)Transaction;
+			co_return DMibErrorInstance("Workaround analyzer bug");
+#endif
 		}
 		catch (NException::CException const &)
 		{
@@ -390,6 +395,7 @@ namespace NMib::NDatabase
 						auto *pReferences = mp_DatabaseEnvironment.f_GetReferencesPointer();
 						++(*pReferences);
 
+#ifndef DMibClangAnalyzerWorkaround
 						co_return CTransactionWrite
 							{
 								g_ActorSubscription / [this, pReferences, pState, SequencerSubscription = fg_Move(_SequencerSubscription), pCanDestroy = mp_pCanDestroyTracker]() mutable
@@ -402,6 +408,9 @@ namespace NMib::NDatabase
 								, fg_Move(Transaction)
 							}
 						;
+#else
+						co_return DMibErrorInstance("Workaround analyzer bug");
+#endif
 					}
 					catch (NException::CException const &)
 					{
