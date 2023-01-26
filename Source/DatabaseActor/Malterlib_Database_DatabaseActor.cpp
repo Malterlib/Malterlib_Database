@@ -68,9 +68,9 @@ namespace NMib::NDatabase
 			OutDatabase = OutTransaction.f_OpenDatabase();
 
 		}
-		catch (CExceptionFile const &_Exception)
+		catch (CExceptionFile const &)
 		{
-			co_return _Exception.f_ExceptionPointer();
+			co_return NException::fg_CurrentException();
 		}
 
 		try
@@ -86,9 +86,9 @@ namespace NMib::NDatabase
 
 			OutTransaction.f_Commit();
 		}
-		catch (NException::CException const &_Exception)
+		catch (NException::CException const &)
 		{
-			co_return _Exception.f_ExceptionPointer();
+			co_return NException::fg_CurrentException();
 		}
 		NewDatabaseEnvironment.f_Close();
 
@@ -104,9 +104,9 @@ namespace NMib::NDatabase
 
 			CFile::fs_DeleteDirectory(CompactTempPath);
 		}
-		catch (CExceptionFile const &_Exception)
+		catch (CExceptionFile const &)
 		{
-			co_return _Exception.f_ExceptionPointer();
+			co_return NException::fg_CurrentException();
 		}
 
 		auto &OldEnvironment = mp_OldDatabaseEnvironments.f_Insert();
@@ -123,9 +123,9 @@ namespace NMib::NDatabase
 			mp_Database = Transaction.f_OpenDatabase();
 			Transaction.f_Commit();
 		}
-		catch (NException::CException const &_Exception)
+		catch (NException::CException const &)
 		{
-			co_return _Exception.f_ExceptionPointer();
+			co_return NException::fg_CurrentException();
 		}
 
 		++mp_CompactionSequence;
@@ -453,9 +453,9 @@ namespace NMib::NDatabase
 
 			co_return Stats;
 		}
-		catch (NException::CException const &_Exception)
+		catch (NException::CException const &)
 		{
-			co_return _Exception.f_ExceptionPointer();
+			co_return NException::fg_CurrentException();
 		}
 	}
 
@@ -502,9 +502,9 @@ namespace NMib::NDatabase
 		{
 			_WriteTransaction.mp_pMainTransaction->f_Commit();
 		}
-		catch (NException::CException const &_Exception)
+		catch (NException::CException const &)
 		{
-			co_return _Exception.f_ExceptionPointer();
+			co_return NException::fg_CurrentException();
 		}
 
 		if (_WriteTransaction.mp_Subscription)
