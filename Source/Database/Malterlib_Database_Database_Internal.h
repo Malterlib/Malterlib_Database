@@ -308,7 +308,8 @@ namespace NMib::NDatabase
 		# error "Two's complement, reasonably sized integer types, please"
 		#endif
 
-#			if defined(DMibDebug) || defined(DArchitecture_arm64) || defined(DArchitecture_arm64e)
+		// Disable for now, because llvm generated incorrect exception headers
+#			if defined(DMibDebug) || defined(DArchitecture_arm64) || defined(DArchitecture_arm64e) || 1
 #				define DMibDatabaseInfrequentSection
 #			else
 			#ifdef __GNUC__
