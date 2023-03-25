@@ -420,7 +420,7 @@ namespace NMib::NDatabase
 	/** @brief Return statistics about the LMDB environment.
 	 *
 	 * @param[out] stat The address of an #CDatabaseStatistics structure
-	 * 	where the statistics will be copied
+	 *	where the statistics will be copied
 	 */
 	CDatabaseStatistics DMibDatabaseInfrequentSection CDatabaseEnvironment::f_Statistics()
 	{
@@ -450,7 +450,7 @@ namespace NMib::NDatabase
 	/** @brief Return information about the LMDB environment.
 	 *
 	 * @param[out] stat The address of an #CDatabaseEnvironmentInfo structure
-	 * 	where the information will be copied
+	 *	where the information will be copied
 	 */
 	CDatabaseEnvironmentInfo DMibDatabaseInfrequentSection CDatabaseEnvironment::f_Info()
 	{
@@ -645,7 +645,7 @@ namespace NMib::NDatabase
 	 * errors are:
 	 * <ul>
 	 *	<li>EINVAL - an invalid parameter was specified, or the environment has
-	 *   	an active write transaction.
+	 *		an active write transaction.
 	 * </ul>
 	 */
 	void DMibDatabaseInfrequentSection CDatabaseEnvironment::f_SetMapSize(CDatabaseOffset size)
@@ -1000,7 +1000,7 @@ namespace NMib::NDatabase
 
 		{
 			int rc = 0;
- 			fDoWrite(rc, me_fd, p, psize * NUM_METAS, 0);
+			fDoWrite(rc, me_fd, p, psize * NUM_METAS, 0);
 			if (!rc)
 				rc = ErrCode();
 			else if ((unsigned) len != psize * NUM_METAS)

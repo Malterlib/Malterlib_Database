@@ -8,8 +8,8 @@ namespace NMib::NDatabase::NPrivate
 	template <typename ...tfp_CValue, mint ...tfp_Indices>
 	NStorage::TCTuple<typename TCGetDescending<typename NTraits::TCRemoveQualifiers<tfp_CValue>::CType>::CType...> fg_ConsumeLexicographicByteArrayImpl
 		(
-		 	CDatabaseValue const &_Value
-		 	, NMeta::TCIndices<tfp_Indices...> _Dummy
+			CDatabaseValue const &_Value
+			, NMeta::TCIndices<tfp_Indices...> _Dummy
 		)
 	{
 		NStream::CBinaryStreamMemoryPtr<NStream::CBinaryStreamBigEndian> Stream;

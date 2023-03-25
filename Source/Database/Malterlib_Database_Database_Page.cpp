@@ -1783,7 +1783,7 @@ namespace NMib::NDatabase
 		indx_t		 newindx;
 		pgno_t		 pgno = 0;
 		int	 i, j, split_indx, nkeys, pmax;
-		MDB_env 	*env = mc->mc_txn->mt_env;
+		MDB_env		*env = mc->mc_txn->mt_env;
 		MDB_node	*node;
 		CDatabaseValue	 sepkey, rkey, xdata, *rdata = &xdata;
 		MDB_page	*copy = nullptr;

@@ -27,7 +27,7 @@ namespace NMib::NDatabase
 							}
 						;
 					}
-				 	, _Values
+					, _Values
 				)
 			;
 		}
@@ -49,7 +49,7 @@ namespace NMib::NDatabase
 							}
 						;
 					}
-				 	, o_Values
+					, o_Values
 				)
 			;
 		}

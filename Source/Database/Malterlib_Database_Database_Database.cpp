@@ -61,7 +61,7 @@ namespace NMib::NDatabase
 	 *
 	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
 	 * @param[in] name The name of the database to open. If only a single
-	 * 	database is needed in the environment, this value may be nullptr.
+	 *	database is needed in the environment, this value may be nullptr.
 	 * @param[in] flags Special options for this database. This parameter
 	 * must be set to 0 or by bitwise OR'ing together one or more of the
 	 * values described here.
@@ -324,7 +324,7 @@ namespace NMib::NDatabase
 	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
 	 * @param[in] _DatabaseID A database handle returned by #f_OpenDatabase()
 	 * @param[out] stat The address of an #CDatabaseStatistics structure
-	 * 	where the statistics will be copied
+	 *	where the statistics will be copied
 	 * @return A non-zero error value on failure and 0 on success. Some possible
 	 * errors are:
 	 * <ul>

@@ -189,8 +189,8 @@ namespace NMib::NDatabase
 		using CDecodedDescending = TCGetDescending<typename NTraits::TCRemoveQualifiers<tf_CValue>::CType>;
 		TCDatabaseStreamLexicographic<typename NTraits::TCRemoveQualifiers<typename CDecodedDescending::CType>::CType, CDecodedDescending::mc_bDescending>::fs_Encode
 			(
-			 	_Stream
-			 	, CDecodedDescending::fs_GetValue(_Value)
+				_Stream
+				, CDecodedDescending::fs_GetValue(_Value)
 			)
 		;
 	}
@@ -201,8 +201,8 @@ namespace NMib::NDatabase
 		using CDecodedDescending = TCGetDescending<typename NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>::CType>;
 		TCDatabaseStreamLexicographic<typename NTraits::TCRemoveQualifiers<typename CDecodedDescending::CType>::CType, CDecodedDescending::mc_bDescending>::fs_Decode
 			(
-			 	_Stream
-			 	, CDecodedDescending::fs_GetValue(o_Value)
+				_Stream
+				, CDecodedDescending::fs_GetValue(o_Value)
 			)
 		;
 	}

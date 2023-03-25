@@ -70,8 +70,8 @@ namespace
 
 			#define DInsertValue(d_Prefix, d_Value) DatabaseTransaction.f_Insert \
 				( \
-				 	fg_Tuple(fg_Descending<tf_bDescending>( d_Prefix ), fg_Descending<tf_bDescending>( d_Value )) \
-				 	, fNextOrder(iOrder) \
+					fg_Tuple(fg_Descending<tf_bDescending>( d_Prefix ), fg_Descending<tf_bDescending>( d_Value )) \
+					, fNextOrder(iOrder) \
 				)
 
 			DInsertValue("float", (fs_ReverseEncodeFloat(0,0,0,0)));

@@ -36,7 +36,7 @@ namespace NMib::NDatabase
 
 			bool bSuccess = _Variant.f_TryVisitCreate
 				(
-				 	TypeID
+					TypeID
 					, [&](auto &&_Value) -> void
 					{
 						CDatabaseValue::fs_ConsumeLexicographic(_Stream, _Value);

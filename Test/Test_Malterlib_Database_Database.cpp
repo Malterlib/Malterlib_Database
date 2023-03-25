@@ -99,8 +99,8 @@ namespace
 					auto DatabaseTransaction = Database.f_Transaction(Transaction);
 					DatabaseTransaction.f_Insert
 						(
-						 	NStorage::fg_TupleReferences("TestKey", iDatabase, iValue)
-						 	, NStorage::fg_TupleReferences("TestValue", iDatabase, iValue, iValue, iValue, iValue)
+							NStorage::fg_TupleReferences("TestKey", iDatabase, iValue)
+							, NStorage::fg_TupleReferences("TestValue", iDatabase, iValue, iValue, iValue, iValue)
 						)
 					;
 				}

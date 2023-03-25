@@ -30,8 +30,8 @@ This can be viewed as a table:
 ResultSet:
 ^^^^^^^^^^
 
-Name:		KeyPart0	|	...		|	KeyPartN 	||	Column0 	|	...		|	ColumnN
-Type:		<CKeyPart0>	|			|	CKeyPartN 	||	CColumn0	|			|	CColumnN
+Name:		KeyPart0	|	...		|	KeyPartN	||	Column0		|	...		|	ColumnN
+Type:		<CKeyPart0>	|			|	CKeyPartN	||	CColumn0	|			|	CColumnN
 			--------------------------------------------------------------------------------
 Row:		<Val>		|	...		|	<Val>		||	<Val>		|	...		|	<Val>
 Row:		<Val>		|	...		|	<Val>		||	<Val>		|	...		|	<Val>
@@ -48,15 +48,15 @@ a member of the EResultDataType enum:
 
 	Type:				|	CType:			| EResultDataType	
 	---------------------------------------------------------------------
-	String				|	CStr 			|	EResultDataType_CStr	
-	64bit float 		|	fp64 			|	EResultDataType_fp64
-	Binary blob 		|	CByteVector		|	EResultDataType_Binary
-	Unsigned 64bit int 	|	uint64 			|	EResultDataType_uint64
+	String				|	CStr			|	EResultDataType_CStr
+	64bit float			|	fp64			|	EResultDataType_fp64
+	Binary blob			|	CByteVector		|	EResultDataType_Binary
+	Unsigned 64bit int	|	uint64			|	EResultDataType_uint64
 
 NOTE: These types have been deprecated:
-	Signed 32bit int 	|	int32 			|	EResultDataType_int32
-	Signed 64bit int 	|	int64 			|	EResultDataType_int64
-	32bit float 		|	fp32 			|	EResultDataType_fp32
+	Signed 32bit int	|	int32			|	EResultDataType_int32
+	Signed 64bit int	|	int64			|	EResultDataType_int64
+	32bit float			|	fp32			|	EResultDataType_fp32
 
 Meta data can be associated with various elements of a result set. Meta data is treated as 
 a binary blob by the result set.
@@ -185,7 +185,7 @@ namespace NMib::NDatabase
 			CRowIterator & operator ++ ();
 
 			// Returns:
-			// 	true: If the iterator points to a row within the result set.
+			//	true: If the iterator points to a row within the result set.
 			//	false: If the iterator points to the end of a result set.
 			explicit operator bool () const;
 

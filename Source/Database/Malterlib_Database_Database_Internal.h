@@ -889,7 +889,7 @@ namespace NMib::NDatabase
 				/** Binary form of names of the reader/writer locks */
 			mdb_hash_t			mtb_mutexid;
 		#elif defined(MDB_USE_SYSV_SEM)
-			int 	mtb_semid;
+			int		mtb_semid;
 			int		mtb_rlocked;
 		#else
 				/** Mutex protecting access to this table.
@@ -1428,7 +1428,7 @@ namespace NMib::NDatabase
 		NPrivate::MDB_dbx		*mc_dbx;
 		/** The @ref mt_dbflag for this database */
 		unsigned char	*mc_dbflag;
-		unsigned short 	mc_snum;	/**< number of pushed pages */
+		unsigned short	mc_snum;	/**< number of pushed pages */
 		unsigned short	mc_top;		/**< index of top page, normally mc_snum-1 */
 	/** @defgroup CInternal	Cursor Flags
 	 *	@ingroup internal
@@ -1568,7 +1568,7 @@ namespace NMib::NDatabase
 	#define	MDB_ENV_TXKEY	0x10000000U
 		/** fdatasync is unreliable */
 	#define	MDB_FSYNCONLY	0x08000000U
-		uint32 	me_flags;		/**< @ref mdb_env */
+		uint32	me_flags;		/**< @ref mdb_env */
 		uint32	me_psize;	/**< DB page size, inited from me_os_psize */
 		uint32	me_os_psize;	/**< OS page size */
 		uint32	m_MaxReaders;	/**< size of the reader table */

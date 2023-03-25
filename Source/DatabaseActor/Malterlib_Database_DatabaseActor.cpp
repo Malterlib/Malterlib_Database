@@ -380,7 +380,7 @@ namespace NMib::NDatabase
 
 		co_return co_await
 			(
-			 	mp_WriteSequencer / [this](CActorSubscription &&_SequencerSubscription) -> TCFuture<CTransactionWrite>
+				mp_WriteSequencer / [this](CActorSubscription &&_SequencerSubscription) -> TCFuture<CTransactionWrite>
 				{
 					if (f_IsDestroyed())
 						co_return DMibErrorInstance("Database actor destroyed");
