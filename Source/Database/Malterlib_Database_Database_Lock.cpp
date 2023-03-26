@@ -183,6 +183,21 @@ namespace NMib::NDatabase
 	 */
 	int DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::mdb_mutex_failed(NPrivate::mdb_mutexref_t mutex, int rc)
 	{
+#ifdef DPlatformFamily_macOS
+		if (rc == EINVAL)
+		{
+			NMib::NThread::CThreadSpinWaiter SpinWaiter;
+			while (rc == EINVAL)
+			{
+				SpinWaiter.f_Wait();
+				rc = LOCK_MUTEX0(mutex);
+			}
+
+			if (rc == MDB_SUCCESS)
+				return 0;
+		}
+#endif
+
 		bool bReadLock;
 		MDB_meta *meta;
 		if (rc == MDB_OWNERDEAD)
