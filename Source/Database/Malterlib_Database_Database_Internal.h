@@ -1645,7 +1645,9 @@ namespace NMib::NDatabase
 		void mdb_env_close0(int excl);
 		mint mdb_leaf_size(CDatabaseValue *key, CDatabaseValue *data);
 		mint mdb_branch_size(CDatabaseValue *key);
+#ifdef MDB_ROBUST_SUPPORTED
 		void mdb_reader_check0(bool _bReadLock, mint *_pDead);
+#endif
 		void mdb_page_free(NPrivate::MDB_page *mp);
 		void mdb_dpage_free(NPrivate::MDB_page *dp);
 		void mdb_dpage_free_memory(NPrivate::MDB_page *dp);
@@ -1658,7 +1660,9 @@ namespace NMib::NDatabase
 		int mdb_env_share_locks(int *excl);
 		int mdb_env_excl_lock(int *excl);
 		void mdb_env_setup_locks(NStr::CStr const &_LockPath, int mode, int *excl);
+#ifdef MDB_ROBUST_SUPPORTED
 		int mdb_mutex_failed(NPrivate::mdb_mutexref_t mutex, int rc);
+#endif
 		int mdb_fopen(NStr::CStr const &_FileName, NPrivate::mdb_fopen_type which, NPrivate::mdb_mode_t mode, HANDLE *res);
 		NStr::CStr mdb_getfilename(NStr::CStr const &_FileName, NPrivate::mdb_fopen_type which);
 		bool f_IsInsideMemoryMap(uint8 const *_pData);

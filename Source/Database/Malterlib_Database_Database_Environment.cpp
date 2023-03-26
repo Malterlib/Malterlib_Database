@@ -823,11 +823,12 @@ namespace NMib::NDatabase
 	{
 		fp_CheckOpened();
 
+		mint nDead = 0;
+#ifdef MDB_ROBUST_SUPPORTED
 		auto &Environment = *mp_pEnvironment;
-
-		mint nDead = false;
 		if (Environment.m_pLocksMemoryMap)
 			Environment.mdb_reader_check0(false, &nDead);
+#endif
 		return nDead;
 	}
 

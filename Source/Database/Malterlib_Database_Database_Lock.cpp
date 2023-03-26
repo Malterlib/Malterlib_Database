@@ -119,6 +119,7 @@ namespace NMib::NDatabase
 		return 0;
 	}
 
+#ifdef MDB_ROBUST_SUPPORTED
 	/** As #mdb_reader_check(). bReadLock = <caller locked the reader mutex>. */
 	void DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::mdb_reader_check0(bool _bReadLock, mint *_pDead)
 	{
@@ -173,6 +174,7 @@ namespace NMib::NDatabase
 		if (_pDead)
 			*_pDead = nDead;
 	}
+#endif
 
 	#ifdef MDB_ROBUST_SUPPORTED
 	/** Handle #LOCK_MUTEX0() failure.
@@ -395,15 +397,15 @@ namespace NMib::NDatabase
 				% ((mdb_hash_t)85*85*85*85*85*85*85*85*85)
 	#endif
 				;
-			mdb_env_mname_init(env);
+			mdb_env_mname_init(this);
 			/* Clean up after a previous run, if needed:  Try to
 			 * remove both semaphores before doing anything else.
 			 */
-			sem_unlink(MUTEXNAME(env, 'r'));
-			sem_unlink(MUTEXNAME(env, 'w'));
-			me_rmutex = sem_open(MUTEXNAME(env, 'r'), O_CREAT|O_EXCL, mode, 1);
+			sem_unlink(MUTEXNAME(this, 'r'));
+			sem_unlink(MUTEXNAME(this, 'w'));
+			me_rmutex = sem_open(MUTEXNAME(this, 'r'), O_CREAT|O_EXCL, mode, 1);
 			if (me_rmutex == SEM_FAILED) goto fail_errno;
-			me_wmutex = sem_open(MUTEXNAME(env, 'w'), O_CREAT|O_EXCL, mode, 1);
+			me_wmutex = sem_open(MUTEXNAME(this, 'w'), O_CREAT|O_EXCL, mode, 1);
 			if (me_wmutex == SEM_FAILED) goto fail_errno;
 	#elif defined(MDB_USE_SYSV_SEM)
 			unsigned short vals[2] = {1, 1};
@@ -480,10 +482,10 @@ namespace NMib::NDatabase
 			me_wmutex = OpenMutexA(SYNCHRONIZE, FALSE, MUTEXNAME(this, 'w'));
 			if (!me_wmutex) goto fail_errno;
 	#elif defined(MDB_USE_POSIX_SEM)
-			mdb_env_mname_init(env);
-			me_rmutex = sem_open(MUTEXNAME(env, 'r'), 0);
+			mdb_env_mname_init(this);
+			me_rmutex = sem_open(MUTEXNAME(this, 'r'), 0);
 			if (me_rmutex == SEM_FAILED) goto fail_errno;
-			me_wmutex = sem_open(MUTEXNAME(env, 'w'), 0);
+			me_wmutex = sem_open(MUTEXNAME(this, 'w'), 0);
 			if (me_wmutex == SEM_FAILED) goto fail_errno;
 	#elif defined(MDB_USE_SYSV_SEM)
 			semid = m_pLocksMemoryMap->m_TransactionBody.mtb_semid;
