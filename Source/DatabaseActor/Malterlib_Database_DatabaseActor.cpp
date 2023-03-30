@@ -50,8 +50,9 @@ namespace NMib::NDatabase
 		CDatabaseEnvironment NewDatabaseEnvironment;
 		CDatabaseWriteTransaction OutTransaction;
 		CDatabaseSub OutDatabase;
-		try
 		{
+			auto CaptureScope = co_await g_CaptureExceptions.f_Specific<CExceptionFile>();
+
 			if (CFile::fs_FileExists(CompactTempPath))
 				CFile::fs_DeleteDirectoryRecursive(CompactTempPath);
 
@@ -68,13 +69,9 @@ namespace NMib::NDatabase
 			OutDatabase = OutTransaction.f_OpenDatabase();
 
 		}
-		catch (CExceptionFile const &)
-		{
-			co_return NException::fg_CurrentException();
-		}
 
-		try
 		{
+			auto CaptureScope = co_await g_CaptureExceptions;
 			{
 				auto Transaction = OutDatabase.f_Transaction(OutTransaction);
 				auto iOut = Transaction.f_WriteCursor();
@@ -86,14 +83,12 @@ namespace NMib::NDatabase
 
 			OutTransaction.f_Commit();
 		}
-		catch (NException::CException const &)
-		{
-			co_return NException::fg_CurrentException();
-		}
+
 		NewDatabaseEnvironment.f_Close();
 
-		try
 		{
+			auto CaptureScope = co_await g_CaptureExceptions.f_Specific<CExceptionFile>();
+
 			CFile::fs_CreateDirectory(TempDeletePath);
 
 			CFile::fs_RenameFile(OriginalPath / "MalterlibDB.lock", TempDeletePath / "MalterlibDB.lock");
@@ -104,17 +99,14 @@ namespace NMib::NDatabase
 
 			CFile::fs_DeleteDirectory(CompactTempPath);
 		}
-		catch (CExceptionFile const &)
-		{
-			co_return NException::fg_CurrentException();
-		}
 
 		auto &OldEnvironment = mp_OldDatabaseEnvironments.f_Insert();
 		OldEnvironment.m_DatabaseEnvironment = fg_Move(fg_Move(mp_DatabaseEnvironment));
 		OldEnvironment.m_TempDeletePath = TempDeletePath;
 
-		try
 		{
+			auto CaptureScope = co_await g_CaptureExceptions;
+
 			mp_DatabaseEnvironment = {};
 			mp_DatabaseEnvironment.f_SetMapSize(_MaxSize);
 			auto Attribs = EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid;
@@ -122,10 +114,6 @@ namespace NMib::NDatabase
 			auto Transaction = mp_DatabaseEnvironment.f_BeginWriteTransaction();
 			mp_Database = Transaction.f_OpenDatabase();
 			Transaction.f_Commit();
-		}
-		catch (NException::CException const &)
-		{
-			co_return NException::fg_CurrentException();
 		}
 
 		++mp_CompactionSequence;
@@ -322,47 +310,42 @@ namespace NMib::NDatabase
 			CDatabaseReadTransaction m_MainTransaction;
 		};
 
-		try
-		{
-			NStorage::TCSharedPointer<CState> pState = fg_Construct();
+		auto CaptureScope = co_await g_CaptureExceptions;
 
-			pState->m_MainTransaction = this->mp_DatabaseEnvironment.f_BeginReadTransaction();
-			auto Transaction = this->mp_Database.f_Transaction(pState->m_MainTransaction);
+		NStorage::TCSharedPointer<CState> pState = fg_Construct();
 
-			++mp_nReaders;
-			auto *pReferences = mp_DatabaseEnvironment.f_GetReferencesPointer();
-			++(*pReferences);
+		pState->m_MainTransaction = this->mp_DatabaseEnvironment.f_BeginReadTransaction();
+		auto Transaction = this->mp_Database.f_Transaction(pState->m_MainTransaction);
+
+		++mp_nReaders;
+		auto *pReferences = mp_DatabaseEnvironment.f_GetReferencesPointer();
+		++(*pReferences);
 
 #ifndef DMibClangAnalyzerWorkaround
-			co_return CTransactionRead
+		co_return CTransactionRead
+			{
+				g_ActorSubscription / [this, pReferences, pState, pCanDestroy = mp_pCanDestroyTracker]() mutable
 				{
-					g_ActorSubscription / [this, pReferences, pState, pCanDestroy = mp_pCanDestroyTracker]() mutable
+					pState.f_Clear();
+					--mp_nReaders;
+					--(*pReferences);
+					if (mp_nReaders == 0)
 					{
-						pState.f_Clear();
-						--mp_nReaders;
-						--(*pReferences);
-						if (mp_nReaders == 0)
-						{
-							for (auto &Waiting : mp_WaitingForReaders)
-								Waiting.f_SetResult();
+						for (auto &Waiting : mp_WaitingForReaders)
+							Waiting.f_SetResult();
 
-							mp_WaitingForReaders.f_Clear();
-							fp_TryDeletePending();
-						}
+						mp_WaitingForReaders.f_Clear();
+						fp_TryDeletePending();
 					}
-					, pState->m_MainTransaction
-					, fg_Move(Transaction)
 				}
-			;
+				, pState->m_MainTransaction
+				, fg_Move(Transaction)
+			}
+		;
 #else
-			(void)Transaction;
-			co_return DMibErrorInstance("Workaround analyzer bug");
+		(void)Transaction;
+		co_return DMibErrorInstance("Workaround analyzer bug");
 #endif
-		}
-		catch (NException::CException const &)
-		{
-			co_return NException::fg_CurrentException();
-		}
 	}
 
 	auto CDatabaseActor::f_OpenTransactionWrite() -> TCFuture<CTransactionWrite>
@@ -385,37 +368,31 @@ namespace NMib::NDatabase
 					if (f_IsDestroyed())
 						co_return DMibErrorInstance("Database actor destroyed");
 
-					try
-					{
-						NStorage::TCSharedPointer<CState> pState = fg_Construct();
+					auto CaptureScope = co_await g_CaptureExceptions;
+					NStorage::TCSharedPointer<CState> pState = fg_Construct();
 
-						pState->m_MainTransaction = this->mp_DatabaseEnvironment.f_BeginWriteTransaction();
-						auto Transaction = this->mp_Database.f_Transaction(pState->m_MainTransaction);
+					pState->m_MainTransaction = this->mp_DatabaseEnvironment.f_BeginWriteTransaction();
+					auto Transaction = this->mp_Database.f_Transaction(pState->m_MainTransaction);
 
-						auto *pReferences = mp_DatabaseEnvironment.f_GetReferencesPointer();
-						++(*pReferences);
+					auto *pReferences = mp_DatabaseEnvironment.f_GetReferencesPointer();
+					++(*pReferences);
 
 #ifndef DMibClangAnalyzerWorkaround
-						co_return CTransactionWrite
+					co_return CTransactionWrite
+						{
+							g_ActorSubscription / [this, pReferences, pState, SequencerSubscription = fg_Move(_SequencerSubscription), pCanDestroy = mp_pCanDestroyTracker]() mutable
 							{
-								g_ActorSubscription / [this, pReferences, pState, SequencerSubscription = fg_Move(_SequencerSubscription), pCanDestroy = mp_pCanDestroyTracker]() mutable
-								{
-									pState.f_Clear();
-									--(*pReferences);
-									fp_TryDeletePending();
-								}
-								, pState->m_MainTransaction
-								, fg_Move(Transaction)
+								pState.f_Clear();
+								--(*pReferences);
+								fp_TryDeletePending();
 							}
-						;
+							, pState->m_MainTransaction
+							, fg_Move(Transaction)
+						}
+					;
 #else
-						co_return DMibErrorInstance("Workaround analyzer bug");
+					co_return DMibErrorInstance("Workaround analyzer bug");
 #endif
-					}
-					catch (NException::CException const &)
-					{
-						co_return NException::fg_CurrentException();
-					}
 				}
 			)
 		;
@@ -429,34 +406,29 @@ namespace NMib::NDatabase
 		if (f_IsDestroyed())
 			co_return DMibErrorInstance("Database actor destroyed");
 
-		try
-		{
-			CDatabaseStatistics Stats;
-			Stats = mp_DatabaseEnvironment.f_Statistics();
+		auto CaptureScope = co_await g_CaptureExceptions;
 
-			auto ReadTransaction = co_await f_OpenTransactionRead();
+		CDatabaseStatistics Stats;
+		Stats = mp_DatabaseEnvironment.f_Statistics();
 
-			if (!ReadTransaction.f_HasDatabases())
-				co_return Stats;
+		auto ReadTransaction = co_await f_OpenTransactionRead();
 
-			auto Databases = ReadTransaction.f_EnumDatabases();
-			for (auto &Database : Databases)
-			{
-				auto DatabaseTransaction = ReadTransaction.f_OpenDatabaseTransaction(Database);
-				auto DbStats = DatabaseTransaction.f_DatabaseStatistics();
-				Stats.m_PageSize = fg_Max(Stats.m_PageSize, DbStats.m_PageSize);
-				Stats.m_nLeafPages += DbStats.m_nLeafPages;
-				Stats.m_nBranchPages += DbStats.m_nBranchPages;
-				Stats.m_nOverflowPages += DbStats.m_nOverflowPages;
-				Stats.m_nDataItems += DbStats.m_nDataItems;
-			}
-
+		if (!ReadTransaction.f_HasDatabases())
 			co_return Stats;
-		}
-		catch (NException::CException const &)
+
+		auto Databases = ReadTransaction.f_EnumDatabases();
+		for (auto &Database : Databases)
 		{
-			co_return NException::fg_CurrentException();
+			auto DatabaseTransaction = ReadTransaction.f_OpenDatabaseTransaction(Database);
+			auto DbStats = DatabaseTransaction.f_DatabaseStatistics();
+			Stats.m_PageSize = fg_Max(Stats.m_PageSize, DbStats.m_PageSize);
+			Stats.m_nLeafPages += DbStats.m_nLeafPages;
+			Stats.m_nBranchPages += DbStats.m_nBranchPages;
+			Stats.m_nOverflowPages += DbStats.m_nOverflowPages;
+			Stats.m_nDataItems += DbStats.m_nDataItems;
 		}
+
+		co_return Stats;
 	}
 
 	NConcurrency::TCFuture<bool> CDatabaseActor::f_WriteWithCompaction
@@ -498,13 +470,9 @@ namespace NMib::NDatabase
 
 	NConcurrency::TCFuture<void> CDatabaseActor::f_CommitWriteTransaction(CTransactionWrite &&_WriteTransaction)
 	{
-		try
 		{
+			auto CaptureScope = co_await g_CaptureExceptions;
 			_WriteTransaction.mp_pMainTransaction->f_Commit();
-		}
-		catch (NException::CException const &)
-		{
-			co_return NException::fg_CurrentException();
 		}
 
 		if (_WriteTransaction.mp_Subscription)
