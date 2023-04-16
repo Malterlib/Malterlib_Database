@@ -5,7 +5,7 @@
 
 #include <Mib/Core/Core>
 #include <Mib/Concurrency/ConcurrencyManager>
-#include <Mib/Concurrency/ActorSequencerAsync>
+#include <Mib/Concurrency/ActorSequencerActor>
 #include <Mib/Concurrency/ActorFunctorWeak>
 #include <Mib/Database/Database>
 
@@ -117,7 +117,8 @@ namespace NMib::NDatabase
 		NContainer::TCVector<COldEnvironment> mp_OldDatabaseEnvironments;
 		CDatabaseSub mp_Database;
 		NStorage::TCSharedPointer<NConcurrency::CCanDestroyTracker> mp_pCanDestroyTracker = fg_Construct();
-		NConcurrency::TCActorSequencerAsync<CTransactionWrite> mp_WriteSequencer;
+		
+		NConcurrency::TCSequencer<CTransactionWrite> mp_WriteSequencer{"DatabaseActor WriteSequencer"};
 		NContainer::TCVector<NConcurrency::TCPromise<void>> mp_WaitingForReaders;
 		mint mp_CompactionSequence = 0;
 		mint mp_nReaders = 0;

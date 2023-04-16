@@ -268,7 +268,7 @@ namespace NMib::NDatabase
 	TCFuture<void> CDatabaseActor::fp_Destroy()
 	{
 		TCActorResultVector<void> Destroys;
-		mp_WriteSequencer.f_Abort() > Destroys.f_AddResult();
+		fg_Move(mp_WriteSequencer).f_Destroy() > Destroys.f_AddResult();
 
 		auto pTracker = fg_Move(mp_pCanDestroyTracker);
 		pTracker->f_Future() > Destroys.f_AddResult();
@@ -361,9 +361,9 @@ namespace NMib::NDatabase
 			CDatabaseWriteTransaction m_MainTransaction;
 		};
 
-		co_return co_await
+		co_return co_await mp_WriteSequencer.f_RunSequenced
 			(
-				mp_WriteSequencer / [this](CActorSubscription &&_SequencerSubscription) -> TCFuture<CTransactionWrite>
+				g_ActorFunctorWeak / [this](CActorSubscription &&_SequencerSubscription) -> TCFuture<CTransactionWrite>
 				{
 					if (f_IsDestroyed())
 						co_return DMibErrorInstance("Database actor destroyed");
