@@ -1772,7 +1772,6 @@ namespace NMib::NDatabase::NPrivate
 	int mdb_cursor_next(MDB_cursor *mc, CDatabaseValue *key, CDatabaseValue *data, EDatabaseCursorGet op)
 	{
 		DMibFastCheck(key);
-		DMibFastCheck(data);
 		MDB_page	*mp;
 		MDB_node	*leaf;
 		int rc;
@@ -1863,7 +1862,6 @@ namespace NMib::NDatabase::NPrivate
 	int mdb_cursor_prev(MDB_cursor *mc, CDatabaseValue *key, CDatabaseValue *data, EDatabaseCursorGet op)
 	{
 		DMibFastCheck(key);
-		DMibFastCheck(data);
 
 		MDB_page	*mp;
 		MDB_node	*leaf;
