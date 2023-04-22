@@ -11,6 +11,7 @@
 #include "Malterlib_Database_DatabaseValue_Map.hpp"
 #include "Malterlib_Database_DatabaseValue_Tuple.hpp"
 #include "Malterlib_Database_DatabaseValue_Variant.hpp"
+#include "Malterlib_Database_DatabaseValue_Optional.hpp"
 #include "Malterlib_Database_DatabaseValue_Time.hpp"
 #include "Malterlib_Database_DatabaseValue_Descending.hpp"
 #include "Malterlib_Database_DatabaseValue_Private.hpp"
