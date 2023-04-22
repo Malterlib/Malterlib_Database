@@ -5,6 +5,7 @@
 
 #include <Mib/Concurrency/ActorSubscription>
 #include <Mib/Concurrency/ActorFunctor>
+#include <Mib/Concurrency/LogError>
 
 namespace NMib::NDatabase
 {
@@ -267,14 +268,17 @@ namespace NMib::NDatabase
 
 	TCFuture<void> CDatabaseActor::fp_Destroy()
 	{
-		TCActorResultVector<void> Destroys;
-		fg_Move(mp_WriteSequencer).f_Destroy() > Destroys.f_AddResult();
+		CLogError LogError("Database");
+		{
+			TCActorResultVector<void> Destroys;
+			fg_Move(mp_WriteSequencer).f_Destroy() > Destroys.f_AddResult();
 
-		auto pTracker = fg_Move(mp_pCanDestroyTracker);
-		pTracker->f_Future() > Destroys.f_AddResult();
-		pTracker.f_Clear();
+			auto pTracker = fg_Move(mp_pCanDestroyTracker);
+			pTracker->f_Future() > Destroys.f_AddResult();
+			pTracker.f_Clear();
 
-		co_await Destroys.f_GetResults();
+			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy can destroy tracker or write sequencer");
+		}
 
 		fp_TryDeletePending();
 
