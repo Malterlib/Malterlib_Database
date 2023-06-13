@@ -12,26 +12,44 @@ namespace NMib::NDatabase
 	using namespace NConcurrency;
 	using namespace NStorage;
 	using namespace NFile;
+	using namespace NStr;
 
-	TCFuture<void> CDatabaseActor::f_OpenDatabase(NStr::CStr const &_Directory, uint64 _MaxSize)
+	TCFuture<void> CDatabaseActor::f_OpenDatabase(CStr const &_Directory, uint64 _MaxSize)
 	{
-		return TCFuture<void>::fs_RunProtected() / [&]
+		if (mp_bOpened)
+			co_return DMibErrorInstance("Database has already been opened");
+
+		mp_bOpened = true;
+
+		auto Cleanup = g_OnScopeExit / [&]
 			{
-				if (mp_bOpened)
-					DMibError("Database has already been opened");
-				CFile::fs_CreateDirectory(_Directory);
-				mp_DatabaseEnvironment.f_SetMapSize(_MaxSize);
-				auto Attribs = EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid;
-				mp_DatabaseEnvironment.f_Open(_Directory, EDatabaseEnvironmentFlag_NoTls, Attribs);
-				auto Transaction = mp_DatabaseEnvironment.f_BeginWriteTransaction();
-				mp_Database = Transaction.f_OpenDatabase();
-				Transaction.f_Commit();
-				mp_bOpened = true;
+				mp_bOpened = false;
 			}
 		;
+
+		mp_WriteActor = fg_Construct(fg_Construct(), "{} (Write)"_f << ((CSeparateThreadActorHolder *)self.m_pThis.f_Get())->f_GetThreadName());
+
+		co_await
+			(
+				g_Dispatch(mp_WriteActor) / [this, _Directory, _MaxSize]
+				{
+					CFile::fs_CreateDirectory(_Directory);
+					mp_DatabaseEnvironment.f_SetMapSize(_MaxSize);
+					auto Attribs = EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid;
+					mp_DatabaseEnvironment.f_Open(_Directory, EDatabaseEnvironmentFlag_NoTls, Attribs);
+					auto Transaction = mp_DatabaseEnvironment.f_BeginWriteTransaction();
+					mp_Database = Transaction.f_OpenDatabase();
+					Transaction.f_Commit();
+				}
+			)
+		;
+
+		Cleanup.f_Clear();
+
+		co_return {};
 	}
 
-	NConcurrency::TCFuture<void> CDatabaseActor::f_Compact(CTransactionWrite &&_WriteTransaction, uint64 _MaxSize)
+	TCFuture<void> CDatabaseActor::f_Compact(CTransactionWrite &&_WriteTransaction, uint64 _MaxSize)
 	{
 		if (!mp_bOpened)
 			co_return DMibErrorInstance("Database has not been opened");
@@ -39,85 +57,92 @@ namespace NMib::NDatabase
 		if (f_IsDestroyed())
 			co_return DMibErrorInstance("Database actor destroyed");
 
-		using namespace NStr;
-
-		CStr OriginalPath = mp_DatabaseEnvironment.f_GetPath();
-		CStr CompactTempPath = OriginalPath + ".compact";
-		CStr TempDeletePath = OriginalPath + ".tempdelete";
-
 		if (!_MaxSize)
 			_MaxSize = mp_DatabaseEnvironment.f_SizeStatistics().m_MapSize;
 
-		CDatabaseEnvironment NewDatabaseEnvironment;
-		CDatabaseWriteTransaction OutTransaction;
-		CDatabaseSub OutDatabase;
-		{
-			auto CaptureScope = co_await g_CaptureExceptions.f_Specific<CExceptionFile>();
+		co_await
+			(
+				g_Dispatch(mp_WriteActor) / [this, pCanDestroy = mp_pCanDestroyTracker, WriteTransaction = fg_Move(_WriteTransaction), _MaxSize]() mutable -> TCFuture<void>
+				{
+					CStr OriginalPath = mp_DatabaseEnvironment.f_GetPath();
+					CStr CompactTempPath = OriginalPath + ".compact";
+					CStr TempDeletePath = OriginalPath + ".tempdelete";
 
-			if (CFile::fs_FileExists(CompactTempPath))
-				CFile::fs_DeleteDirectoryRecursive(CompactTempPath);
+					CDatabaseEnvironment NewDatabaseEnvironment;
+					CDatabaseWriteTransaction OutTransaction;
+					CDatabaseSub OutDatabase;
+					{
+						auto CaptureScope = co_await g_CaptureExceptions.f_Specific<CExceptionFile>();
 
-			mint iDisambiguate = 0;
-			while (CFile::fs_FileExists(TempDeletePath))
-				TempDeletePath = OriginalPath + CStr(".tempdelete{}"_f << iDisambiguate++);
+						if (CFile::fs_FileExists(CompactTempPath))
+							CFile::fs_DeleteDirectoryRecursive(CompactTempPath);
 
-			CFile::fs_CreateDirectory(CompactTempPath);
+						mint iDisambiguate = 0;
+						while (CFile::fs_FileExists(TempDeletePath))
+							TempDeletePath = OriginalPath + CStr(".tempdelete{}"_f << iDisambiguate++);
 
-			NewDatabaseEnvironment.f_SetMapSize(_MaxSize);
-			auto Attribs = EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid;
-			NewDatabaseEnvironment.f_Open(CompactTempPath, EDatabaseEnvironmentFlag_NoTls, Attribs);
-			OutTransaction = NewDatabaseEnvironment.f_BeginWriteTransaction();
-			OutDatabase = OutTransaction.f_OpenDatabase();
+						CFile::fs_CreateDirectory(CompactTempPath);
 
-		}
+						NewDatabaseEnvironment.f_SetMapSize(_MaxSize);
+						auto Attribs = EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid;
+						NewDatabaseEnvironment.f_Open(CompactTempPath, EDatabaseEnvironmentFlag_NoTls, Attribs);
+						OutTransaction = NewDatabaseEnvironment.f_BeginWriteTransaction();
+						OutDatabase = OutTransaction.f_OpenDatabase();
 
-		{
-			auto CaptureScope = co_await g_CaptureExceptions;
-			{
-				auto Transaction = OutDatabase.f_Transaction(OutTransaction);
-				auto iOut = Transaction.f_WriteCursor();
-				auto iSource = _WriteTransaction.m_Transaction.f_ReadCursor();
-				iSource.f_First();
-				for (; iSource; ++iSource)
-					iOut.f_Insert(iSource.f_Key(), iSource.f_Value());
-			}
+					}
 
-			OutTransaction.f_Commit();
-		}
+					{
+						auto CaptureScope = co_await g_CaptureExceptions;
+						{
+							auto Transaction = OutDatabase.f_Transaction(OutTransaction);
+							auto iOut = Transaction.f_WriteCursor();
+							auto iSource = WriteTransaction.m_Transaction.f_ReadCursor();
+							iSource.f_First();
+							for (; iSource; ++iSource)
+								iOut.f_Insert(iSource.f_Key(), iSource.f_Value());
+						}
 
-		NewDatabaseEnvironment.f_Close();
+						OutTransaction.f_Commit();
+					}
 
-		{
-			auto CaptureScope = co_await g_CaptureExceptions.f_Specific<CExceptionFile>();
+					NewDatabaseEnvironment.f_Close();
 
-			CFile::fs_CreateDirectory(TempDeletePath);
+					{
+						auto CaptureScope = co_await g_CaptureExceptions.f_Specific<CExceptionFile>();
 
-			CFile::fs_RenameFile(OriginalPath / "MalterlibDB.lock", TempDeletePath / "MalterlibDB.lock");
-			CFile::fs_RenameFile(OriginalPath / "MalterlibDB.mibdb", TempDeletePath / "MalterlibDB.mibdb");
+						CFile::fs_CreateDirectory(TempDeletePath);
 
-			CFile::fs_RenameFile(CompactTempPath / "MalterlibDB.lock", OriginalPath / "MalterlibDB.lock");
-			CFile::fs_RenameFile(CompactTempPath / "MalterlibDB.mibdb", OriginalPath / "MalterlibDB.mibdb");
+						CFile::fs_RenameFile(OriginalPath / "MalterlibDB.lock", TempDeletePath / "MalterlibDB.lock");
+						CFile::fs_RenameFile(OriginalPath / "MalterlibDB.mibdb", TempDeletePath / "MalterlibDB.mibdb");
 
-			CFile::fs_DeleteDirectory(CompactTempPath);
-		}
+						CFile::fs_RenameFile(CompactTempPath / "MalterlibDB.lock", OriginalPath / "MalterlibDB.lock");
+						CFile::fs_RenameFile(CompactTempPath / "MalterlibDB.mibdb", OriginalPath / "MalterlibDB.mibdb");
 
-		auto &OldEnvironment = mp_OldDatabaseEnvironments.f_Insert();
-		OldEnvironment.m_DatabaseEnvironment = fg_Move(fg_Move(mp_DatabaseEnvironment));
-		OldEnvironment.m_TempDeletePath = TempDeletePath;
+						CFile::fs_DeleteDirectory(CompactTempPath);
+					}
 
-		{
-			auto CaptureScope = co_await g_CaptureExceptions;
+					auto &OldEnvironment = mp_OldDatabaseEnvironments.f_Insert();
+					OldEnvironment.m_DatabaseEnvironment = fg_Move(fg_Move(mp_DatabaseEnvironment));
+					OldEnvironment.m_TempDeletePath = TempDeletePath;
 
-			mp_DatabaseEnvironment = {};
-			mp_DatabaseEnvironment.f_SetMapSize(_MaxSize);
-			auto Attribs = EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid;
-			mp_DatabaseEnvironment.f_Open(OriginalPath, EDatabaseEnvironmentFlag_NoTls, Attribs);
-			auto Transaction = mp_DatabaseEnvironment.f_BeginWriteTransaction();
-			mp_Database = Transaction.f_OpenDatabase();
-			Transaction.f_Commit();
-		}
+					{
+						auto CaptureScope = co_await g_CaptureExceptions;
 
-		++mp_CompactionSequence;
+						mp_DatabaseEnvironment = {};
+						mp_DatabaseEnvironment.f_SetMapSize(_MaxSize);
+						auto Attribs = EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid;
+						mp_DatabaseEnvironment.f_Open(OriginalPath, EDatabaseEnvironmentFlag_NoTls, Attribs);
+						auto Transaction = mp_DatabaseEnvironment.f_BeginWriteTransaction();
+						mp_Database = Transaction.f_OpenDatabase();
+						Transaction.f_Commit();
+					}
+
+					++mp_CompactionSequence;
+
+					co_return {};
+				}
+			)
+		;
 
 		co_return {};
 	}
@@ -194,7 +219,7 @@ namespace NMib::NDatabase
 		return mp_pMainTransaction->f_HasDatabases();
 	}
 
-	NContainer::TCSet<NStr::CStr> CDatabaseActor::CTransactionRead::f_EnumDatabases()
+	NContainer::TCSet<CStr> CDatabaseActor::CTransactionRead::f_EnumDatabases()
 	{
 		return mp_pMainTransaction->f_EnumDatabases();
 	}
@@ -261,13 +286,15 @@ namespace NMib::NDatabase
 		return mp_pMainTransaction->f_HasDatabases();
 	}
 
-	NContainer::TCSet<NStr::CStr> CDatabaseActor::CTransactionWrite::f_EnumDatabases()
+	NContainer::TCSet<CStr> CDatabaseActor::CTransactionWrite::f_EnumDatabases()
 	{
 		return mp_pMainTransaction->f_EnumDatabases();
 	}
 
 	TCFuture<void> CDatabaseActor::fp_Destroy()
 	{
+		mp_bDestroyed.f_Exchange(true);
+
 		CLogError LogError("Database");
 		{
 			TCActorResultVector<void> Destroys;
@@ -280,12 +307,14 @@ namespace NMib::NDatabase
 			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy can destroy tracker or write sequencer");
 		}
 
+		co_await fg_Move(mp_WriteActor).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy write actor");
+
 		fp_TryDeletePending();
 
 		co_return {};
 	}
 
-	NConcurrency::TCFuture<void> CDatabaseActor::f_WaitForAllReaders()
+	TCFuture<void> CDatabaseActor::f_WaitForAllReaders()
 	{
 		if (mp_nReaders == 0)
 			co_return {};
@@ -296,7 +325,7 @@ namespace NMib::NDatabase
 		co_return {};
 	}
 
-	NConcurrency::TCFuture<mint> CDatabaseActor::f_CheckForStaleReaders()
+	TCFuture<mint> CDatabaseActor::f_CheckForStaleReaders()
 	{
 		co_return mp_DatabaseEnvironment.f_CheckForStaleReaders();
 	}
@@ -367,9 +396,9 @@ namespace NMib::NDatabase
 
 		co_return co_await mp_WriteSequencer.f_RunSequenced
 			(
-				g_ActorFunctorWeak / [this](CActorSubscription &&_SequencerSubscription) -> TCFuture<CTransactionWrite>
+				g_ActorFunctorWeak(mp_WriteActor) / [this, pCanDestroy = mp_pCanDestroyTracker](CActorSubscription &&_SequencerSubscription) mutable -> TCFuture<CTransactionWrite>
 				{
-					if (f_IsDestroyed())
+					if (mp_bDestroyed.f_Load())
 						co_return DMibErrorInstance("Database actor destroyed");
 
 					auto CaptureScope = co_await g_CaptureExceptions;
@@ -384,7 +413,7 @@ namespace NMib::NDatabase
 #ifndef DMibClangAnalyzerWorkaround
 					co_return CTransactionWrite
 						{
-							g_ActorSubscription / [this, pReferences, pState, SequencerSubscription = fg_Move(_SequencerSubscription), pCanDestroy = mp_pCanDestroyTracker]() mutable
+							g_ActorSubscription / [this, pReferences, pState, SequencerSubscription = fg_Move(_SequencerSubscription), pCanDestroy = fg_Move(pCanDestroy)]() mutable
 							{
 								pState.f_Clear();
 								--(*pReferences);
@@ -402,7 +431,7 @@ namespace NMib::NDatabase
 		;
 	}
 
-	NConcurrency::TCFuture<CDatabaseStatistics> CDatabaseActor::f_GetAggregateStatistics()
+	TCFuture<CDatabaseStatistics> CDatabaseActor::f_GetAggregateStatistics()
 	{
 		if (!mp_bOpened)
 			co_return DMibErrorInstance("Database has not been opened");
@@ -435,10 +464,7 @@ namespace NMib::NDatabase
 		co_return Stats;
 	}
 
-	NConcurrency::TCFuture<bool> CDatabaseActor::f_WriteWithCompaction
-		(
-			NConcurrency::TCActorFunctorWeak<NConcurrency::TCFuture<CTransactionWrite> (CTransactionWrite &&_Transaction, bool _bCompacting)> &&_fDoWork
-		)
+	TCFuture<bool> CDatabaseActor::f_WriteWithCompaction(TCActorFunctorWeak<TCFuture<CTransactionWrite> (CTransactionWrite &&_Transaction, bool _bCompacting)> &&_fDoWork)
 	{
 		auto fDoWrite = g_ActorFunctor / [OriginalCompactionSequence = mp_CompactionSequence, this, fDoWork = fg_Move(_fDoWork)](bool _bCompact) -> TCFuture<bool>
 			{
@@ -472,20 +498,29 @@ namespace NMib::NDatabase
 		co_return *Result;
 	}
 
-	NConcurrency::TCFuture<void> CDatabaseActor::f_CommitWriteTransaction(CTransactionWrite &&_WriteTransaction)
+	TCFuture<void> CDatabaseActor::f_CommitWriteTransaction(CTransactionWrite &&_WriteTransaction)
 	{
-		{
-			auto CaptureScope = co_await g_CaptureExceptions;
-			_WriteTransaction.mp_pMainTransaction->f_Commit();
-		}
+		co_await
+			(
+				g_Dispatch(mp_WriteActor) / [WriteTransaction = fg_Move(_WriteTransaction), pCanDestroy = mp_pCanDestroyTracker]() mutable -> TCFuture<void>
+				{
+					{
+						auto CaptureScope = co_await g_CaptureExceptions;
+						WriteTransaction.mp_pMainTransaction->f_Commit();
+					}
 
-		if (_WriteTransaction.mp_Subscription)
-			co_await _WriteTransaction.mp_Subscription->f_Destroy();
+					if (WriteTransaction.mp_Subscription)
+						co_await WriteTransaction.mp_Subscription->f_Destroy();
+
+					co_return {};
+				}
+			)
+		;
 
 		co_return {};
 	}
 
-	NConcurrency::TCFuture<CDatabaseStatistics> CDatabaseActor::f_Statistics()
+	TCFuture<CDatabaseStatistics> CDatabaseActor::f_Statistics()
 	{
 		if (!mp_bOpened)
 			co_return DMibErrorInstance("Database has not been opened");
@@ -496,7 +531,7 @@ namespace NMib::NDatabase
 		co_return mp_DatabaseEnvironment.f_Statistics();
 	}
 
-	NConcurrency::TCFuture<CDatabaseSizeStatistics> CDatabaseActor::f_SizeStatistics()
+	TCFuture<CDatabaseSizeStatistics> CDatabaseActor::f_SizeStatistics()
 	{
 		if (!mp_bOpened)
 			co_return DMibErrorInstance("Database has not been opened");
@@ -507,7 +542,7 @@ namespace NMib::NDatabase
 		co_return mp_DatabaseEnvironment.f_SizeStatistics();
 	}
 
-	NConcurrency::TCFuture<CDatabaseEnvironmentInfo> CDatabaseActor::f_Info()
+	TCFuture<CDatabaseEnvironmentInfo> CDatabaseActor::f_Info()
 	{
 		if (!mp_bOpened)
 			co_return DMibErrorInstance("Database has not been opened");
@@ -518,7 +553,7 @@ namespace NMib::NDatabase
 		co_return mp_DatabaseEnvironment.f_Info();
 	}
 
-	NConcurrency::TCFuture<NStr::CStr> CDatabaseActor::f_GetPath()
+	TCFuture<CStr> CDatabaseActor::f_GetPath()
 	{
 		if (!mp_bOpened)
 			co_return DMibErrorInstance("Database has not been opened");

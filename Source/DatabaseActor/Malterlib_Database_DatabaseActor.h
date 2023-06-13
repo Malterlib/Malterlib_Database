@@ -117,7 +117,10 @@ namespace NMib::NDatabase
 		NContainer::TCVector<COldEnvironment> mp_OldDatabaseEnvironments;
 		CDatabaseSub mp_Database;
 		NStorage::TCSharedPointer<NConcurrency::CCanDestroyTracker> mp_pCanDestroyTracker = fg_Construct();
-		
+
+		NAtomic::TCAtomic<bool> mp_bDestroyed;
+		NConcurrency::TCActor<NConcurrency::CSeparateThreadActor> mp_WriteActor;
+
 		NConcurrency::TCSequencer<CTransactionWrite> mp_WriteSequencer{"DatabaseActor WriteSequencer"};
 		NContainer::TCVector<NConcurrency::TCPromise<void>> mp_WaitingForReaders;
 		mint mp_CompactionSequence = 0;

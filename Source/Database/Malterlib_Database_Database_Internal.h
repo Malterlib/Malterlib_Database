@@ -1628,7 +1628,7 @@ namespace NMib::NDatabase
 		uint32 me_rpcheck;
 	#endif
 		mint m_LockedThreadID = 0;
-		mint m_nReferences = 0;
+		NAtomic::TCAtomic<mint> m_nReferences = 0;
 		// Publics
 		NDatabase::CDatabaseTransactionCommon mdb_txn_begin(NPrivate::MDB_txn *parent, uint32 flags);
 		void mdb_dbi_close(CDatabaseSubID dbi);

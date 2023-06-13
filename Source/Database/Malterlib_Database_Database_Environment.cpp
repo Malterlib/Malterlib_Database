@@ -611,7 +611,7 @@ namespace NMib::NDatabase
 		return (void *)(mint)Environment.me_fd;
 	}
 
-	mint *CDatabaseEnvironment::f_GetReferencesPointer()
+	NAtomic::TCAtomic<mint> *CDatabaseEnvironment::f_GetReferencesPointer()
 	{
 		auto &Environment = *mp_pEnvironment;
 		return &Environment.m_nReferences;

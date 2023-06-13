@@ -175,7 +175,7 @@ namespace NMib::NDatabase
 		void f_SetMapSize(CDatabaseOffset _Size);
 		void f_SetMaxDatabases(CDatabaseSubID _DatabaseID);
 
-		mint *f_GetReferencesPointer();
+		NAtomic::TCAtomic<mint> *f_GetReferencesPointer();
 
 		NContainer::TCVector<CDatabaseReaderInfo> f_GetReaderInfos();
 
