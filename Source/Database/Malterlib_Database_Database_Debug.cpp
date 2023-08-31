@@ -57,6 +57,7 @@ namespace NMib::NDatabase::NPrivate
 		char *ptr = buf;
 		unsigned char *c = (unsigned char *)key->m_pData;
 		uint32 i;
+		size_t buf_len = DKBUF_MAXKEYSIZE*2;
 
 		if (!key)
 			return "";
@@ -69,7 +70,11 @@ namespace NMib::NDatabase::NPrivate
 	#if 1
 		buf[0] = '\0';
 		for (i=0; i<key->m_Size; i++)
-			ptr += sprintf(ptr, "%02x", *c++);
+		{
+			auto *pPrevPtr = ptr;
+			ptr += snprintf(ptr, buf_len, "%02x", *c++);
+			buf_len -= ptr - pPrevPtr;
+		}
 	#else
 		sprintf(buf, "%.*s", key->m_Size, key->m_pData);
 	#endif
