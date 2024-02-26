@@ -56,8 +56,6 @@ namespace NMib::NDatabase
 	{
 		NStorage::TCUniquePointer<CDatabaseEnvironment_Internal> pEnvironment = fg_Construct();
 
-		NMemory::fg_MemClear(*pEnvironment);
-
 		pEnvironment->m_MaxReaders = DEFAULT_READERS;
 		pEnvironment->me_maxdbs = CORE_DBS;
 		pEnvironment->me_numdbs = CORE_DBS;
