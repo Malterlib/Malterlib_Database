@@ -273,6 +273,7 @@ namespace NMib::NDatabase
 		union semun semu;
 	#endif
 		off_t size, rsize;
+		int error_location = 0;
 
 		NStr::CStr LockPath = mdb_getfilename(_LockPath, MDB_O_LOCKS);
 		{
@@ -313,16 +314,26 @@ namespace NMib::NDatabase
 	#else
 		size = lseek(me_lfd, 0, SEEK_END);
 		if (size == -1)
+		{
+			error_location = 1;
 			goto fail_errno;
+		}
 	#endif
 		rsize = (m_MaxReaders-1) * sizeof(MDB_reader) + sizeof(CLocksMemoryMap);
 		if (size < rsize && *excl > 0) {
 	#ifdef DPlatformFamily_Windows
 			if (SetFilePointer(me_lfd, rsize, nullptr, FILE_BEGIN) != (DWORD)rsize
 				|| !SetEndOfFile(me_lfd))
+			{
+				error_location = 2;
 				goto fail_errno;
+			}
 	#else
-			if (ftruncate(me_lfd, rsize) != 0) goto fail_errno;
+			if (ftruncate(me_lfd, rsize) != 0)
+			{
+				error_location = 3;
+				goto fail_errno;
+			}
 	#endif
 		} else {
 			rsize = size;
@@ -334,14 +345,26 @@ namespace NMib::NDatabase
 			HANDLE mh;
 			mh = CreateFileMapping(me_lfd, nullptr, PAGE_READWRITE,
 				0, 0, nullptr);
-			if (!mh) goto fail_errno;
+			if (!mh)
+			{
+				error_location = 4;
+				goto fail_errno;
+			}
 			m_pLocksMemoryMap = (NPrivate::CLocksMemoryMap *)MapViewOfFileEx(mh, FILE_MAP_WRITE, 0, 0, rsize, nullptr);
 			CloseHandle(mh);
-			if (!m_pLocksMemoryMap) goto fail_errno;
+			if (!m_pLocksMemoryMap)
+			{
+				error_location = 5;
+				goto fail_errno;
+			}
 	#else
 			void *m = mmap(nullptr, rsize, PROT_READ|PROT_WRITE, MAP_SHARED,
 				me_lfd, 0);
-			if (m == MAP_FAILED) goto fail_errno;
+			if (m == MAP_FAILED)
+			{
+				error_location = 6;
+				goto fail_errno;
+			}
 			m_pLocksMemoryMap = (CLocksMemoryMap	*)m;
 	#endif
 		}
@@ -365,16 +388,28 @@ namespace NMib::NDatabase
 				mdb_all_sa.lpSecurityDescriptor = &mdb_null_sd;
 				mdb_sec_inited = 1;
 			}
-			if (!GetFileInformationByHandle(me_lfd, &stbuf)) goto fail_errno;
+			if (!GetFileInformationByHandle(me_lfd, &stbuf))
+			{
+				error_location = 7;
+				goto fail_errno;
+			}
 			idbuf.volume = stbuf.dwVolumeSerialNumber;
 			idbuf.nhigh  = stbuf.nFileIndexHigh;
 			idbuf.nlow   = stbuf.nFileIndexLow;
 			m_pLocksMemoryMap->m_TransactionBody.mtb_mutexid = mdb_hash(&idbuf, sizeof(idbuf));
 			mdb_env_mname_init(this);
 			me_rmutex = CreateMutexA(&mdb_all_sa, FALSE, MUTEXNAME(this, 'r'));
-			if (!me_rmutex) goto fail_errno;
+			if (!me_rmutex)
+			{
+				error_location = 8;
+				goto fail_errno;
+			}
 			me_wmutex = CreateMutexA(&mdb_all_sa, FALSE, MUTEXNAME(this, 'w'));
-			if (!me_wmutex) goto fail_errno;
+			if (!me_wmutex)
+			{
+				error_location = 9;
+				goto fail_errno;
+			}
 	#elif defined(MDB_USE_POSIX_SEM)
 			struct stat stbuf;
 			struct {
@@ -385,7 +420,11 @@ namespace NMib::NDatabase
 	#if defined(__NetBSD__)
 	#define	MDB_SHORT_SEMNAMES	1	/* limited to 14 chars */
 	#endif
-			if (fstat(me_lfd, &stbuf)) goto fail_errno;
+			if (fstat(me_lfd, &stbuf))
+			{
+				error_location = 10;
+				goto fail_errno;
+			}
 			memset(&idbuf, 0, sizeof(idbuf));
 			idbuf.dev = stbuf.st_dev;
 			idbuf.ino = stbuf.st_ino;
@@ -404,20 +443,37 @@ namespace NMib::NDatabase
 			sem_unlink(MUTEXNAME(this, 'r'));
 			sem_unlink(MUTEXNAME(this, 'w'));
 			me_rmutex = sem_open(MUTEXNAME(this, 'r'), O_CREAT|O_EXCL, mode, 1);
-			if (me_rmutex == SEM_FAILED) goto fail_errno;
+			if (me_rmutex == SEM_FAILED)
+			{
+				error_location = 11;
+				goto fail_errno;
+			}
 			me_wmutex = sem_open(MUTEXNAME(this, 'w'), O_CREAT|O_EXCL, mode, 1);
-			if (me_wmutex == SEM_FAILED) goto fail_errno;
+			if (me_wmutex == SEM_FAILED)
+			{
+				error_location = 12;
+				goto fail_errno;
+			}
 	#elif defined(MDB_USE_SYSV_SEM)
 			unsigned short vals[2] = {1, 1};
 			key_t key = ftok(LockPath.f_GetStr(), 'M'); /* fname is lockfile path now */
 			if (key == -1)
+			{
+				error_location = 13;
 				goto fail_errno;
+			}
 			semid = semget(key, 2, (mode & 0777) | IPC_CREAT);
 			if (semid < 0)
+			{
+				error_location = 14;
 				goto fail_errno;
+			}
 			semu.array = vals;
 			if (semctl(semid, 0, SETALL, semu) < 0)
+			{
+				error_location = 15;
 				goto fail_errno;
+			}
 			m_pLocksMemoryMap->m_TransactionBody.mtb_semid = semid;
 			m_pLocksMemoryMap->m_TransactionBody.mtb_rlocked = 0;
 			m_pLocksMemoryMap->m_WriteLock = 0;
@@ -473,29 +529,51 @@ namespace NMib::NDatabase
 			{
 				int rc = ErrCode();
 				if (rc && rc != EACCES && rc != EAGAIN)
-					DMibError(NStr::fg_Format("Error setting up locks: {}", mdb_strerror(rc)));
+					DMibError(NStr::fg_Format("Error setting up locks (non-exclusive): {}", mdb_strerror(rc)));
 			}
 	#ifdef DPlatformFamily_Windows
 			mdb_env_mname_init(this);
 			me_rmutex = OpenMutexA(SYNCHRONIZE, FALSE, MUTEXNAME(this, 'r'));
-			if (!me_rmutex) goto fail_errno;
+			if (!me_rmutex)
+			{
+				error_location = 16;
+				goto fail_errno;
+			}
 			me_wmutex = OpenMutexA(SYNCHRONIZE, FALSE, MUTEXNAME(this, 'w'));
-			if (!me_wmutex) goto fail_errno;
+			if (!me_wmutex) 
+			{
+				error_location = 17;
+				goto fail_errno;
+			}
 	#elif defined(MDB_USE_POSIX_SEM)
 			mdb_env_mname_init(this);
 			me_rmutex = sem_open(MUTEXNAME(this, 'r'), 0);
-			if (me_rmutex == SEM_FAILED) goto fail_errno;
+			if (me_rmutex == SEM_FAILED)
+			{
+				error_location = 18;
+				goto fail_errno;
+			}
 			me_wmutex = sem_open(MUTEXNAME(this, 'w'), 0);
-			if (me_wmutex == SEM_FAILED) goto fail_errno;
+			if (me_wmutex == SEM_FAILED) 
+			{
+				error_location = 19;
+				goto fail_errno;
+			}
 	#elif defined(MDB_USE_SYSV_SEM)
 			semid = m_pLocksMemoryMap->m_TransactionBody.mtb_semid;
 			semu.buf = &buf;
 			/* check for read access */
 			if (semctl(semid, 0, IPC_STAT, semu) < 0)
+			{
+				error_location = 20;
 				goto fail_errno;
+			}
 			/* check for write access */
 			if (semctl(semid, 0, IPC_SET, semu) < 0)
+			{
+				error_location = 21;
 				goto fail_errno;
+			}
 	#endif
 		}
 	#ifdef MDB_USE_SYSV_SEM
@@ -512,7 +590,7 @@ namespace NMib::NDatabase
 	fail_errno:
 		{
 			int rc = ErrCode();
-			DMibError(NStr::fg_Format("Error setting up locks: {}", mdb_strerror(rc)));
+			DMibError(NStr::fg_Format("Error setting up locks ({}): {}", error_location, mdb_strerror(rc)));
 		}
 	}
 
