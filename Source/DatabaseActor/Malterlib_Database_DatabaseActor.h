@@ -13,8 +13,6 @@ namespace NMib::NDatabase
 {
 	struct CDatabaseActor : public NConcurrency::CActor
 	{
-		using CActorHolder = NConcurrency::CSeparateThreadActorHolder;
-
 		struct CTransactionRead
 		{
 			CTransactionRead(NConcurrency::CActorSubscription &&_Subscription, CDatabaseReadTransaction &_MainTransaction, CDatabaseSubReadTransaction &&_Transaction);
@@ -34,6 +32,16 @@ namespace NMib::NDatabase
 			;
 			NContainer::TCSet<NStr::CStr> f_EnumDatabases();
 
+			template <typename tf_CFunctor, typename ...tfp_CHandlers>
+			auto f_BlockingDispatch(tf_CFunctor &&_Functor, tfp_CHandlers && ...p_Handlers) && -> NConcurrency::TCFuture
+				<
+					typename NConcurrency::NPrivate::TCIsFuture
+					<
+						typename NTraits::TCMemberFunctionPointerTraits<decltype(&NTraits::TCRemoveReference<tf_CFunctor>::CType::operator ())>::CReturn
+					>::CType
+				>
+			;
+
 			CDatabaseSubReadTransaction m_Transaction; // Transaction for the unnamed main database
 
 		private:
@@ -45,7 +53,14 @@ namespace NMib::NDatabase
 
 		struct CTransactionWrite
 		{
-			CTransactionWrite(NConcurrency::CActorSubscription &&_Subscription, CDatabaseWriteTransaction &_MainTransaction, CDatabaseSubWriteTransaction &&_Transaction);
+			CTransactionWrite
+				(
+					NConcurrency::CActorSubscription &&_Subscription
+					, CDatabaseWriteTransaction &_MainTransaction
+					, CDatabaseSubWriteTransaction &&_Transaction
+					, NConcurrency::CBlockingActorCheckout &&_Checkout
+				)
+			;
 			~CTransactionWrite();
 			CTransactionWrite(CTransactionWrite &&_Other);
 			CTransactionWrite(CTransactionWrite const &_Other) = delete;
@@ -65,6 +80,8 @@ namespace NMib::NDatabase
 			NContainer::TCSet<NStr::CStr> f_EnumDatabases();
 			CDatabaseWriteTransaction f_BeginChildTransaction();
 
+			NConcurrency::CBlockingActorCheckout const &f_Checkout() const;
+
 			static CTransactionWrite fs_Empty();
 
 			bool f_IsEmpty() const;
@@ -76,6 +93,7 @@ namespace NMib::NDatabase
 			CTransactionWrite();
 
 			NConcurrency::CActorSubscription mp_Subscription;
+			NConcurrency::CBlockingActorCheckout mp_Checkout;
 			CDatabaseWriteTransaction *mp_pMainTransaction = nullptr;
 		};
 
@@ -111,7 +129,7 @@ namespace NMib::NDatabase
 
 		NConcurrency::TCFuture<void> fp_Destroy();
 
-		void fp_TryDeletePending();
+		NConcurrency::TCFuture<void> fp_TryDeletePending();
 
 		CDatabaseEnvironment mp_DatabaseEnvironment;
 		NContainer::TCVector<COldEnvironment> mp_OldDatabaseEnvironments;
@@ -119,12 +137,12 @@ namespace NMib::NDatabase
 		NStorage::TCSharedPointer<NConcurrency::CCanDestroyTracker> mp_pCanDestroyTracker = fg_Construct();
 
 		NAtomic::TCAtomic<bool> mp_bDestroyed;
-		NConcurrency::TCActor<NConcurrency::CSeparateThreadActor> mp_WriteActor;
 
-		NConcurrency::TCSequencer<CTransactionWrite> mp_WriteSequencer{"DatabaseActor WriteSequencer"};
+		NConcurrency::CSequencer mp_WriteSequencer{"DatabaseActor WriteSequencer"};
+		NConcurrency::CSequencer mp_ReadSequencer{"DatabaseActor ReadSequencer"};
 		NContainer::TCVector<NConcurrency::TCPromise<void>> mp_WaitingForReaders;
 		mint mp_CompactionSequence = 0;
-		mint mp_nReaders = 0;
+		NAtomic::TCAtomic<mint> mp_nReaders = 0;
 		bool mp_bOpened = false;
 	};
 }
@@ -132,3 +150,5 @@ namespace NMib::NDatabase
 #ifndef DMibPNoShortCuts
 	using namespace NMib::NDatabase;
 #endif
+
+#include "Malterlib_Database_DatabaseActor.hpp"

@@ -45,26 +45,25 @@ namespace NMib::NDatabase::NPrivate
 		CCompactingCopyState(MDB_env *_pEnvironment, HANDLE _DestinationFile)
 			: m_pEnvironment{_pEnvironment}
 			, m_OutputFileHandle{_DestinationFile}
+			, m_BlockingActorCheckout(fg_BlockingActor())
 		{
 		}
 
 		~CCompactingCopyState()
 		{
-			if (m_ProcessingActor)
-				fg_Move(m_ProcessingActor)->f_BlockDestroy();
 			if (m_WriteBuffers[0])
 				NMemory::fg_Free(m_WriteBuffers[0], gc_CopyBufferSize*2);
 		}
 
 		void f_Init(mint _PageSize)
 		{
-			m_ProcessingActor = fg_ConstructActor<CSeparateThreadActor>(fg_Construct("Low level DB Copy"));
 			m_WriteBuffers[0] = (uint8 *)NMemory::fg_AllocAligned(gc_CopyBufferSize*2, _PageSize);
 			NMemory::fg_MemClear(m_WriteBuffers[0], gc_CopyBufferSize*2);
 			m_WriteBuffers[1] = m_WriteBuffers[0] + gc_CopyBufferSize;
 		}
 
-		TCActor<CSeparateThreadActor> m_ProcessingActor;
+		CBlockingActorCheckout m_BlockingActorCheckout;
+
 		uint8 *m_WriteBuffers[2] = {nullptr, nullptr};
 		uint8 *m_OverflowPages[2] = {nullptr, nullptr};
 		mint m_WriteBuffersLength[2] = {0, 0};
@@ -129,14 +128,14 @@ namespace NMib::NDatabase::NPrivate
 		auto &CopyState = _CopyState;
 		mint iBuffer = CopyState.m_iBuffer;
 		// Block on last write finishing
-		fg_Dispatch(CopyState.m_ProcessingActor, []{}).f_CallSync();
+		fg_Dispatch(CopyState.m_BlockingActorCheckout.f_Actor(), []{}).f_CallSync();
 
 		if (CopyState.m_Status)
 			return CopyState.m_Status;
 
 		fg_Dispatch
 			(
-				CopyState.m_ProcessingActor
+				CopyState.m_BlockingActorCheckout.f_Actor()
 				, [pCopyState = &_CopyState, iBuffer]()
 				{
 					fg_DoBufferWrite(*pCopyState, iBuffer);
@@ -379,7 +378,7 @@ namespace NMib::NDatabase
 		CopyState.m_WriteBuffersLength[0] = me_psize * NUM_METAS;
 		CopyState.m_pInternalTransaction = pInternalTransaction;
 		fg_DispatchCopyBuffer(CopyState);
-		fg_Dispatch(CopyState.m_ProcessingActor, []{}).f_CallSync();
+		fg_Dispatch(CopyState.m_BlockingActorCheckout.f_Actor(), []{}).f_CallSync();
 		rc = fg_TraverseTreeCopyRecursive(CopyState, &root, 0);
 
 		if (rc == MDB_SUCCESS && root != new_root)
@@ -392,12 +391,13 @@ namespace NMib::NDatabase
 			rc = fg_DispatchCopyBuffer(CopyState);
 
 		// Block
-		fg_Dispatch(CopyState.m_ProcessingActor, []{}).f_CallSync();
+		fg_Dispatch(CopyState.m_BlockingActorCheckout.f_Actor(), []{}).f_CallSync();
 		if (rc)
 			DMibError(NStr::fg_Format("Error compacting database: {}", mdb_strerror(rc)));
 		
 		rc = fg_DispatchCopyBuffer(CopyState); // Get status
 		if (rc)
 			DMibError(NStr::fg_Format("Error compacting database: {}", mdb_strerror(rc)));
+		fg_Dispatch(CopyState.m_BlockingActorCheckout.f_Actor(), []{}).f_CallSync();
 	}
 }

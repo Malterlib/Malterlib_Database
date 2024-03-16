@@ -29,22 +29,28 @@ namespace NMib::NDatabase
 			}
 		;
 
-		mp_WriteActor = fg_Construct(fg_Construct(), "{} (Write)"_f << ((CSeparateThreadActorHolder *)self.m_pThis.f_Get())->f_GetThreadName());
+		auto BlockingActorCheckout = fg_BlockingActor();
 
-		co_await
+		auto [DatabaseEnvironment, Database] = co_await
 			(
-				g_Dispatch(mp_WriteActor) / [this, _Directory, _MaxSize]
+				g_Dispatch(BlockingActorCheckout) / [_Directory, _MaxSize]
 				{
 					CFile::fs_CreateDirectory(_Directory);
-					mp_DatabaseEnvironment.f_SetMapSize(_MaxSize);
+					CDatabaseEnvironment DatabaseEnvironment;
+					DatabaseEnvironment.f_SetMapSize(_MaxSize);
 					auto Attribs = EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid;
-					mp_DatabaseEnvironment.f_Open(_Directory, gc_EnvironmentFlags, Attribs);
-					auto Transaction = mp_DatabaseEnvironment.f_BeginWriteTransaction();
-					mp_Database = Transaction.f_OpenDatabase();
+					DatabaseEnvironment.f_Open(_Directory, gc_EnvironmentFlags, Attribs);
+					auto Transaction = DatabaseEnvironment.f_BeginWriteTransaction();
+					auto Database = Transaction.f_OpenDatabase();
 					Transaction.f_Commit();
+
+					return fg_Tuple(fg_Move(DatabaseEnvironment), Database);
 				}
 			)
 		;
+
+		mp_DatabaseEnvironment = fg_Move(DatabaseEnvironment);
+		mp_Database = Database;
 
 		Cleanup.f_Clear();
 
@@ -64,7 +70,7 @@ namespace NMib::NDatabase
 
 		co_await
 			(
-				g_Dispatch(mp_WriteActor) / [this, pCanDestroy = mp_pCanDestroyTracker, WriteTransaction = fg_Move(_WriteTransaction), _MaxSize]() mutable -> TCFuture<void>
+				g_Dispatch(_WriteTransaction.mp_Checkout.f_Actor()) / [this, pCanDestroy = mp_pCanDestroyTracker, WriteTransaction = fg_Move(_WriteTransaction), _MaxSize]() mutable -> TCFuture<void>
 				{
 					CStr OriginalPath = mp_DatabaseEnvironment.f_GetPath();
 					CStr CompactTempPath = OriginalPath + ".compact";
@@ -149,36 +155,53 @@ namespace NMib::NDatabase
 		co_return {};
 	}
 
-	void CDatabaseActor::fp_TryDeletePending()
+	TCFuture<void> CDatabaseActor::fp_TryDeletePending()
 	{
 		if (mp_OldDatabaseEnvironments.f_IsEmpty())
-			return;
+			co_return {};
 
-		NContainer::TCSet<mint> ToRemove;
+		NContainer::TCVector<mint> ToRemoveIndexes;
+		NContainer::TCVector<COldEnvironment> ToRemove;
 		mint iEnv = 0;
-		for (auto &Enviroment : mp_OldDatabaseEnvironments)
+		for (auto &Environment : mp_OldDatabaseEnvironments)
 		{
-			if (*Enviroment.m_DatabaseEnvironment.f_GetReferencesPointer() != 0)
+			if (*Environment.m_DatabaseEnvironment.f_GetReferencesPointer() != 0)
 				continue;
 
-			Enviroment.m_DatabaseEnvironment.f_Close();
-			ToRemove[iEnv];
-			if (CFile::fs_FileExists(Enviroment.m_TempDeletePath))
-			{
-				try
-				{
-					CFile::fs_DeleteDirectoryRecursive(Enviroment.m_TempDeletePath);
-				}
-				catch (CExceptionFile const &)
-				{
-				}
-			}
+			ToRemoveIndexes.f_Insert(iEnv);
+			ToRemove.f_Insert(fg_Move(Environment));
 
 			++iEnv;
 		}
 
-		for (auto iToRemove = ToRemove.f_GetIteratorBidirectionalReverse(); iToRemove; ++iToRemove)
-			mp_OldDatabaseEnvironments.f_Remove(*iToRemove);
+		for (auto iToRemove : ToRemoveIndexes.f_Reverse())
+			mp_OldDatabaseEnvironments.f_Remove(iToRemove);
+
+		auto BlockingActorCheckout = fg_BlockingActor();
+
+		co_await
+			(
+				g_Dispatch(BlockingActorCheckout) / [ToRemove = fg_Move(ToRemove)]() mutable
+				{
+					for (auto &Environment : ToRemove)
+					{
+						Environment.m_DatabaseEnvironment.f_Close();
+						if (CFile::fs_FileExists(Environment.m_TempDeletePath))
+						{
+							try
+							{
+								CFile::fs_DeleteDirectoryRecursive(Environment.m_TempDeletePath);
+							}
+							catch (CExceptionFile const &)
+							{
+							}
+						}
+					}
+				}
+			)
+		;
+
+		co_return {};
 	}
 
 	CDatabaseActor::CTransactionRead::CTransactionRead(CActorSubscription &&_Subscription, CDatabaseReadTransaction &_MainTransaction, CDatabaseSubReadTransaction &&_Transaction)
@@ -226,15 +249,23 @@ namespace NMib::NDatabase
 		return mp_pMainTransaction->f_EnumDatabases();
 	}
 
-	CDatabaseActor::CTransactionWrite::CTransactionWrite(CActorSubscription &&_Subscription, CDatabaseWriteTransaction &_MainTransaction, CDatabaseSubWriteTransaction &&_Transaction)
+	CDatabaseActor::CTransactionWrite::CTransactionWrite
+		(
+			CActorSubscription &&_Subscription
+			, CDatabaseWriteTransaction &_MainTransaction
+			, CDatabaseSubWriteTransaction &&_Transaction
+			, CBlockingActorCheckout &&_Checkout
+		)
 		: mp_Subscription(fg_Move(_Subscription))
 		, mp_pMainTransaction(&_MainTransaction)
+		, mp_Checkout(fg_Move(_Checkout))
 		, m_Transaction(fg_Move(_Transaction))
 	{
 	}
 
 	CDatabaseActor::CTransactionWrite::CTransactionWrite()
 		: m_Transaction(CDatabaseSubWriteTransaction::fs_Empty())
+		, mp_Checkout(nullptr, nullptr)
 	{
 	}
 
@@ -252,6 +283,7 @@ namespace NMib::NDatabase
 		: mp_Subscription(fg_Move(_Other.mp_Subscription))
 		, mp_pMainTransaction(fg_Exchange(_Other.mp_pMainTransaction, nullptr))
 		, m_Transaction(fg_Move(_Other.m_Transaction))
+		, mp_Checkout(fg_Move(_Other.mp_Checkout))
 	{
 	}
 
@@ -260,6 +292,7 @@ namespace NMib::NDatabase
 		mp_Subscription = fg_Move(_Other.mp_Subscription);
 		m_Transaction = fg_Move(_Other.m_Transaction);
 		mp_pMainTransaction = fg_Exchange(_Other.mp_pMainTransaction, nullptr);
+		mp_Checkout = fg_Move(_Other.mp_Checkout);
 
 		return *this;
 	}
@@ -268,6 +301,7 @@ namespace NMib::NDatabase
 	{
 		mp_Subscription.f_Clear();
 		m_Transaction.f_Clear();
+		mp_Checkout.f_Clear();
 		mp_pMainTransaction = nullptr;
 	}
 
@@ -301,6 +335,7 @@ namespace NMib::NDatabase
 		{
 			TCActorResultVector<void> Destroys;
 			fg_Move(mp_WriteSequencer).f_Destroy() > Destroys.f_AddResult();
+			fg_Move(mp_ReadSequencer).f_Destroy() > Destroys.f_AddResult();
 
 			auto pTracker = fg_Move(mp_pCanDestroyTracker);
 			pTracker->f_Future() > Destroys.f_AddResult();
@@ -309,9 +344,7 @@ namespace NMib::NDatabase
 			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy can destroy tracker or write sequencer");
 		}
 
-		co_await fg_Move(mp_WriteActor).f_Destroy().f_Wrap() > LogError.f_Warning("Failed to destroy write actor");
-
-		fp_TryDeletePending();
+		co_await fp_TryDeletePending();
 
 		co_return {};
 	}
@@ -345,42 +378,64 @@ namespace NMib::NDatabase
 			CDatabaseReadTransaction m_MainTransaction;
 		};
 
-		auto CaptureScope = co_await g_CaptureExceptions;
+		auto SequenceSubscription = co_await mp_ReadSequencer.f_Sequence();
 
-		NStorage::TCSharedPointer<CState> pState = fg_Construct();
+		auto BlockingActorCheckout = fg_BlockingActor();
 
-		pState->m_MainTransaction = this->mp_DatabaseEnvironment.f_BeginReadTransaction();
-		auto Transaction = this->mp_Database.f_Transaction(pState->m_MainTransaction);
-
-		++mp_nReaders;
-		auto *pReferences = mp_DatabaseEnvironment.f_GetReferencesPointer();
-		++(*pReferences);
-
-#ifndef DMibClangAnalyzerWorkaround
-		co_return CTransactionRead
-			{
-				g_ActorSubscription / [this, pReferences, pState, pCanDestroy = mp_pCanDestroyTracker]() mutable
+		co_return co_await
+			(
+				g_Dispatch(BlockingActorCheckout.f_Actor()) / [this, pCanDestroy = mp_pCanDestroyTracker]() mutable -> TCFuture<CTransactionRead>
 				{
-					pState.f_Clear();
-					--mp_nReaders;
-					--(*pReferences);
-					if (mp_nReaders == 0)
-					{
-						for (auto &Waiting : mp_WaitingForReaders)
-							Waiting.f_SetResult();
+					auto CaptureScope = co_await g_CaptureExceptions;
 
-						mp_WaitingForReaders.f_Clear();
-						fp_TryDeletePending();
-					}
+					NStorage::TCSharedPointer<CState> pState = fg_Construct();
+
+					pState->m_MainTransaction = this->mp_DatabaseEnvironment.f_BeginReadTransaction();
+					auto Transaction = this->mp_Database.f_Transaction(pState->m_MainTransaction);
+
+					++mp_nReaders;
+					auto *pReferences = mp_DatabaseEnvironment.f_GetReferencesPointer();
+					++(*pReferences);
+
+			#ifndef DMibClangAnalyzerWorkaround
+					co_return CTransactionRead
+						{
+							g_BlockingActorSubscription / [this, pReferences, pState, pCanDestroy = fg_Move(pCanDestroy)]() mutable
+							{
+								pState.f_Clear();
+								auto NewReaders = --mp_nReaders;
+								--(*pReferences);
+								if (NewReaders != 0)
+									return;
+
+								g_Dispatch(fg_ThisActor(this)) / [this, pCanDestroy = fg_Move(pCanDestroy)]() -> TCFuture<void>
+									{
+										if (mp_nReaders.f_Load() == 0)
+										{
+											for (auto &Waiting : mp_WaitingForReaders)
+												Waiting.f_SetResult();
+
+											mp_WaitingForReaders.f_Clear();
+										}
+
+										co_await fp_TryDeletePending();
+
+										co_return {};
+									}
+									> fg_LogError("Database", "Failed releasing after 0 readers")
+								;
+							}
+							, pState->m_MainTransaction
+							, fg_Move(Transaction)
+						}
+					;
+			#else
+					(void)Transaction;
+					co_return DMibErrorInstance("Workaround analyzer bug");
+			#endif
 				}
-				, pState->m_MainTransaction
-				, fg_Move(Transaction)
-			}
+			)
 		;
-#else
-		(void)Transaction;
-		co_return DMibErrorInstance("Workaround analyzer bug");
-#endif
 	}
 
 	auto CDatabaseActor::f_OpenTransactionWrite() -> TCFuture<CTransactionWrite>
@@ -396,9 +451,16 @@ namespace NMib::NDatabase
 			CDatabaseWriteTransaction m_MainTransaction;
 		};
 
-		co_return co_await mp_WriteSequencer.f_RunSequenced
+		auto pCanDestroy = mp_pCanDestroyTracker;
+		auto SequenceSubscription = co_await mp_WriteSequencer.f_Sequence();
+		auto BlockingActorCheckout = fg_BlockingActor();
+		auto BlockingActor = BlockingActorCheckout.f_Actor();
+
+		co_return co_await
 			(
-				g_ActorFunctorWeak(mp_WriteActor) / [this, pCanDestroy = mp_pCanDestroyTracker](CActorSubscription &&_SequencerSubscription) mutable -> TCFuture<CTransactionWrite>
+				g_Dispatch(BlockingActor)
+				/ [this, pCanDestroy = fg_Move(pCanDestroy), SequenceSubscription = fg_Move(SequenceSubscription), BlockingActorCheckout = fg_Move(BlockingActorCheckout)]
+				() mutable -> TCFuture<CTransactionWrite>
 				{
 					if (mp_bDestroyed.f_Load())
 						co_return DMibErrorInstance("Database actor destroyed");
@@ -412,17 +474,31 @@ namespace NMib::NDatabase
 					auto *pReferences = mp_DatabaseEnvironment.f_GetReferencesPointer();
 					++(*pReferences);
 
+					auto BlockingActor = BlockingActorCheckout.f_Actor();
+					auto ThisActor = fg_ThisActor(this);
+
 #ifndef DMibClangAnalyzerWorkaround
 					co_return CTransactionWrite
 						{
-							g_ActorSubscription / [this, pReferences, pState, SequencerSubscription = fg_Move(_SequencerSubscription), pCanDestroy = fg_Move(pCanDestroy)]() mutable
+							g_ActorSubscription(BlockingActor) / [this, ThisActor, pReferences, pState, SequenceSubscription = fg_Move(SequenceSubscription), pCanDestroy = fg_Move(pCanDestroy)]() mutable
 							{
 								pState.f_Clear();
 								--(*pReferences);
-								fp_TryDeletePending();
+								g_Dispatch(ThisActor) / [this, pCanDestroy = fg_Move(pCanDestroy)]() -> TCFuture<void>
+									{
+										if (mp_bDestroyed.f_Load())
+											co_return {};
+
+										co_await fp_TryDeletePending();
+
+										co_return {};
+									}
+									> fg_LogError("Database", "Failed delete pending after write transaction")
+								;
 							}
 							, pState->m_MainTransaction
 							, fg_Move(Transaction)
+							, fg_Move(BlockingActorCheckout)
 						}
 					;
 #else
@@ -502,9 +578,11 @@ namespace NMib::NDatabase
 
 	TCFuture<void> CDatabaseActor::f_CommitWriteTransaction(CTransactionWrite &&_WriteTransaction)
 	{
+		auto BlockingActor = _WriteTransaction.mp_Checkout.f_Actor();
+
 		co_await
 			(
-				g_Dispatch(mp_WriteActor) / [WriteTransaction = fg_Move(_WriteTransaction), pCanDestroy = mp_pCanDestroyTracker]() mutable -> TCFuture<void>
+				g_Dispatch(BlockingActor) / [WriteTransaction = fg_Move(_WriteTransaction), pCanDestroy = mp_pCanDestroyTracker]() mutable -> TCFuture<void>
 				{
 					{
 						auto CaptureScope = co_await g_CaptureExceptions;
@@ -564,5 +642,10 @@ namespace NMib::NDatabase
 			co_return DMibErrorInstance("Database actor destroyed");
 		
 		co_return mp_DatabaseEnvironment.f_GetPath();
+	}
+
+	CBlockingActorCheckout const &CDatabaseActor::CTransactionWrite::f_Checkout() const
+	{
+		return mp_Checkout;
 	}
 }

@@ -444,7 +444,7 @@ namespace
 				fp_PopulateEnvironmentSingleDB(TestEnvironment.m_Environment);
 				TestEnvironment.m_Environment.f_Close();
 
-				NConcurrency::TCActor<CDatabaseActor> DatabaseActor{fg_Construct(), "Test Database"};
+				NConcurrency::TCActor<CDatabaseActor> DatabaseActor{fg_Construct()};
 
 				{
 					co_await DatabaseActor(&CDatabaseActor::f_OpenDatabase, CFile::fs_GetProgramDirectory() / "TestDatabase13", 0);
