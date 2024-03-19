@@ -116,4 +116,22 @@ namespace NMib::NDatabase::NPrivate
 		return NPlatform::fg_ErrnoString<NStr::CStr>(_Error);
 	#endif
 	}
+
+	NStr::CStr mdb_strerror_system(int _Error)
+	{
+		if (!_Error)
+			return "Successful return: 0";
+
+		if (_Error >= MDB_KEYEXIST && _Error <= MDB_LAST_ERRCODE)
+		{
+			int i = _Error - MDB_KEYEXIST;
+			return g_ErrorStrings[i];
+		}
+
+	#ifdef DPlatformFamily_Windows
+		return NPlatform::fg_Win32_GetLastErrorStr(_Error);
+	#else
+		return NPlatform::fg_ErrnoString<NStr::CStr>(_Error);
+	#endif
+	}
 }

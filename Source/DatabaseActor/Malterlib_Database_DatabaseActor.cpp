@@ -14,6 +14,8 @@ namespace NMib::NDatabase
 	using namespace NFile;
 	using namespace NStr;
 
+	static auto gc_EnvironmentFlags = EDatabaseEnvironmentFlag_NoTls | EDatabaseEnvironmentFlag_AllowOneProcessLocking;
+
 	TCFuture<void> CDatabaseActor::f_OpenDatabase(CStr const &_Directory, uint64 _MaxSize)
 	{
 		if (mp_bOpened)
@@ -36,7 +38,7 @@ namespace NMib::NDatabase
 					CFile::fs_CreateDirectory(_Directory);
 					mp_DatabaseEnvironment.f_SetMapSize(_MaxSize);
 					auto Attribs = EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid;
-					mp_DatabaseEnvironment.f_Open(_Directory, EDatabaseEnvironmentFlag_NoTls, Attribs);
+					mp_DatabaseEnvironment.f_Open(_Directory, gc_EnvironmentFlags, Attribs);
 					auto Transaction = mp_DatabaseEnvironment.f_BeginWriteTransaction();
 					mp_Database = Transaction.f_OpenDatabase();
 					Transaction.f_Commit();
@@ -85,7 +87,7 @@ namespace NMib::NDatabase
 
 						NewDatabaseEnvironment.f_SetMapSize(_MaxSize);
 						auto Attribs = EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid;
-						NewDatabaseEnvironment.f_Open(CompactTempPath, EDatabaseEnvironmentFlag_NoTls, Attribs);
+						NewDatabaseEnvironment.f_Open(CompactTempPath, gc_EnvironmentFlags, Attribs);
 						OutTransaction = NewDatabaseEnvironment.f_BeginWriteTransaction();
 						OutDatabase = OutTransaction.f_OpenDatabase();
 
@@ -131,7 +133,7 @@ namespace NMib::NDatabase
 						mp_DatabaseEnvironment = {};
 						mp_DatabaseEnvironment.f_SetMapSize(_MaxSize);
 						auto Attribs = EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid;
-						mp_DatabaseEnvironment.f_Open(OriginalPath, EDatabaseEnvironmentFlag_NoTls, Attribs);
+						mp_DatabaseEnvironment.f_Open(OriginalPath, gc_EnvironmentFlags, Attribs);
 						auto Transaction = mp_DatabaseEnvironment.f_BeginWriteTransaction();
 						mp_Database = Transaction.f_OpenDatabase();
 						Transaction.f_Commit();

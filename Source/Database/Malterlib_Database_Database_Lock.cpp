@@ -398,17 +398,29 @@ namespace NMib::NDatabase
 			idbuf.nlow   = stbuf.nFileIndexLow;
 			m_pLocksMemoryMap->m_TransactionBody.mtb_mutexid = mdb_hash(&idbuf, sizeof(idbuf));
 			mdb_env_mname_init(this);
-			me_rmutex = CreateMutexA(&mdb_all_sa, FALSE, MUTEXNAME(this, 'r'));
+			me_rmutex = CreateMutexExA(&mdb_all_sa, MUTEXNAME(this, 'r'), 0, SYNCHRONIZE);
 			if (!me_rmutex)
 			{
-				error_location = 8;
-				goto fail_errno;
+				if (!!(me_flags & EDatabaseEnvironmentFlag_AllowOneProcessLocking) && GetLastError() == ERROR_ACCESS_DENIED)
+					me_rmutex = CreateMutexExA(&mdb_all_sa, nullptr, 0, SYNCHRONIZE);
+
+				if (!me_rmutex)
+				{
+					error_location = 8;
+					goto fail_errno;
+				}
 			}
-			me_wmutex = CreateMutexA(&mdb_all_sa, FALSE, MUTEXNAME(this, 'w'));
+			me_wmutex = CreateMutexExA(&mdb_all_sa, MUTEXNAME(this, 'w'), 0, SYNCHRONIZE);
 			if (!me_wmutex)
 			{
-				error_location = 9;
-				goto fail_errno;
+				if (!!(me_flags & EDatabaseEnvironmentFlag_AllowOneProcessLocking) && GetLastError() == ERROR_ACCESS_DENIED)
+					me_wmutex = CreateMutexExA(&mdb_all_sa, nullptr, 0, SYNCHRONIZE);
+
+				if (!me_wmutex)
+				{
+					error_location = 9;
+					goto fail_errno;
+				}
 			}
 	#elif defined(MDB_USE_POSIX_SEM)
 			struct stat stbuf;
@@ -590,7 +602,7 @@ namespace NMib::NDatabase
 	fail_errno:
 		{
 			int rc = ErrCode();
-			DMibError(NStr::fg_Format("Error setting up locks ({}): {}", error_location, mdb_strerror(rc)));
+			DMibError(NStr::fg_Format("Error setting up locks ({}): {}", error_location, mdb_strerror_system(rc)));
 		}
 	}
 

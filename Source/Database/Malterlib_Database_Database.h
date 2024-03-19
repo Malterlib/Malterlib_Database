@@ -77,18 +77,19 @@ namespace NMib::NDatabase
 	enum EDatabaseEnvironmentFlag : uint32
 	{
 		EDatabaseEnvironmentFlag_None = 0
-		, EDatabaseEnvironmentFlag_FixedMap = 0x01				///< Memory map at a fixed address (experimental)
-		, EDatabaseEnvironmentFlag_NoSubdir = 0x4000			///< No environment directory
-		, EDatabaseEnvironmentFlag_NoSync = 0x10000				///< Don't fsync after commit
-		, EDatabaseEnvironmentFlag_ReadOnly = 0x20000			///< Read only
-		, EDatabaseEnvironmentFlag_NoMetaSync = 0x40000			///< Don't fsync metapage after commit
-		, EDatabaseEnvironmentFlag_WriteMap = 0x80000			///< Use writable mmap
-		, EDatabaseEnvironmentFlag_WriteMapAsync = 0x100000		///< Use asynchronous msync when #EDatabaseEnvironmentFlag_WriteMap is used
-		, EDatabaseEnvironmentFlag_NoTls = 0x200000				///< Tie reader locktable slots to #NMib::NDatabase::CDatabaseReadTransaction objects instead of to threads
-		, EDatabaseEnvironmentFlag_NoLock = 0x400000			///< Don't do any locking, caller must manage their own locks
-		, EDatabaseEnvironmentFlag_NoReadAhead = 0x800000		///< Don't do readahead (no effect on Windows)
-		, EDatabaseEnvironmentFlag_NoMemoryInit = 0x1000000		///< Don't initialize malloc'd memory before writing to datafile
-		, EDatabaseEnvironmentFlag_PreviousSnapshot = 0x2000000	///< Use the previous snapshot rather than the latest one
+		, EDatabaseEnvironmentFlag_FixedMap = 0x01						///< Memory map at a fixed address (experimental)
+		, EDatabaseEnvironmentFlag_NoSubdir = 0x4000					///< No environment directory
+		, EDatabaseEnvironmentFlag_NoSync = 0x10000						///< Don't fsync after commit
+		, EDatabaseEnvironmentFlag_ReadOnly = 0x20000					///< Read only
+		, EDatabaseEnvironmentFlag_NoMetaSync = 0x40000					///< Don't fsync metapage after commit
+		, EDatabaseEnvironmentFlag_WriteMap = 0x80000					///< Use writable mmap
+		, EDatabaseEnvironmentFlag_WriteMapAsync = 0x100000				///< Use asynchronous msync when #EDatabaseEnvironmentFlag_WriteMap is used
+		, EDatabaseEnvironmentFlag_NoTls = 0x200000						///< Tie reader locktable slots to #NMib::NDatabase::CDatabaseReadTransaction objects instead of to threads
+		, EDatabaseEnvironmentFlag_NoLock = 0x400000					///< Don't do any locking, caller must manage their own locks
+		, EDatabaseEnvironmentFlag_NoReadAhead = 0x800000				///< Don't do readahead (no effect on Windows)
+		, EDatabaseEnvironmentFlag_NoMemoryInit = 0x1000000				///< Don't initialize malloc'd memory before writing to datafile
+		, EDatabaseEnvironmentFlag_PreviousSnapshot = 0x2000000			///< Use the previous snapshot rather than the latest one
+ 		, EDatabaseEnvironmentFlag_AllowOneProcessLocking = 0x4000000	///< Allow one process only locking if a named mutex cannot be created due to access rights on Windows
 
 		, EDatabaseEnvironmentFlag_Changable =
 		(
@@ -107,6 +108,7 @@ namespace NMib::NDatabase
 			| EDatabaseEnvironmentFlag_NoLock
 			| EDatabaseEnvironmentFlag_NoReadAhead
 			| EDatabaseEnvironmentFlag_PreviousSnapshot
+			| EDatabaseEnvironmentFlag_AllowOneProcessLocking
 		)
 	};
 

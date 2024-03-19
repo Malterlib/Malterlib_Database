@@ -1739,6 +1739,7 @@ namespace NMib::NDatabase
 		void mdb_txn_abort(MDB_txn *txn);
 
 		NStr::CStr mdb_strerror(int _Error);
+		NStr::CStr mdb_strerror_system(int _Error);
 
 		int  mdb_page_get(MDB_cursor *mc, pgno_t pgno, MDB_page **mp, int *lvl);
 		int  mdb_page_search_root(MDB_cursor *mc, CDatabaseValue const *key, int modify);
