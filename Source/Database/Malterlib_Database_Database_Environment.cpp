@@ -38,6 +38,10 @@
 #endif
 
 uint32 fg_MalterlibAttributesToMode(NMib::NFile::EFileAttrib _Attributes, uint32 _Mode = 0644);
+#ifndef DPlatformFamily_Windows
+int fg_GetUnixOpenFlags();
+void fg_SetUnixHandleOptions(int _File);
+#endif
 
 namespace NMib::NDatabase
 {
@@ -1294,8 +1298,6 @@ namespace NMib::NDatabase
 		HANDLE fd;
 	#ifdef DPlatformFamily_Windows
 		DWORD acc, share, disp, attrs;
-	#else
-		int flags;
 	#endif
 
 		NStr::CStr FileName = mdb_getfilename(_FileName, which);
@@ -1319,7 +1321,8 @@ namespace NMib::NDatabase
 		share = FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE;
 		disp = OPEN_ALWAYS;
 		attrs = FILE_ATTRIBUTE_NORMAL;
-		switch (which) {
+		switch (which) 
+		{
 		case MDB_O_RDONLY:			/* read-only datafile */
 			acc = GENERIC_READ;
 			disp = OPEN_EXISTING;
@@ -1339,18 +1342,16 @@ namespace NMib::NDatabase
 		}
 		fd = CreateFileW(NStr::CWStr(FileName).f_GetStr(), acc, share, NULL, disp, attrs, NULL);
 	#else
-		fd = open(FileName.f_GetStr(), which & MDB_O_MASK, mode);
+		fd = open(FileName.f_GetStr(), (which & MDB_O_MASK) | fg_GetUnixOpenFlags(), mode);
 	#endif
 
 		if (fd == INVALID_HANDLE_VALUE)
 			rc = ErrCode();
 	#ifndef DPlatformFamily_Windows
-		else {
-			if (which != MDB_O_RDONLY && which != MDB_O_RDWR) {
-				/* Set CLOEXEC if we could not pass it to open() */
-				if (!MDB_CLOEXEC && (flags = fcntl(fd, F_GETFD)) != -1)
-					(void) fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
-			}
+		else 
+		{
+			fg_SetUnixHandleOptions(fd);
+
 			if (which == MDB_O_COPY && me_psize >= me_os_psize) {
 				/* This may require buffer alignment.  There is no portable
 				 * way to ask how much, so we require OS pagesize alignment.
@@ -1361,6 +1362,7 @@ namespace NMib::NDatabase
 				/* open(...O_DIRECT...) would break on filesystems without
 				 * O_DIRECT support (ITS#7682). Try to set it here instead.
 				 */
+				int flags;
 				if ((flags = fcntl(fd, F_GETFL)) != -1)
 					(void) fcntl(fd, F_SETFL, flags | O_DIRECT);
 	# endif
