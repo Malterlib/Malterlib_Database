@@ -141,7 +141,7 @@ namespace NMib::NDatabase::NPrivate
 					fg_DoBufferWrite(*pCopyState, iBuffer);
 				}
 			)
-			> fg_DiscardResult()
+			.f_DiscardResult()
 		;
 
 		CopyState.m_iBuffer = iBuffer ^ 1;

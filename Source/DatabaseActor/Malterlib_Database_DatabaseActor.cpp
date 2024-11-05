@@ -16,7 +16,7 @@ namespace NMib::NDatabase
 
 	static auto gc_EnvironmentFlags = EDatabaseEnvironmentFlag_NoTls | EDatabaseEnvironmentFlag_AllowOneProcessLocking;
 
-	TCFuture<void> CDatabaseActor::f_OpenDatabase(CStr const &_Directory, uint64 _MaxSize)
+	TCFuture<void> CDatabaseActor::f_OpenDatabase(CStr _Directory, uint64 _MaxSize)
 	{
 		if (mp_bOpened)
 			co_return DMibErrorInstance("Database has already been opened");
@@ -57,7 +57,7 @@ namespace NMib::NDatabase
 		co_return {};
 	}
 
-	TCFuture<void> CDatabaseActor::f_Compact(CTransactionWrite &&_WriteTransaction, uint64 _MaxSize)
+	TCFuture<void> CDatabaseActor::f_Compact(CTransactionWrite _WriteTransaction, uint64 _MaxSize)
 	{
 		if (!mp_bOpened)
 			co_return DMibErrorInstance("Database has not been opened");
@@ -333,15 +333,15 @@ namespace NMib::NDatabase
 
 		CLogError LogError("Database");
 		{
-			TCActorResultVector<void> Destroys;
-			fg_Move(mp_WriteSequencer).f_Destroy() > Destroys.f_AddResult();
-			fg_Move(mp_ReadSequencer).f_Destroy() > Destroys.f_AddResult();
+			TCFutureVector<void> Destroys;
+			fg_Move(mp_WriteSequencer).f_Destroy() > Destroys;
+			fg_Move(mp_ReadSequencer).f_Destroy() > Destroys;
 
 			auto pTracker = fg_Move(mp_pCanDestroyTracker);
-			pTracker->f_Future() > Destroys.f_AddResult();
+			pTracker->f_Future() > Destroys;
 			pTracker.f_Clear();
 
-			co_await Destroys.f_GetUnwrappedResults().f_Wrap() > LogError.f_Warning("Failed to destroy can destroy tracker or write sequencer");
+			co_await fg_AllDone(Destroys).f_Wrap() > LogError.f_Warning("Failed to destroy can destroy tracker or write sequencer");
 		}
 
 		co_await fp_TryDeletePending();
@@ -542,19 +542,19 @@ namespace NMib::NDatabase
 		co_return Stats;
 	}
 
-	TCFuture<bool> CDatabaseActor::f_WriteWithCompaction(TCActorFunctorWeak<TCFuture<CTransactionWrite> (CTransactionWrite &&_Transaction, bool _bCompacting)> &&_fDoWork)
+	TCFuture<bool> CDatabaseActor::f_WriteWithCompaction(TCActorFunctorWeak<TCFuture<CTransactionWrite> (CTransactionWrite _Transaction, bool _bCompacting)> _fDoWork)
 	{
 		auto fDoWrite = g_ActorFunctor / [OriginalCompactionSequence = mp_CompactionSequence, this, fDoWork = fg_Move(_fDoWork)](bool _bCompact) -> TCFuture<bool>
 			{
-				auto Transaction = co_await self(&CDatabaseActor::f_OpenTransactionWrite);
+				auto Transaction = co_await f_OpenTransactionWrite();
 				Transaction = co_await fDoWork(fg_Move(Transaction), _bCompact);
 				if (Transaction.f_IsEmpty())
 					co_return false;
 
 				if (_bCompact && OriginalCompactionSequence == mp_CompactionSequence)
-					co_await self(&CDatabaseActor::f_Compact, fg_Move(Transaction), 0);
+					co_await f_Compact(fg_Move(Transaction), 0);
 				else
-					co_await self(&CDatabaseActor::f_CommitWriteTransaction, fg_Move(Transaction));
+					co_await f_CommitWriteTransaction(fg_Move(Transaction));
 
 				co_return true;
 			}
@@ -576,7 +576,7 @@ namespace NMib::NDatabase
 		co_return *Result;
 	}
 
-	TCFuture<void> CDatabaseActor::f_CommitWriteTransaction(CTransactionWrite &&_WriteTransaction)
+	TCFuture<void> CDatabaseActor::f_CommitWriteTransaction(CTransactionWrite _WriteTransaction)
 	{
 		auto BlockingActor = _WriteTransaction.mp_Checkout.f_Actor();
 

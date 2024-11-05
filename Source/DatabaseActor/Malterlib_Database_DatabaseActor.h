@@ -33,7 +33,7 @@ namespace NMib::NDatabase
 			NContainer::TCSet<NStr::CStr> f_EnumDatabases();
 
 			template <typename tf_CFunctor, typename ...tfp_CHandlers>
-			auto f_BlockingDispatch(tf_CFunctor &&_Functor, tfp_CHandlers && ...p_Handlers) && -> NConcurrency::TCFuture
+			auto f_BlockingDispatch(tf_CFunctor &&_Functor, tfp_CHandlers && ...p_Handlers) && -> NConcurrency::TCUnsafeFuture
 				<
 					typename NConcurrency::NPrivate::TCIsFuture
 					<
@@ -97,14 +97,14 @@ namespace NMib::NDatabase
 			CDatabaseWriteTransaction *mp_pMainTransaction = nullptr;
 		};
 
-		NConcurrency::TCFuture<void> f_OpenDatabase(NStr::CStr const &_Directory, uint64 _MaxSize);
+		NConcurrency::TCFuture<void> f_OpenDatabase(NStr::CStr _Directory, uint64 _MaxSize);
 
 		NConcurrency::TCFuture<CTransactionRead> f_OpenTransactionRead();
 		NConcurrency::TCFuture<CTransactionWrite> f_OpenTransactionWrite();
-		NConcurrency::TCFuture<void> f_CommitWriteTransaction(CTransactionWrite &&_WriteTransaction);
+		NConcurrency::TCFuture<void> f_CommitWriteTransaction(CTransactionWrite _WriteTransaction);
 		NConcurrency::TCFuture<void> f_WaitForAllReaders();
 		NConcurrency::TCFuture<mint> f_CheckForStaleReaders();
-		NConcurrency::TCFuture<void> f_Compact(CTransactionWrite &&_WriteTransaction, uint64 _MaxSize);
+		NConcurrency::TCFuture<void> f_Compact(CTransactionWrite _WriteTransaction, uint64 _MaxSize);
 
 		NConcurrency::TCFuture<CDatabaseStatistics> f_Statistics();
 		NConcurrency::TCFuture<CDatabaseSizeStatistics> f_SizeStatistics();
@@ -116,7 +116,7 @@ namespace NMib::NDatabase
 
 		NConcurrency::TCFuture<bool> f_WriteWithCompaction
 			(
-				NConcurrency::TCActorFunctorWeak<NConcurrency::TCFuture<CTransactionWrite> (CTransactionWrite &&_Transaction, bool _bCompacting)> &&_fDoWork
+				NConcurrency::TCActorFunctorWeak<NConcurrency::TCFuture<CTransactionWrite> (CTransactionWrite _Transaction, bool _bCompacting)> _fDoWork
 			)
 		;
 
