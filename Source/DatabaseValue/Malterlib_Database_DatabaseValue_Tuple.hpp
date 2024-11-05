@@ -17,15 +17,14 @@ namespace NMib::NDatabase
 				(
 					[&](auto && ...p_Values) -> void
 					{
-						[[maybe_unused]] TCInitializerList<bool> Dummy =
+						(
+							[&]
 							{
-								[&]
-								{
-									CDatabaseValue::fs_FeedLexicographic(_Stream, p_Values);
-									return true;
-								}()...
+								CDatabaseValue::fs_FeedLexicographic(_Stream, p_Values);
 							}
-						;
+							()
+							, ...
+						);
 					}
 					, _Values
 				)
@@ -39,15 +38,14 @@ namespace NMib::NDatabase
 				(
 					[&](auto && ...p_Values) -> void
 					{
-						[[maybe_unused]] TCInitializerList<bool> Dummy =
+						(
+							[&]
 							{
-								[&]
-								{
-									CDatabaseValue::fs_ConsumeLexicographic(_Stream, p_Values);
-									return true;
-								}()...
+								CDatabaseValue::fs_ConsumeLexicographic(_Stream, p_Values);
 							}
-						;
+							()
+							, ...
+						);
 					}
 					, o_Values
 				)

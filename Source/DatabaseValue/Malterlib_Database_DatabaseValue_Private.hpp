@@ -16,18 +16,15 @@ namespace NMib::NDatabase::NPrivate
 		Stream.f_OpenRead(_Value.m_pData, _Value.m_Size);
 		NStorage::TCTuple<typename TCGetDescending<typename NTraits::TCRemoveQualifiers<tfp_CValue>::CType>::CType...> Values;
 
-		TCInitializerList<bool> Dummy =
+		(
+			[&]
 			{
-				[&]
-				{
-					using CDecodedDescending = TCGetDescending<typename NTraits::TCRemoveQualifiers<tfp_CValue>::CType>;
-					CDatabaseValue::fs_ConsumeLexicographic(Stream, fg_Descending<CDecodedDescending::mc_bDescending>(fg_Get<tfp_Indices>(Values)));
-					return true;
-				}
-				()...
+				using CDecodedDescending = TCGetDescending<typename NTraits::TCRemoveQualifiers<tfp_CValue>::CType>;
+				CDatabaseValue::fs_ConsumeLexicographic(Stream, fg_Descending<CDecodedDescending::mc_bDescending>(fg_Get<tfp_Indices>(Values)));
 			}
-		;
-		(void)Dummy;
+			()
+			, ...
+		);
 
 		return Values;
 	}

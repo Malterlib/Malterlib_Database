@@ -57,17 +57,14 @@ namespace NMib::NDatabase
 	{
 		{
 			NStream::CBinaryStreamMemoryRef<NStream::CBinaryStreamBigEndian, CDatabaseValueCache> Stream{o_StreamCache, 0};
-			TCInitializerList<bool> Dummy =
+			(
+				[&]
 				{
-					[&]
-					{
-						CDatabaseValue::fs_FeedLexicographic(Stream, p_Value);
-						return true;
-					}
-					()...
+					CDatabaseValue::fs_FeedLexicographic(Stream, p_Value);
 				}
-			;
-			(void)Dummy;
+				()
+				, ...
+			);
 		}
 		return CDatabaseValue{o_StreamCache};
 	}
@@ -81,15 +78,14 @@ namespace NMib::NDatabase
 			(
 				[&](auto && ...p_Values) -> void
 				{
-					[[maybe_unused]] TCInitializerList<bool> Dummy =
+					(
+						[&]
 						{
-							[&]
-							{
-								Stream << p_Values;
-								return true;
-							}()...
+							Stream << p_Values;
 						}
-					;
+						()
+						, ...
+					);
 				}
 				, _Value
 			)
@@ -102,17 +98,14 @@ namespace NMib::NDatabase
 	{
 		{
 			NStream::CBinaryStreamMemoryRef<NStream::CBinaryStreamDefault, CDatabaseValueCache> Stream{o_StreamCache, 0};
-			TCInitializerList<bool> Dummy =
+			(
+				[&]
 				{
-					[&]
-					{
-						Stream << p_Value;
-						return true;
-					}
-					()...
+					Stream << p_Value;
 				}
-			;
-			(void)Dummy;
+				()
+				, ...
+			);
 		}
 		return CDatabaseValue{o_StreamCache};
 	}
