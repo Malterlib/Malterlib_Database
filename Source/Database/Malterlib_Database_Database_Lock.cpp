@@ -468,12 +468,38 @@ namespace NMib::NDatabase
 			}
 	#elif defined(MDB_USE_SYSV_SEM)
 			unsigned short vals[2] = {1, 1};
-			key_t key = ftok(LockPath.f_GetStr(), 'M'); /* fname is lockfile path now */
+			// ftok has big chance of collision, use hash of same data instead to create key.
+			// (key_t) (id << 24 | (st.st_dev & 0xff) << 16 | (st.st_ino & 0xffff));
+			/*
+			key_t key = ftok(LockPath.f_GetStr(), 'M');
 			if (key == -1)
 			{
 				error_location = 13;
 				goto fail_errno;
 			}
+			*/
+
+			struct stat stbuf;
+			if (fstat(me_lfd, &stbuf))
+			{
+				error_location = 22;
+				goto fail_errno;
+			}
+
+			NCryptography::CHash_SHA256 Hash;
+			Hash.f_AddData("MalterlibDB", 11);
+			Hash.f_AddData(&stbuf.st_dev, sizeof(stbuf.st_dev));
+			Hash.f_AddData(&stbuf.st_ino, sizeof(stbuf.st_ino));
+
+			key_t key = Hash.f_GetDigest().f_FoldToInt<key_t>();
+
+			if (key == IPC_PRIVATE) // Collision with IPC private
+			{
+				error_location = 23;
+				errno = EINVAL;
+				goto fail_errno;
+			}
+
 			semid = semget(key, 2, (mode & 0777) | IPC_CREAT);
 			if (semid < 0)
 			{
