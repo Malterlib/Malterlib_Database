@@ -113,7 +113,7 @@ namespace NMib::NDatabase
 	template <typename ...tfp_CValue>
 	auto CDatabaseValue::f_TupleFromLexicographic() const
 	{
-		return NPrivate::fg_ConsumeLexicographicByteArrayImpl<tfp_CValue...>(*this, typename NMeta::TCMakeConsecutiveIndices<sizeof...(tfp_CValue)>::CType());
+		return NPrivate::fg_ConsumeLexicographicByteArrayImpl<tfp_CValue...>(*this, NMeta::TCConsecutiveIndices<sizeof...(tfp_CValue)>());
 	}
 	
 	template <typename tf_CValue>
