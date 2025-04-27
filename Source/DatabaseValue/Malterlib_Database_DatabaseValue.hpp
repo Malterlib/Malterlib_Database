@@ -7,6 +7,7 @@
 #include "Malterlib_Database_DatabaseValue_Float.hpp"
 #include "Malterlib_Database_DatabaseValue_String.hpp"
 #include "Malterlib_Database_DatabaseValue_Vector.hpp"
+#include "Malterlib_Database_DatabaseValue_Digest.hpp"
 #include "Malterlib_Database_DatabaseValue_Set.hpp"
 #include "Malterlib_Database_DatabaseValue_Map.hpp"
 #include "Malterlib_Database_DatabaseValue_Tuple.hpp"
