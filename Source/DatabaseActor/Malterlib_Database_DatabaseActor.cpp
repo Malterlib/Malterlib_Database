@@ -327,6 +327,11 @@ namespace NMib::NDatabase
 		return mp_pMainTransaction->f_EnumDatabases();
 	}
 
+	CDatabaseWriteTransaction CDatabaseActor::CTransactionWrite::f_BeginChildTransaction()
+	{
+		return mp_pMainTransaction->f_BeginChildTransaction();
+	}
+
 	TCFuture<void> CDatabaseActor::fp_Destroy()
 	{
 		mp_bDestroyed.f_Exchange(true);
