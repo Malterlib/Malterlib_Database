@@ -58,13 +58,13 @@ NOTE: These types have been deprecated:
 	Signed 64bit int	|	int64			|	EResultDataType_int64
 	32bit float			|	fp32			|	EResultDataType_fp32
 
-Meta data can be associated with various elements of a result set. Meta data is treated as 
+Metadata can be associated with various elements of a result set. Meta data is treated as
 a binary blob by the result set.
 
-The following elements can have associated meta data:
-	1) The Result set itself can have any number of meta data blobs attached, identified by a unique uint32.
-	2) Each key part (of the structure, not per row) can have a meta data blob attached.
-	3) Each column (of the structure, not per row) can have a meta data blob attached.
+The following elements can have associated metadata:
+	1) The Result set itself can have any number of metadata blobs attached, identified by a unique uint32.
+	2) Each key part (of the structure, not per row) can have a metadata blob attached.
+	3) Each column (of the structure, not per row) can have a metadata blob attached.
 
 */
 
@@ -91,7 +91,7 @@ namespace NMib::NDatabase
 		// Structure:
 		//
 
-		NContainer::TCVector<NResultSet::CMetaDataEntry> mp_MetaData;	// Lookup by uint32 m_ID
+		NContainer::TCVector<NResultSet::CMetadataEntry> mp_Metadata;	// Lookup by uint32 m_ID
 		NContainer::TCVector<NResultSet::CElementInfo> mp_KeyPartInfos;	// Index by iKeyPart
 		NContainer::TCVector<NResultSet::CElementInfo> mp_ColumnInfos;	// Index by iColumn
 
@@ -256,9 +256,9 @@ namespace NMib::NDatabase
 
 		mint f_GetNumRows() const;
 
-		CResultMetaData const*f_GetMetaData(uint32 _ID) const;
-		CResultMetaData const& f_GetKeyPartMetaData(mint _iKeyPart) const;
-		CResultMetaData const& f_GetColumnMetaData(mint _iKeyPart) const;
+		CResultMetadata const*f_GetMetadata(uint32 _ID) const;
+		CResultMetadata const& f_GetKeyPartMetadata(mint _iKeyPart) const;
+		CResultMetadata const& f_GetColumnMetadata(mint _iKeyPart) const;
 
 		CRowIterator f_GetRowIterator() const;
 		// Returns an iterator starting at the specified row allowing for iteration over each row.

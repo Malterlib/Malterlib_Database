@@ -202,7 +202,7 @@ namespace NMib::NDatabase
 	}
 
 	CResultSet::CResultSet(CResultSet&& _ToMove)
-		: mp_MetaData(fg_Move(_ToMove.mp_MetaData))
+		: mp_Metadata(fg_Move(_ToMove.mp_Metadata))
 		, mp_KeyPartInfos(fg_Move(_ToMove.mp_KeyPartInfos))
 		, mp_ColumnInfos(fg_Move(_ToMove.mp_ColumnInfos))
 		, mp_KeyPartValues(fg_Move(_ToMove.mp_KeyPartValues))
@@ -219,7 +219,7 @@ namespace NMib::NDatabase
 
 	void CResultSet::f_Clear()
 	{
-		mp_MetaData.f_Clear();
+		mp_Metadata.f_Clear();
 		mp_KeyPartInfos.f_Clear();
 		mp_ColumnInfos.f_Clear();
 		mp_KeyPartValues.f_Clear();
@@ -270,42 +270,42 @@ namespace NMib::NDatabase
 		return mp_nRows;
 	}
 
-	struct CMetaDataCompare
+	struct CMetadataCompare
 	{
-		COrdering_Strong operator()(NResultSet::CMetaDataEntry const &_A, NResultSet::CMetaDataEntry const &_B) const
+		COrdering_Strong operator()(NResultSet::CMetadataEntry const &_A, NResultSet::CMetadataEntry const &_B) const
 		{
 			return _A.m_ID <=> _B.m_ID;
 		}
 
-		COrdering_Strong operator()(NResultSet::CMetaDataEntry const& _A, uint32 _B) const
+		COrdering_Strong operator()(NResultSet::CMetadataEntry const& _A, uint32 _B) const
 		{
 			return _A.m_ID <=> _B;
 		}
 
-		COrdering_Strong operator()(uint32 _A, NResultSet::CMetaDataEntry const& _B) const
+		COrdering_Strong operator()(uint32 _A, NResultSet::CMetadataEntry const& _B) const
 		{
 			return _A <=> _B.m_ID;
 		}
 	};
 
-	CResultMetaData const* CResultSet::f_GetMetaData(uint32 _ID) const
+	CResultMetadata const* CResultSet::f_GetMetadata(uint32 _ID) const
 	{
-		CMetaDataCompare Compare;
-		aint iMetaData = mp_MetaData.f_BinarySearch(Compare, _ID);
-		if (iMetaData == -1)
+		CMetadataCompare Compare;
+		aint iMetadata = mp_Metadata.f_BinarySearch(Compare, _ID);
+		if (iMetadata == -1)
 			return nullptr;
 		else
-			return &mp_MetaData[iMetaData].m_Data;
+			return &mp_Metadata[iMetadata].m_Data;
 	}
 
-	CResultMetaData const& CResultSet::f_GetKeyPartMetaData(mint _iKeyPart) const
+	CResultMetadata const& CResultSet::f_GetKeyPartMetadata(mint _iKeyPart) const
 	{
-		return mp_KeyPartInfos[_iKeyPart].m_MetaData;
+		return mp_KeyPartInfos[_iKeyPart].m_Metadata;
 	}
 
-	CResultMetaData const& CResultSet::f_GetColumnMetaData(mint _iKeyPart) const
+	CResultMetadata const& CResultSet::f_GetColumnMetadata(mint _iKeyPart) const
 	{
-		return mp_ColumnInfos[_iKeyPart].m_MetaData;
+		return mp_ColumnInfos[_iKeyPart].m_Metadata;
 	}
 
 

@@ -24,8 +24,8 @@ namespace NMib::NDatabase
 	};
 
 
-	// Represents a single bit of meta data in a binary blob
-	typedef NContainer::CByteVector CResultMetaData;
+	// Represents a single bit of metadata in a binary blob
+	typedef NContainer::CByteVector CResultMetadata;
 
 	namespace NResultSet
 	{
@@ -40,12 +40,12 @@ namespace NMib::NDatabase
 		};
 
 
-		// Represents a bit of meta data with a specified ID
-		// Used for meta data attached to the result set itself.
-		struct CMetaDataEntry
+		// Represents a bit of metadata with a specified ID
+		// Used for metadata attached to the result set itself.
+		struct CMetadataEntry
 		{
 			uint32 m_ID;
-			CResultMetaData m_Data;
+			CResultMetadata m_Data;
 
 			template <typename tf_CStream>
 			inline void f_Feed(tf_CStream &_Stream) const;
@@ -62,7 +62,7 @@ namespace NMib::NDatabase
 		{
 			EResultDataType m_Type;		// Type of key part or column
 			CSubType m_SubType;			// Subtype of key part or column
-			CResultMetaData m_MetaData;		// Meta data for the key part or column
+			CResultMetadata m_Metadata;		// Metadata for the key part or column
 
 			template <typename tf_CStream>
 			inline void f_Feed(tf_CStream &_Stream) const;

@@ -50,7 +50,7 @@ namespace NMib::NDatabase
 	}
 
 	CResultSetBuilder::CResultSetBuilder(CResultSetBuilder&& _ToMove)
-		: mp_MetaData(fg_Move(_ToMove.mp_MetaData))
+		: mp_Metadata(fg_Move(_ToMove.mp_Metadata))
 		, mp_KeyPartInfos(fg_Move(_ToMove.mp_KeyPartInfos))
 		, mp_ColumnInfos(fg_Move(_ToMove.mp_ColumnInfos))
 		, mp_KeyPartValues(fg_Move(_ToMove.mp_KeyPartValues))
@@ -97,7 +97,7 @@ namespace NMib::NDatabase
 
 	void CResultSetBuilder::f_Clear()
 	{
-		mp_MetaData.f_Clear();
+		mp_Metadata.f_Clear();
 		mp_KeyPartInfos.f_Clear();
 		mp_ColumnInfos.f_Clear();
 
@@ -210,21 +210,21 @@ namespace NMib::NDatabase
 		f_SetDescription(_Desc.m_lKeyPartTypes, _Desc.m_lKeyPartSubTypes, _Desc.m_lColumnTypes, _Desc.m_lColumnSubTypes);
 	}
 
-	void CResultSetBuilder::f_AddMetaData(uint32 _ID, CResultMetaData _Data)
+	void CResultSetBuilder::f_AddMetadata(uint32 _ID, CResultMetadata _Data)
 	{
-		mp_MetaData[_ID] = fg_Move(_Data);
+		mp_Metadata[_ID] = fg_Move(_Data);
 	}
 
-	void CResultSetBuilder::f_SetKeyPartMetaData(mint _iKeyPart, CResultMetaData _Data)
+	void CResultSetBuilder::f_SetKeyPartMetadata(mint _iKeyPart, CResultMetadata _Data)
 	{
 		DMibCheck( mp_KeyPartInfos.f_IsPosValid(_iKeyPart))("Invalid key part");
-		mp_KeyPartInfos[_iKeyPart].m_MetaData = fg_Move(_Data);
+		mp_KeyPartInfos[_iKeyPart].m_Metadata = fg_Move(_Data);
 	}
 
-	void CResultSetBuilder::f_SetColumnMetaData(mint _iColumn, CResultMetaData _Data)
+	void CResultSetBuilder::f_SetColumnMetadata(mint _iColumn, CResultMetadata _Data)
 	{
 		DMibCheck( mp_ColumnInfos.f_IsPosValid(_iColumn))("Invalid column");
-		mp_ColumnInfos[_iColumn].m_MetaData = fg_Move(_Data);
+		mp_ColumnInfos[_iColumn].m_Metadata = fg_Move(_Data);
 	}
 
 	mint CResultSetBuilder::f_AddKeyPartVariantValue(uint32 _iKeyPart, NResultSet::CValue const& _Value)
@@ -388,9 +388,9 @@ namespace NMib::NDatabase
 
 		_oRS.f_Clear();
 
-		for (auto iMetaData = mp_MetaData.f_GetIterator(); iMetaData; ++iMetaData)
+		for (auto iMetadata = mp_Metadata.f_GetIterator(); iMetadata; ++iMetadata)
 		{
-			_oRS.mp_MetaData.f_Insert( { iMetaData.f_GetKey(), fg_Move(*iMetaData) } );
+			_oRS.mp_Metadata.f_Insert( { iMetadata.f_GetKey(), fg_Move(*iMetadata) } );
 		}
 
 		_oRS.mp_KeyPartInfos = fg_Move(mp_KeyPartInfos);

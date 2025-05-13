@@ -293,8 +293,8 @@ namespace NMib::NDatabase
 		// Version
 		_Stream << (uint32)NResultSet::EResultSetFormatVersion;
 
-		// Structure & MetaData
-		_Stream << mp_MetaData;
+		// Structure & Metadata
+		_Stream << mp_Metadata;
 		_Stream << mp_KeyPartInfos;
 		_Stream << mp_ColumnInfos;
 
@@ -320,8 +320,8 @@ namespace NMib::NDatabase
 
 		DMibBinaryStreamVersion(_Stream, Version);
 
-		// Structure & MetaData
-		_Stream >> mp_MetaData;
+		// Structure & Metadata
+		_Stream >> mp_Metadata;
 		_Stream >> mp_KeyPartInfos;
 		_Stream >> mp_ColumnInfos;
 

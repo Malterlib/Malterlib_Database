@@ -46,11 +46,11 @@ Usage Example:
 		.f_Column(", World!")
 		.f_Column(nullptr);
 
-// Step 4: Attach meta data:
+// Step 4: Attach metadata:
 // (can be done before or after step 3)
-	Builder.f_AddMetaData(0, MyMetaData);
-	Builder.f_SetKeyPartMetaData(0, OtherMetaData);
-	Builder.f_SetColumnMetaData(0, AnotherMetaData);
+	Builder.f_AddMetadata(0, MyMetadata);
+	Builder.f_SetKeyPartMetadata(0, OtherMetadata);
+	Builder.f_SetColumnMetadata(0, AnotherMetadata);
 
 */
 #pragma once
@@ -95,7 +95,7 @@ namespace NMib::NDatabase
 		// Structure:
 		//
 
-		NContainer::TCMap<uint32, CResultMetaData> mp_MetaData;	// Lookup by uint32 m_ID
+		NContainer::TCMap<uint32, CResultMetadata> mp_Metadata;	// Lookup by uint32 m_ID
 		NContainer::TCVector<NResultSet::CElementInfo> mp_KeyPartInfos;	// Index by iKeyPart
 		NContainer::TCVector<NResultSet::CElementInfo> mp_ColumnInfos;	// Index by iColumn
 
@@ -214,9 +214,9 @@ namespace NMib::NDatabase
 		void f_SetDescription( NContainer::TCVector<EResultDataType> const& _lKeyPartTypes, NContainer::TCVector<NResultSet::CSubType> const& _lKeyPartSubTypes, NContainer::TCVector<EResultDataType> const& _lColumnTypes, NContainer::TCVector<NResultSet::CSubType> const& _lColumnSubTypes);
 		void f_SetDescription( CResultSetDescription const& _Desc );
 
-		void f_AddMetaData(uint32 _ID, CResultMetaData _Data);
-		void f_SetKeyPartMetaData(mint _iKeyPart, CResultMetaData _Data);
-		void f_SetColumnMetaData(mint _iColumn, CResultMetaData _Data);
+		void f_AddMetadata(uint32 _ID, CResultMetadata _Data);
+		void f_SetKeyPartMetadata(mint _iKeyPart, CResultMetadata _Data);
+		void f_SetColumnMetadata(mint _iColumn, CResultMetadata _Data);
 
 		template<typename t_CType>
 		inline mint f_AddKeyPartValue(uint32 _iKeyPart, t_CType && _Value);

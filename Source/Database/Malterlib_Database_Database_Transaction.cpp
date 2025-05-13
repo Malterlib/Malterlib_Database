@@ -647,7 +647,7 @@ namespace NMib::NDatabase
 		if (!F_ISSET(txn->mt_flags, MDB_TXN_NOSYNC))
 			env->mdb_env_sync0(0, txn->mt_next_pgno);
 		if (int rc = NPrivate::mdb_env_write_meta(txn))
-			DMibError(NStr::fg_Format("Error writing meta data: {}", mdb_strerror(rc)));
+			DMibError(NStr::fg_Format("Error writing metadata: {}", mdb_strerror(rc)));
 		end_mode = MDB_END_COMMITTED|MDB_END_UPDATE;
 		if (env->me_flags & EDatabaseEnvironmentFlag_PreviousSnapshot) {
 			if (!(env->me_flags & EDatabaseEnvironmentFlag_NoLock)) {

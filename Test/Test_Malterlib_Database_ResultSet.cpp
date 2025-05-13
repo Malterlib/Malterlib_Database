@@ -53,24 +53,24 @@ namespace
 				.f_Column(lBinData);
 
 
-			// Add result set meta data.
-			NMib::NContainer::CByteVector MetaData;
+			// Add result set metadata.
+			NMib::NContainer::CByteVector Metadata;
 
-			MetaData.f_Insert(1);
-			_Builder.f_AddMetaData(1, MetaData);
-			MetaData[0] = 2;
-			_Builder.f_AddMetaData(2, MetaData);
+			Metadata.f_Insert(1);
+			_Builder.f_AddMetadata(1, Metadata);
+			Metadata[0] = 2;
+			_Builder.f_AddMetadata(2, Metadata);
 
-			// Add key part meta data.
-			MetaData[0] = 3;
-			_Builder.f_SetKeyPartMetaData(0, MetaData);
+			// Add key part metadata.
+			Metadata[0] = 3;
+			_Builder.f_SetKeyPartMetadata(0, Metadata);
 
-			MetaData[0] = 4;
-			_Builder.f_SetKeyPartMetaData(1, MetaData);
+			Metadata[0] = 4;
+			_Builder.f_SetKeyPartMetadata(1, Metadata);
 
-			// Add column meta data.
-			MetaData[0] = 5;
-			_Builder.f_SetColumnMetaData(0, MetaData);					
+			// Add column metadata.
+			Metadata[0] = 5;
+			_Builder.f_SetColumnMetadata(0, Metadata);
 		}
 
 
@@ -123,24 +123,24 @@ namespace
 				Column3.f_AddValue(lBinData);
 			}
 
-			// Add result set meta data.
-			NMib::NContainer::CByteVector MetaData;
+			// Add result set metadata.
+			NMib::NContainer::CByteVector Metadata;
 
-			MetaData.f_Insert(1);
-			_Builder.f_AddMetaData(1, MetaData);
-			MetaData[0] = 2;
-			_Builder.f_AddMetaData(2, MetaData);
+			Metadata.f_Insert(1);
+			_Builder.f_AddMetadata(1, Metadata);
+			Metadata[0] = 2;
+			_Builder.f_AddMetadata(2, Metadata);
 
-			// Add key part meta data.
-			MetaData[0] = 3;
-			_Builder.f_SetKeyPartMetaData(0, MetaData);
+			// Add key part metadata.
+			Metadata[0] = 3;
+			_Builder.f_SetKeyPartMetadata(0, Metadata);
 
-			MetaData[0] = 4;
-			_Builder.f_SetKeyPartMetaData(1, MetaData);
+			Metadata[0] = 4;
+			_Builder.f_SetKeyPartMetadata(1, Metadata);
 
-			// Add column meta data.
-			MetaData[0] = 5;
-			_Builder.f_SetColumnMetaData(0, MetaData);					
+			// Add column metadata.
+			Metadata[0] = 5;
+			_Builder.f_SetColumnMetadata(0, Metadata);
 		}
 
 		void f_TestResultSet(CResultSet const& _RS)
@@ -159,51 +159,51 @@ namespace
 			DMibTest(DMibExpr(EResultDataType_Binary) == DMibExpr(_RS.f_GetColumnType(3)));
 
 
-			{ // Check we can get the result set meta data OK, and that lookup by ID works.
-				DMibTestPath("Check MetaData 0");
-				NMib::NContainer::CByteVector const* pMetaData = nullptr;
+			{ // Check we can get the result set metadata OK, and that lookup by ID works.
+				DMibTestPath("Check Metadata 0");
+				NMib::NContainer::CByteVector const* pMetadata = nullptr;
 
-				pMetaData = _RS.f_GetMetaData(0);
-				DMibTest(DMibExpr(nullptr) == DMibExpr(pMetaData));
+				pMetadata = _RS.f_GetMetadata(0);
+				DMibTest(DMibExpr(nullptr) == DMibExpr(pMetadata));
 			}
 
 			{
-				DMibTestPath("Check MetaData 1");
-				NMib::NContainer::CByteVector const* pMetaData = nullptr;
-				pMetaData = _RS.f_GetMetaData(1);
-				DMibTest(DMibExpr(nullptr) != DMibExpr(pMetaData));
-				DMibTest(DMibExpr(1) == DMibExpr(pMetaData->f_GetLen()));
-				DMibTest(DMibExpr(1) == DMibExpr(pMetaData->operator[](0)));
+				DMibTestPath("Check Metadata 1");
+				NMib::NContainer::CByteVector const* pMetadata = nullptr;
+				pMetadata = _RS.f_GetMetadata(1);
+				DMibTest(DMibExpr(nullptr) != DMibExpr(pMetadata));
+				DMibTest(DMibExpr(1) == DMibExpr(pMetadata->f_GetLen()));
+				DMibTest(DMibExpr(1) == DMibExpr(pMetadata->operator[](0)));
 			}
 
 			{
-				DMibTestPath("Check MetaData 2");
-				NMib::NContainer::CByteVector const* pMetaData = nullptr;
-				pMetaData = _RS.f_GetMetaData(2);
-				DMibTest(DMibExpr(nullptr) != DMibExpr(pMetaData));
-				DMibTest(DMibExpr(1) == DMibExpr(pMetaData->f_GetLen()));
-				DMibTest(DMibExpr(2) == DMibExpr(pMetaData->operator[](0)));
+				DMibTestPath("Check Metadata 2");
+				NMib::NContainer::CByteVector const* pMetadata = nullptr;
+				pMetadata = _RS.f_GetMetadata(2);
+				DMibTest(DMibExpr(nullptr) != DMibExpr(pMetadata));
+				DMibTest(DMibExpr(1) == DMibExpr(pMetadata->f_GetLen()));
+				DMibTest(DMibExpr(2) == DMibExpr(pMetadata->operator[](0)));
 			}
 
 			{
-				DMibTestPath("Check KeyPart 0 Meta Data");
-				NMib::NContainer::CByteVector const& MetaData = _RS.f_GetKeyPartMetaData(0);
-				DMibTest(DMibExpr(1) == DMibExpr(MetaData.f_GetLen()));
-				DMibTest(DMibExpr(3) == DMibExpr(MetaData.operator[](0)));
+				DMibTestPath("Check KeyPart 0 Metadata");
+				NMib::NContainer::CByteVector const& Metadata = _RS.f_GetKeyPartMetadata(0);
+				DMibTest(DMibExpr(1) == DMibExpr(Metadata.f_GetLen()));
+				DMibTest(DMibExpr(3) == DMibExpr(Metadata.operator[](0)));
 			}
 
 			{
-				DMibTestPath("Check KeyPart 1 Meta Data");
-				NMib::NContainer::CByteVector const& MetaData = _RS.f_GetKeyPartMetaData(1);
-				DMibTest(DMibExpr(1) == DMibExpr(MetaData.f_GetLen()));
-				DMibTest(DMibExpr(4) == DMibExpr(MetaData.operator[](0)));
+				DMibTestPath("Check KeyPart 1 Metadata");
+				NMib::NContainer::CByteVector const& Metadata = _RS.f_GetKeyPartMetadata(1);
+				DMibTest(DMibExpr(1) == DMibExpr(Metadata.f_GetLen()));
+				DMibTest(DMibExpr(4) == DMibExpr(Metadata.operator[](0)));
 			}
 
 			{
-				DMibTestPath("Check Column 0 Meta Data");
-				NMib::NContainer::CByteVector const& MetaData = _RS.f_GetColumnMetaData(0);
-				DMibTest(DMibExpr(1) == DMibExpr(MetaData.f_GetLen()));
-				DMibTest(DMibExpr(5) == DMibExpr(MetaData.operator[](0)));
+				DMibTestPath("Check Column 0 Metadata");
+				NMib::NContainer::CByteVector const& Metadata = _RS.f_GetColumnMetadata(0);
+				DMibTest(DMibExpr(1) == DMibExpr(Metadata.f_GetLen()));
+				DMibTest(DMibExpr(5) == DMibExpr(Metadata.operator[](0)));
 			}
 
 			// Check we have access to each row

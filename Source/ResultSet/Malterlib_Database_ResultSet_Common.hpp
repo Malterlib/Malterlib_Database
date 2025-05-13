@@ -10,14 +10,14 @@ namespace NMib::NDatabase::NResultSet
 	//
 
 	template <typename tf_CStream>
-	void CMetaDataEntry::f_Feed(tf_CStream &_Stream) const
+	void CMetadataEntry::f_Feed(tf_CStream &_Stream) const
 	{
 		_Stream << m_ID
 				<< m_Data;
 	}
 
 	template <typename tf_CStream>
-	void CMetaDataEntry::f_Consume(tf_CStream &_Stream)
+	void CMetadataEntry::f_Consume(tf_CStream &_Stream)
 	{
 		_Stream >> m_ID
 				>> m_Data;
@@ -74,7 +74,7 @@ namespace NMib::NDatabase::NResultSet
 	{
 		_Stream << (uint32)m_Type
 				<< m_SubType
-				<< m_MetaData;
+				<< m_Metadata;
 	}
 
 	template <typename tf_CStream>
@@ -82,7 +82,7 @@ namespace NMib::NDatabase::NResultSet
 	{
 		_Stream >> (uint32&)m_Type
 				>> m_SubType
-				>> m_MetaData;
+				>> m_Metadata;
 	}
 
 	// Utility class for converting to/from result data types
