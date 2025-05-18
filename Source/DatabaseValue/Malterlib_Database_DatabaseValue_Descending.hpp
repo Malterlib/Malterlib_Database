@@ -16,14 +16,14 @@ namespace NMib::NDatabase
 	template <typename tf_CValue>
 	TCDescending<tf_CValue> fg_Descending(tf_CValue &&_Value)
 	{
-		return TCDescending<typename NTraits::TCRemoveReference<tf_CValue>::CType>(_Value);
+		return TCDescending<NTraits::TCRemoveReference<tf_CValue>>(_Value);
 	}
 
 	template <bool tf_bDescending, typename tf_CValue>
 	decltype(auto) fg_Descending(tf_CValue &&_Value)
 	{
 		if constexpr (tf_bDescending)
-			return (TCDescending<typename NTraits::TCRemoveReference<tf_CValue>::CType>(_Value));
+			return (TCDescending<NTraits::TCRemoveReference<tf_CValue>>(_Value));
 		else
 			return fg_Forward<tf_CValue>(_Value);
 	}
@@ -32,7 +32,7 @@ namespace NMib::NDatabase
 	struct TCGetDescending
 	{
 		static constexpr bool mc_bDescending = false;
-		using CType = typename NTraits::TCRemoveQualifiers<t_CValue>::CType;
+		using CType = NTraits::TCRemoveQualifiers<t_CValue>;
 
 		template <typename tf_CType>
 		static tf_CType &&fs_GetValue(tf_CType &&_Value)
@@ -45,7 +45,7 @@ namespace NMib::NDatabase
 	struct TCGetDescending<TCDescending<t_CValue>>
 	{
 		static constexpr bool mc_bDescending = true;
-		using CType = typename NTraits::TCRemoveQualifiers<t_CValue>::CType;
+		using CType = NTraits::TCRemoveQualifiers<t_CValue>;
 
 		template <typename tf_CType>
 		static decltype(auto) fs_GetValue(tf_CType &&_Value)
@@ -55,7 +55,7 @@ namespace NMib::NDatabase
 	};
 
 	template <typename t_CType>
-	struct TCDatabaseStreamLexicographic<t_CType, true, TCEnableIfType<TCDatabaseStreamLexicographicAutoDescending<t_CType>::mc_bValue>>
+	struct TCDatabaseStreamLexicographic<t_CType, true, TCEnableIf<TCDatabaseStreamLexicographicAutoDescending<t_CType>::mc_bValue>>
 	{
 		template <typename t_CStream>
 		struct TCBinaryStream_Invert : public NStream::CBinaryStreamBigEndian

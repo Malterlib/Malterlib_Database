@@ -165,13 +165,13 @@ namespace
 					DMibTestPath(_Path);
 					CDatabaseValueCache Cache;
 					auto RecodedValue = CDatabaseValue::fs_ToLexicographic(Cache, fg_Descending<tf_bDescending>(_Value))
-						.template f_FromLexicographic<typename NTraits::TCRemoveReferenceAndQualifiers<decltype(fg_Descending<tf_bDescending>(_Value))>::CType>()
+						.template f_FromLexicographic<NTraits::TCRemoveReferenceAndQualifiers<decltype(fg_Descending<tf_bDescending>(_Value))>>()
 					;
 
 					DMibExpect(RecodedValue, ==, _Value);
 
 					auto RecodedTuple = CDatabaseValue::fs_ToLexicographic(Cache, fg_Descending<tf_bDescending>(_Value))
-						.template f_TupleFromLexicographic<typename NTraits::TCRemoveReferenceAndQualifiers<decltype(fg_Descending<tf_bDescending>(_Value))>::CType>()
+						.template f_TupleFromLexicographic<NTraits::TCRemoveReferenceAndQualifiers<decltype(fg_Descending<tf_bDescending>(_Value))>>()
 					;
 					DMibExpect(fg_Get<0>(RecodedTuple), ==, _Value);
 				}
@@ -183,13 +183,13 @@ namespace
 					DMibTestPath(_Path);
 					CDatabaseValueCache Cache;
 					auto RecodedValue = CDatabaseValue::fs_ToLexicographic(Cache, fg_Descending<tf_bDescending>(_Value))
-						.template f_FromLexicographic<typename NTraits::TCRemoveReferenceAndQualifiers<decltype(fg_Descending<tf_bDescending>(_Value))>::CType>()
+						.template f_FromLexicographic<NTraits::TCRemoveReferenceAndQualifiers<decltype(fg_Descending<tf_bDescending>(_Value))>>()
 					;
-					using CInteger = typename NTraits::TCIntFromSize<sizeof(_Value)>::CType;
+					using CInteger = NTraits::TCIntFromSize<sizeof(_Value)>;
 					DMibExpect((CInteger const &)RecodedValue, ==, (CInteger const &)_Value);
 
 					auto RecodedTuple = CDatabaseValue::fs_ToLexicographic(Cache, fg_Descending<tf_bDescending>(_Value))
-						.template f_TupleFromLexicographic<typename NTraits::TCRemoveReferenceAndQualifiers<decltype(fg_Descending<tf_bDescending>(_Value))>::CType>()
+						.template f_TupleFromLexicographic<NTraits::TCRemoveReferenceAndQualifiers<decltype(fg_Descending<tf_bDescending>(_Value))>>()
 					;
 					DMibExpect((CInteger const &)fg_Get<0>(RecodedTuple), ==, (CInteger const &)_Value);
 				}

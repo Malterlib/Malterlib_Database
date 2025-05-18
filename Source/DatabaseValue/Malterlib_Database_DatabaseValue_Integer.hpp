@@ -6,7 +6,7 @@
 namespace NMib::NDatabase
 {
 	template <typename t_CType>
-	struct TCDatabaseStreamLexicographic<t_CType, false, TCEnableIfType<NTraits::TCIsInteger<t_CType>::mc_Value && NTraits::TCIsSigned<t_CType>::mc_Value>>
+	struct TCDatabaseStreamLexicographic<t_CType, false, TCEnableIf<NTraits::cIsInteger<t_CType> && NTraits::cIsSigned<t_CType>>>
 	{
 		template <typename tf_CStream>
 		static void fs_Encode(tf_CStream &_Stream, t_CType const &_Value)
@@ -25,7 +25,7 @@ namespace NMib::NDatabase
 	};
 
 	template <typename t_CType>
-	struct TCDatabaseStreamLexicographic<t_CType, false, TCEnableIfType<NTraits::TCIsInteger<t_CType>::mc_Value && !NTraits::TCIsSigned<t_CType>::mc_Value>>
+	struct TCDatabaseStreamLexicographic<t_CType, false, TCEnableIf<NTraits::cIsInteger<t_CType> && !NTraits::cIsSigned<t_CType>>>
 	{
 		template <typename tf_CStream>
 		static void fs_Encode(tf_CStream &_Stream, t_CType const &_Value)

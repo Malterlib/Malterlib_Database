@@ -6,7 +6,7 @@
 namespace NMib::NDatabase::NPrivate
 {
 	template <typename ...tfp_CValue, mint ...tfp_Indices>
-	NStorage::TCTuple<typename TCGetDescending<typename NTraits::TCRemoveQualifiers<tfp_CValue>::CType>::CType...> fg_ConsumeLexicographicByteArrayImpl
+	NStorage::TCTuple<typename TCGetDescending<NTraits::TCRemoveQualifiers<tfp_CValue>>::CType...> fg_ConsumeLexicographicByteArrayImpl
 		(
 			CDatabaseValue const &_Value
 			, NMeta::TCIndices<tfp_Indices...> _Dummy
@@ -14,12 +14,12 @@ namespace NMib::NDatabase::NPrivate
 	{
 		NStream::CBinaryStreamMemoryPtr<NStream::CBinaryStreamBigEndian> Stream;
 		Stream.f_OpenRead(_Value.m_pData, _Value.m_Size);
-		NStorage::TCTuple<typename TCGetDescending<typename NTraits::TCRemoveQualifiers<tfp_CValue>::CType>::CType...> Values;
+		NStorage::TCTuple<typename TCGetDescending<NTraits::TCRemoveQualifiers<tfp_CValue>>::CType...> Values;
 
 		(
 			[&]
 			{
-				using CDecodedDescending = TCGetDescending<typename NTraits::TCRemoveQualifiers<tfp_CValue>::CType>;
+				using CDecodedDescending = TCGetDescending<NTraits::TCRemoveQualifiers<tfp_CValue>>;
 				CDatabaseValue::fs_ConsumeLexicographic(Stream, fg_Descending<CDecodedDescending::mc_bDescending>(fg_Get<tfp_Indices>(Values)));
 			}
 			()

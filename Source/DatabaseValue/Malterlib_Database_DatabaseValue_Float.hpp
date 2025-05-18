@@ -6,9 +6,9 @@
 namespace NMib::NDatabase
 {
 	template <typename t_CType>
-	struct TCDatabaseStreamLexicographic<t_CType, false, TCEnableIfType<NTraits::TCIsFloat<t_CType>::mc_Value>>
+	struct TCDatabaseStreamLexicographic<t_CType, false, TCEnableIf<NTraits::cIsFloat<t_CType>>>
 	{
-		using CInteger = typename NTraits::TCIntFromSize<sizeof(t_CType)>::CType;
+		using CInteger = NTraits::TCIntFromSize<sizeof(t_CType)>;
 
 		template <typename tf_CStream>
 		static void fs_Encode(tf_CStream &_Stream, t_CType const &_Value)

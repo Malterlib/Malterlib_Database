@@ -10,7 +10,7 @@ namespace NMib::NDatabase
 		<
 			typename NConcurrency::NPrivate::TCIsFuture
 			<
-				typename NTraits::TCMemberFunctionPointerTraits<decltype(&NTraits::TCRemoveReference<tf_CFunctor>::CType::operator ())>::CReturn
+				typename NTraits::TCMemberFunctionPointerTraits<decltype(&NTraits::TCRemoveReference<tf_CFunctor>::operator ())>::CReturn
 			>::CType
 		>
 	{

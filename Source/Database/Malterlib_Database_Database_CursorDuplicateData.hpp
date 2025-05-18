@@ -27,9 +27,9 @@ namespace NMib::NDatabase
 	{
 		auto &ThreadLocal = **g_DatabaseThreadLocal;
 
-		if constexpr (NTraits::TCIsSame<tf_CKey, CDatabaseValue>::mc_Value)
+		if constexpr (NTraits::cIsSame<tf_CKey, CDatabaseValue>)
 			return f_FindEqual(_Key, CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_ValueCache, _Value));
-		else if constexpr (NTraits::TCIsSame<tf_CValue, CDatabaseValue>::mc_Value)
+		else if constexpr (NTraits::cIsSame<tf_CValue, CDatabaseValue>)
 			return f_FindEqual(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_KeyCache, _Key), _Value);
 		else
 			return f_FindEqual(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_KeyCache, _Key), CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_ValueCache, _Value));
@@ -40,9 +40,9 @@ namespace NMib::NDatabase
 	{
 		auto &ThreadLocal = **g_DatabaseThreadLocal;
 
-		if constexpr (NTraits::TCIsSame<tf_CKey, CDatabaseValue>::mc_Value)
+		if constexpr (NTraits::cIsSame<tf_CKey, CDatabaseValue>)
 			return f_FindLowerBound(_Key, CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_ValueCache, _Value));
-		else if constexpr (NTraits::TCIsSame<tf_CValue, CDatabaseValue>::mc_Value)
+		else if constexpr (NTraits::cIsSame<tf_CValue, CDatabaseValue>)
 			return f_FindLowerBound(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_KeyCache, _Key), _Value);
 		else
 			return f_FindLowerBound(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_KeyCache, _Key), CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_ValueCache, _Value));
@@ -61,9 +61,9 @@ namespace NMib::NDatabase
 	{
 		auto &ThreadLocal = **g_DatabaseThreadLocal;
 
-		if constexpr (NTraits::TCIsSame<tf_CKey, CDatabaseValue>::mc_Value)
+		if constexpr (NTraits::cIsSame<tf_CKey, CDatabaseValue>)
 			return f_Insert(_Key, CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_ValueCache, _Value), _bAppend);
-		else if constexpr (NTraits::TCIsSame<tf_CValue, CDatabaseValue>::mc_Value)
+		else if constexpr (NTraits::cIsSame<tf_CValue, CDatabaseValue>)
 			return f_Insert(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_KeyCache, _Key), _Value, _bAppend);
 		else
 			return f_Insert(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_KeyCache, _Key), CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_ValueCache, _Value), _bAppend);
@@ -74,9 +74,9 @@ namespace NMib::NDatabase
 	{
 		auto &ThreadLocal = **g_DatabaseThreadLocal;
 
-		if constexpr (NTraits::TCIsSame<tf_CKey, CDatabaseValue>::mc_Value)
+		if constexpr (NTraits::cIsSame<tf_CKey, CDatabaseValue>)
 			return f_Upsert(_Key, CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_ValueCache, _Value), _bAppend);
-		else if constexpr (NTraits::TCIsSame<tf_CValue, CDatabaseValue>::mc_Value)
+		else if constexpr (NTraits::cIsSame<tf_CValue, CDatabaseValue>)
 			return f_Upsert(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_KeyCache, _Key), _Value, _bAppend);
 		else
 			return f_Upsert(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_KeyCache, _Key), CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_ValueCache, _Value), _bAppend);

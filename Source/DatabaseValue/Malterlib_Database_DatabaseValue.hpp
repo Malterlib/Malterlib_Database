@@ -128,7 +128,7 @@ namespace NMib::NDatabase
 	template <typename tf_CValue>
 	auto CDatabaseValue::f_FromLexicographic() const
 	{
-		using CDecodedDescending = TCGetDescending<typename NTraits::TCRemoveQualifiers<tf_CValue>::CType>;
+		using CDecodedDescending = TCGetDescending<NTraits::TCRemoveQualifiers<tf_CValue>>;
 
 		NStream::CBinaryStreamMemoryPtr<NStream::CBinaryStreamBigEndian> Stream;
 		Stream.f_OpenRead(m_pData, m_Size);
@@ -181,8 +181,8 @@ namespace NMib::NDatabase
 	template <typename tf_CStream, typename tf_CValue>
 	void CDatabaseValue::fs_FeedLexicographic(tf_CStream &_Stream, tf_CValue const &_Value)
 	{
-		using CDecodedDescending = TCGetDescending<typename NTraits::TCRemoveQualifiers<tf_CValue>::CType>;
-		TCDatabaseStreamLexicographic<typename NTraits::TCRemoveQualifiers<typename CDecodedDescending::CType>::CType, CDecodedDescending::mc_bDescending>::fs_Encode
+		using CDecodedDescending = TCGetDescending<NTraits::TCRemoveQualifiers<tf_CValue>>;
+		TCDatabaseStreamLexicographic<NTraits::TCRemoveQualifiers<typename CDecodedDescending::CType>, CDecodedDescending::mc_bDescending>::fs_Encode
 			(
 				_Stream
 				, CDecodedDescending::fs_GetValue(_Value)
@@ -193,8 +193,8 @@ namespace NMib::NDatabase
 	template <typename tf_CStream, typename tf_CValue>
 	void CDatabaseValue::fs_ConsumeLexicographic(tf_CStream &_Stream, tf_CValue &&o_Value)
 	{
-		using CDecodedDescending = TCGetDescending<typename NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>::CType>;
-		TCDatabaseStreamLexicographic<typename NTraits::TCRemoveQualifiers<typename CDecodedDescending::CType>::CType, CDecodedDescending::mc_bDescending>::fs_Decode
+		using CDecodedDescending = TCGetDescending<NTraits::TCRemoveReferenceAndQualifiers<tf_CValue>>;
+		TCDatabaseStreamLexicographic<NTraits::TCRemoveQualifiers<typename CDecodedDescending::CType>, CDecodedDescending::mc_bDescending>::fs_Decode
 			(
 				_Stream
 				, CDecodedDescending::fs_GetValue(o_Value)
