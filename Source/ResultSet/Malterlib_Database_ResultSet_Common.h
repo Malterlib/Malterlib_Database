@@ -25,7 +25,7 @@ namespace NMib::NDatabase
 
 
 	// Represents a single bit of metadata in a binary blob
-	typedef NContainer::CByteVector CResultMetadata;
+	using CResultMetadata = NContainer::CByteVector;
 
 	namespace NResultSet
 	{
@@ -55,7 +55,7 @@ namespace NMib::NDatabase
 		};
 
 		// Represents the subtype of a key part or column
-		typedef uint8 CSubType;
+		using CSubType = uint8;
 
 		// Represents information about either a key part or a column.
 		struct CElementInfo
@@ -72,10 +72,10 @@ namespace NMib::NDatabase
 		};
 
 		// Represents a binary blob
-		typedef NContainer::CByteVector CBlob;
+		using CBlob = NContainer::CByteVector;
 
 		// Represents a value that can be stored in either a row key part or a row column.
-		typedef NStorage::TCStreamableVariant
+		using CValue = NStorage::TCStreamableVariant
 			<
 				EResultDataType
 				, NStorage::TCMember<NStr::CStr, EResultDataType_CStr>
@@ -87,12 +87,12 @@ namespace NMib::NDatabase
 				, NStorage::TCMember<int64, EResultDataType_int64>
 				, NStorage::TCMember<fp32, EResultDataType_fp32>
 				*/
-			> CValue
+			>
 		;
 
 		// Represents a vector of values.
 		// Used to store the value of a specific key part for all rows.
-		typedef NStorage::TCStreamableVariant
+		using CValueVector = NStorage::TCStreamableVariant
 			<
 				EResultDataType
 				, NStorage::TCMember<NContainer::TCVector<NStr::CStr>, EResultDataType_CStr>
@@ -104,13 +104,13 @@ namespace NMib::NDatabase
 				, NStorage::TCMember<NContainer::TCVector<int64>, EResultDataType_int64>
 				, NStorage::TCMember<NContainer::TCVector<fp32>, EResultDataType_fp32>
 			*/
-			> CValueVector
+			>
 		;
 
-		typedef NContainer::TCVector<mint> CRowKeyPartValueIndices;
+		using CRowKeyPartValueIndices = NContainer::TCVector<mint>;
 
 		// Represents the index of a row (from 0)
-		typedef uint32 CRowIndex;
+		using CRowIndex = uint32;
 
 		// Base class for storing a column value
 		struct CSparseDataEntryBase
@@ -140,7 +140,7 @@ namespace NMib::NDatabase
 		};
 
 		// Represents the list of values for each row of a specific column in a sparse manner.
-		typedef NStorage::TCStreamableVariant
+		using CSparseValueVector = NStorage::TCStreamableVariant
 			<
 				EResultDataType
 				, NStorage::TCMember<NContainer::TCVector<TCSparseDataEntry<NStr::CStr>>, EResultDataType_CStr>
@@ -152,7 +152,7 @@ namespace NMib::NDatabase
 				, NStorage::TCMember<NContainer::TCVector<TCSparseDataEntry<int64>>, EResultDataType_int64>
 				, NStorage::TCMember<NContainer::TCVector<TCSparseDataEntry<fp32>>, EResultDataType_fp32>
 		*/
-			> CSparseValueVector
+			>
 		;
 
 		// Utility class for converting to/from result data types
@@ -163,7 +163,7 @@ namespace NMib::NDatabase
 		{
 //				static_assert( false, "The type you pass in must be one of: CStr, int32, int64, fp32, fp64, TCVector<uin8> or convertible to one.");
 
-//				typedef _OutType CDataType;
+//				using CDataType = _OutType;
 //				static constexpr EResultDataType mc_Type = <DataTypeEnum>; 
 //				static _OutType fs_Convert(_InType _V) { return _OutType (_V); }
 		};

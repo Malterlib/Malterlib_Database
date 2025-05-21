@@ -91,7 +91,7 @@ namespace NMib::NDatabase::NResultSet
 		template<>	\
 		struct TCTypeToDataType< _InType >	\
 		{	\
-			typedef _OutType CDataType; \
+			using CDataType = _OutType; \
 			static constexpr EResultDataType mc_Type = _Enum; \
 			static _OutType fs_Convert(_InType _V) { return _OutType (_V); } \
 		}
@@ -105,7 +105,7 @@ namespace NMib::NDatabase::NResultSet
 	template<>
 	struct TCTypeToDataType< NContainer::CByteVector >
 	{
-		typedef NContainer::CByteVector CDataType;
+		using CDataType = NContainer::CByteVector;
 		static constexpr EResultDataType mc_Type = EResultDataType_Binary;
 		static NContainer::CByteVector fs_Convert(NContainer::CByteVector&& _V) { return fg_Move(_V); }
 	};
@@ -114,7 +114,7 @@ namespace NMib::NDatabase::NResultSet
 	template<>
 	struct TCTypeToDataType< NContainer::CByteVector& >
 	{
-		typedef NContainer::CByteVector CDataType;
+		using CDataType = NContainer::CByteVector;
 		static constexpr EResultDataType mc_Type = EResultDataType_Binary;
 		static NContainer::CByteVector fs_Convert(NContainer::CByteVector const& _V) { return _V; }
 	};
@@ -122,7 +122,7 @@ namespace NMib::NDatabase::NResultSet
 	template<>
 	struct TCTypeToDataType< NContainer::CByteVector const& >
 	{
-		typedef NContainer::CByteVector CDataType;
+		using CDataType = NContainer::CByteVector;
 		static constexpr EResultDataType mc_Type = EResultDataType_Binary;
 		static NContainer::CByteVector fs_Convert(NContainer::CByteVector const& _V) { return _V; }
 	};
@@ -130,7 +130,7 @@ namespace NMib::NDatabase::NResultSet
 	template<size_t t_Len>
 	struct TCTypeToDataType< char const (&)[t_Len] >
 	{
-		typedef NStr::CStr CDataType;
+		using CDataType = NStr::CStr;
 		static constexpr EResultDataType mc_Type = EResultDataType_CStr;
 		static NStr::CStr fs_Convert(char const _V[t_Len]) { return NStr::CStr(_V); }
 	};
