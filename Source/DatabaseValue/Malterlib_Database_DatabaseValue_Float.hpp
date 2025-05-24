@@ -13,7 +13,11 @@ namespace NMib::NDatabase
 		template <typename tf_CStream>
 		static void fs_Encode(tf_CStream &_Stream, t_CType const &_Value)
 		{
-			CInteger Integer = reinterpret_cast<CInteger const &>(_Value);
+			CInteger Integer;
+			if constexpr (requires() { _Value.f_GetAsInteger(); })
+				Integer = _Value.f_GetAsInteger();
+			else
+				Integer = fg_BitCast<CInteger>(_Value);
 
 			if (t_CType::mc_SignBits)
 			{
@@ -39,7 +43,10 @@ namespace NMib::NDatabase
 				Integer ^= SignExtended | SignBit; 
 			}
 			
-			o_Value = reinterpret_cast<t_CType const &>(Integer);
+			if constexpr (requires(CInteger _Int) { o_Value.f_SetAsInteger(_Int); })
+				o_Value.f_SetAsInteger(Integer);
+			else
+				o_Value = fg_BitCast<t_CType>(Integer);
 		}
 	};
 }
