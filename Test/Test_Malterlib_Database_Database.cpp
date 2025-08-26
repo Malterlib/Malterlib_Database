@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Concurrency/ConcurrencyManager>
@@ -19,11 +19,11 @@ namespace NMib::NDatabase
 {
 	CTestEnvironment::CTestEnvironment(CTestEnvironment &&_Other) = default;
 	CTestEnvironment &CTestEnvironment::operator =(CTestEnvironment &&_Other) = default;
-	
+
 	CTestEnvironment::CTestEnvironment()
 	{
 	}
-	
+
 	CTestEnvironment::~CTestEnvironment()
 	{
 		EDatabaseEnvironmentFlag Flags = EDatabaseEnvironmentFlag_None;
@@ -76,7 +76,7 @@ namespace NMib::NDatabase
 		if (_MapSize)
 			Environment.m_Environment.f_SetMapSize(_MapSize);
 		Environment.m_Environment.f_Open(Environment.m_DatabaseDirectory, _OpenFlags, EFileAttrib_None);
-		
+
 		return fg_Move(Environment);
 	}
 }
@@ -86,7 +86,7 @@ namespace
 	class CDatabase_Tests : public NMib::NTest::CTest
 	{
 	public:
-		
+
 		void fp_PopulateEnvironment(CDatabaseEnvironment &_Environment, mint _nDatabases = 16, mint _nValuesPerDatabase = 4*1024)
 		{
 			_Environment.f_SetMapSize(_nDatabases * _nValuesPerDatabase * 256 * fg_Max(NSys::fg_Mem_PageSize() / 4096u, 1u));
@@ -130,7 +130,7 @@ namespace
 		{
 			auto Transaction = _Environment.f_BeginWriteTransaction();
 			auto Databases = Transaction.f_EnumDatabases();
-			
+
 			for (auto &DatabaseName : Databases)
 			{
 				auto Database = Transaction.f_OpenDatabase(DatabaseName);
@@ -149,18 +149,18 @@ namespace
 			}
 			Transaction.f_Commit();
 		}
-		
+
 		bool fp_EnvironmentsSame(CDatabaseEnvironment &_Environment0, CDatabaseEnvironment &_Environment1)
 		{
 			auto TransactionLeft = _Environment0.f_BeginReadTransaction();
 			auto TransactionRight = _Environment1.f_BeginReadTransaction();
-			
+
 			auto LeftDatabases = TransactionLeft.f_EnumDatabases();
 			auto ReightDatabases = TransactionRight.f_EnumDatabases();
-			
+
 			if (LeftDatabases != ReightDatabases)
 				return false;
-			
+
 			for (auto &DatabaseName : LeftDatabases)
 			{
 				auto LeftDatabase = TransactionLeft.f_OpenDatabaseTransaction(DatabaseName);
@@ -177,12 +177,12 @@ namespace
 					auto &RightKey = iRightCursor.f_Key();
 					if (LeftKey != RightKey)
 						return false;
-					
+
 					auto &LeftValue = iLeftCursor.f_Value();
 					auto &RightValue = iRightCursor.f_Value();
 					if (LeftValue != RightValue)
 						return false;
-					
+
 					++iLeftCursor;
 					++iRightCursor;
 				}
@@ -207,10 +207,10 @@ namespace
 			DMibExpectExceptionType(_Environment.m_Environment.f_Copy(CopyPath), NException::CException);
 
 			auto EnvironmentCopy = fg_GetTestEnvironment(_Environment.m_FileName + _Name, false);
-		
+
 			DMibExpectTrue(fp_EnvironmentsSame(_Environment.m_Environment, EnvironmentCopy.m_Environment));
 		}
-		
+
 		void f_DoTests()
 		{
 			DMibTestSuite("Basics")
@@ -331,7 +331,7 @@ namespace
 					auto Environment = fg_GetTestEnvironment("TestDatabase2");
 					fp_PopulateEnvironment(Environment.m_Environment, 16, 128);
 					DMibExpect(Environment.m_Environment.f_Statistics().m_nDataItems, ==, 16);
-					
+
 					auto Transaction = Environment.m_Environment.f_BeginReadTransaction();
 					DMibExpect(Transaction.f_OpenDatabaseTransaction().f_DatabaseStatistics().m_nDataItems, ==, 16);
 					for (auto &Database : Transaction.f_EnumDatabases())
@@ -347,7 +347,7 @@ namespace
 					DMibExpect(Info.m_LastCommittedTransactionID, ==, 1);
 					DMibExpect(Environment.m_Environment.f_GetPath(), ==, CFile::fs_GetProgramDirectory() + "/TestDatabase3");
 					DMibExpect(Environment.m_Environment.f_GetFD(), !=, nullptr);
-					
+
 					auto ReadOnly0 = fg_GetTestEnvironment("TestDatabase3", false, EDatabaseEnvironmentFlag_ReadOnly | EDatabaseEnvironmentFlag_NoTls);
 					auto ReadOnly1 = fg_GetTestEnvironment("TestDatabase3", false, EDatabaseEnvironmentFlag_ReadOnly | EDatabaseEnvironmentFlag_NoTls);
 					auto ReadTransaciton00 = ReadOnly0.m_Environment.f_BeginReadTransaction();
@@ -355,7 +355,7 @@ namespace
 					auto ReadTransaciton10 = ReadOnly1.m_Environment.f_BeginReadTransaction();
 					auto ReadTransaciton11 = ReadOnly1.m_Environment.f_BeginReadTransaction();
 					auto ReaderInfos = Environment.m_Environment.f_GetReaderInfos();
-					
+
 					DMibExpect(ReaderInfos.f_GetLen(), ==, 4);
 				};
 				DMibTestSuite("Sync")
@@ -392,7 +392,7 @@ namespace
 					fp_PopulateEnvironment(Writable.m_Environment);
 					auto ReadOnly = fg_GetTestEnvironment("TestDatabase8", false, EDatabaseEnvironmentFlag_ReadOnly);
 					DMibExpectTrue(fp_EnvironmentsSame(Writable.m_Environment, ReadOnly.m_Environment));
-					
+
 					DMibExpectException
 						(
 							ReadOnly.m_Environment.f_BeginWriteTransaction()
@@ -425,18 +425,152 @@ namespace
 					fp_DoCopy("Copy", EDatabaseEnvironmentCopyFlag_None, Environment);
 				};
 
-	/*			
-				TODO
-				void f_SetMapSize(CDatabaseSize size);
-				void f_SetMaxReaders(uint32 _nReaders);
-				uint32 f_MaxReaders();
-				void f_SetMaxDatabases(CDatabaseDatabaseID _DatabaseID);
-				mint f_MaxKeySize();
-				void f_EnumerateReadersInfo(NFunction::TCFunction<void (ch8 const *_pMessage)> const &_fEnumerate);
-				mint f_CheckForStaleReaders();
-				CDatabaseReadTransaction f_BeginReadTransaction();
-				CDatabaseWriteTransaction f_BeginWriteTransaction(EDatabaseWriteTrasactionFlag _Flags = EDatabaseWriteTrasactionFlag_None);
-	*/
+				DMibTestSuite("SetMapSize")
+				{
+					CTestEnvironment TestEnvironment;
+					TestEnvironment.m_FileName = "TestDatabase_MapSize";
+					TestEnvironment.m_DatabaseDirectory = CFile::fs_GetProgramDirectory() / TestEnvironment.m_FileName;
+					if (CFile::fs_FileExists(TestEnvironment.m_DatabaseDirectory))
+						CFile::fs_DeleteDirectoryRecursive(TestEnvironment.m_DatabaseDirectory, true);
+					if (CFile::fs_FileExists(TestEnvironment.m_DatabaseDirectory + ".lock"))
+						CFile::fs_DeleteDirectoryRecursive(TestEnvironment.m_DatabaseDirectory + ".lock", true);
+					CFile::fs_CreateDirectory(TestEnvironment.m_DatabaseDirectory);
+
+					CDatabaseOffset const MapSize = 16u * 1024u * 1024u; // 16MB
+					TestEnvironment.m_Environment.f_SetMapSize(MapSize);
+					TestEnvironment.m_Environment.f_Open(TestEnvironment.m_DatabaseDirectory, EDatabaseEnvironmentFlag_None, EFileAttrib_None);
+
+					auto EnvironmentInfo = TestEnvironment.m_Environment.f_Info();
+					DMibExpect(EnvironmentInfo.m_MapSize, ==, MapSize);
+
+					{
+						// Cannot change mapsize while a write transaction is open
+						auto WriteTransaction = TestEnvironment.m_Environment.f_BeginWriteTransaction();
+						DMibExpectException(TestEnvironment.m_Environment.f_SetMapSize(MapSize * 2), DMibErrorInstance("Cannot set map size when write transaction is open"));
+						WriteTransaction.f_Commit();
+					}
+				};
+
+				DMibTestSuite("MaxReaders")
+				{
+					CTestEnvironment TestEnvironment;
+					TestEnvironment.m_FileName = "TestDatabase_MaxReaders";
+					TestEnvironment.m_DatabaseDirectory = CFile::fs_GetProgramDirectory() / TestEnvironment.m_FileName;
+					if (CFile::fs_FileExists(TestEnvironment.m_DatabaseDirectory))
+						CFile::fs_DeleteDirectoryRecursive(TestEnvironment.m_DatabaseDirectory, true);
+					if (CFile::fs_FileExists(TestEnvironment.m_DatabaseDirectory + ".lock"))
+						CFile::fs_DeleteDirectoryRecursive(TestEnvironment.m_DatabaseDirectory + ".lock", true);
+					CFile::fs_CreateDirectory(TestEnvironment.m_DatabaseDirectory);
+
+					DMibExpectException(TestEnvironment.m_Environment.f_SetMaxReaders(0), DMibErrorInstance("A minimum of 1 reader is required"));
+					TestEnvironment.m_Environment.f_SetMaxReaders(64);
+					TestEnvironment.m_Environment.f_Open(TestEnvironment.m_DatabaseDirectory, EDatabaseEnvironmentFlag_None, EFileAttrib_None);
+
+					DMibExpect(TestEnvironment.m_Environment.f_MaxReaders(), ==, 64u);
+
+					DMibExpectException(TestEnvironment.m_Environment.f_SetMaxReaders(32), DMibErrorInstance("Max number of readers can only be set before environment has been opened"));
+				};
+
+				DMibTestSuite("MaxDatabases")
+				{
+					CTestEnvironment TestEnvironment;
+					TestEnvironment.m_FileName = "TestDatabase_MaxDatabases";
+					TestEnvironment.m_DatabaseDirectory = CFile::fs_GetProgramDirectory() / TestEnvironment.m_FileName;
+					if (CFile::fs_FileExists(TestEnvironment.m_DatabaseDirectory))
+						CFile::fs_DeleteDirectoryRecursive(TestEnvironment.m_DatabaseDirectory, true);
+					if (CFile::fs_FileExists(TestEnvironment.m_DatabaseDirectory + ".lock"))
+						CFile::fs_DeleteDirectoryRecursive(TestEnvironment.m_DatabaseDirectory + ".lock", true);
+					CFile::fs_CreateDirectory(TestEnvironment.m_DatabaseDirectory);
+
+					TestEnvironment.m_Environment.f_SetMaxDatabases(2);
+					TestEnvironment.m_Environment.f_Open(TestEnvironment.m_DatabaseDirectory, EDatabaseEnvironmentFlag_None, EFileAttrib_None);
+
+					{
+						auto WriteTransaction = TestEnvironment.m_Environment.f_BeginWriteTransaction();
+						{
+							WriteTransaction.f_OpenDatabase("DB0");
+							WriteTransaction.f_OpenDatabase("DB1");
+							DMibExpectException(WriteTransaction.f_OpenDatabase("DB2"), DMibErrorInstance("Out of database IDs"));
+						}
+						WriteTransaction.f_Commit();
+					}
+				};
+
+				DMibTestSuite("MaxKeySize")
+				{
+					auto TestEnvironment = fg_GetTestEnvironment("TestDatabase_MaxKeySize", true);
+					DMibExpect(TestEnvironment.m_Environment.f_MaxKeySize(), >, 0);
+				};
+
+				DMibTestSuite("CheckForStaleReaders")
+				{
+					auto TestEnvironment = fg_GetTestEnvironment("TestDatabase_StaleReaders", true);
+					mint ClearedReaderCount = TestEnvironment.m_Environment.f_CheckForStaleReaders();
+					DMibExpect(ClearedReaderCount, >=, 0);
+				};
+
+				DMibTestSuite("BeginTransactions")
+				{
+					auto TestEnvironment = fg_GetTestEnvironment("TestDatabase_BeginTransactions", true);
+					{
+						auto ReadTransaction = TestEnvironment.m_Environment.f_BeginReadTransaction();
+						auto DatabaseSubTransaction = ReadTransaction.f_OpenDatabaseTransaction();
+						auto ReadCursor = DatabaseSubTransaction.f_ReadCursor();
+						ReadCursor.f_First();
+						DMibExpectFalse(ReadCursor);
+					}
+
+					{
+						auto WriteTransaction = TestEnvironment.m_Environment.f_BeginWriteTransaction(EDatabaseWriteTrasactionFlag_None);
+						auto Database = WriteTransaction.f_OpenDatabase();
+						auto DatabaseTransaction = Database.f_Transaction(WriteTransaction);
+						DatabaseTransaction.f_Insert("Key", "Value");
+						WriteTransaction.f_Commit();
+
+						// Verify write persisted
+						{
+							auto ReadBackTransaction = TestEnvironment.m_Environment.f_BeginReadTransaction();
+							auto DatabaseSubTransactionVerify = ReadBackTransaction.f_OpenDatabaseTransaction();
+							auto ReadCursorVerify = DatabaseSubTransactionVerify.f_ReadCursor();
+							DMibExpectTrue(ReadCursorVerify.f_FindEqual("Key"));
+							DMibExpect(ReadCursorVerify.f_Value<NStr::CStr>(), ==, NStr::CStr("Value"));
+						}
+					}
+
+					{
+						auto WriteTransaction = TestEnvironment.m_Environment.f_BeginWriteTransaction(EDatabaseWriteTrasactionFlag_NoSync);
+						auto Database = WriteTransaction.f_OpenDatabase();
+						auto DatabaseTransaction = Database.f_Transaction(WriteTransaction);
+						DatabaseTransaction.f_Insert("Key2", "Value2");
+						WriteTransaction.f_Commit();
+
+						// Verify write persisted with NoSync
+						{
+							auto ReadBackTransaction = TestEnvironment.m_Environment.f_BeginReadTransaction();
+							auto DatabaseSubTransactionVerify = ReadBackTransaction.f_OpenDatabaseTransaction();
+							auto ReadCursorVerify = DatabaseSubTransactionVerify.f_ReadCursor();
+							DMibExpectTrue(ReadCursorVerify.f_FindEqual("Key2"));
+							DMibExpect(ReadCursorVerify.f_Value<NStr::CStr>(), ==, NStr::CStr("Value2"));
+						}
+					}
+
+					{
+						auto WriteTransaction = TestEnvironment.m_Environment.f_BeginWriteTransaction(EDatabaseWriteTrasactionFlag_NoMetaSync);
+						auto Database = WriteTransaction.f_OpenDatabase();
+						auto DatabaseTransaction = Database.f_Transaction(WriteTransaction);
+						DatabaseTransaction.f_Insert("Key3", "Value3");
+						WriteTransaction.f_Commit();
+
+						// Verify write persisted with NoMetaSync
+						{
+							auto ReadBackTransaction = TestEnvironment.m_Environment.f_BeginReadTransaction();
+							auto DatabaseSubTransactionVerify = ReadBackTransaction.f_OpenDatabaseTransaction();
+							auto ReadCursorVerify = DatabaseSubTransactionVerify.f_ReadCursor();
+							DMibExpectTrue(ReadCursorVerify.f_FindEqual("Key3"));
+							DMibExpect(ReadCursorVerify.f_Value<NStr::CStr>(), ==, NStr::CStr("Value3"));
+						}
+					}
+				};
 			};
 			DMibTestSuite("Actor Compact") -> NConcurrency::TCFuture<void>
 			{
@@ -490,6 +624,6 @@ namespace
 			};
 		}
 	};
-	
+
 	DMibTestRegister(CDatabase_Tests, Malterlib::Database);
 }
