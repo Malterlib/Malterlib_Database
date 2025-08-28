@@ -506,7 +506,7 @@ namespace
 				{
 					auto TestEnvironment = fg_GetTestEnvironment("TestDatabase_StaleReaders", true);
 					mint ClearedReaderCount = TestEnvironment.m_Environment.f_CheckForStaleReaders();
-					DMibExpect(ClearedReaderCount, >=, 0);
+					DMibExpect(ClearedReaderCount, >=, 0u);
 				};
 
 				DMibTestSuite("BeginTransactions")
