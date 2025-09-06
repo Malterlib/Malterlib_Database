@@ -499,7 +499,7 @@ namespace
 				DMibTestSuite("MaxKeySize")
 				{
 					auto TestEnvironment = fg_GetTestEnvironment("TestDatabase_MaxKeySize", true);
-					DMibExpect(TestEnvironment.m_Environment.f_MaxKeySize(), >, 0);
+					DMibExpect(TestEnvironment.m_Environment.f_MaxKeySize(), >, 0u);
 				};
 
 				DMibTestSuite("CheckForStaleReaders")
