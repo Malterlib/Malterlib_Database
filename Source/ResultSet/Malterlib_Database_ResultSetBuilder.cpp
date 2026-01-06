@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 /*
@@ -194,7 +194,7 @@ namespace NMib::NDatabase
 				case EResultDataType_fp32:
 					(*iColumn).f_Set<EResultDataType_fp32>();
 					break;
-*/						
+*/
 			}
 
 			++iColumnType;

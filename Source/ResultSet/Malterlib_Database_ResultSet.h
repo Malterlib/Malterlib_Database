@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 /*
@@ -22,7 +22,7 @@ The data of a result set consists of a ordered list of nRows rows.
 (Note: You don't know how the rows are ordered, just that they are)
 
 Each row consists:
-	A) nKeyParts key part values 
+	A) nKeyParts key part values
 	B) nColumns column values
 
 This can be viewed as a table:
@@ -43,10 +43,10 @@ Row:		<Val>		|	...		|	<Val>		||	<Val>		|	...		|	<Val>
 			<Val>		|	...		|	<Val>		||	<Val>		|	...		|	<Val>
 
 
-Each key part or column can be of one of the following types, represented internally by 
+Each key part or column can be of one of the following types, represented internally by
 a member of the EResultDataType enum:
 
-	Type:				|	CType:			| EResultDataType	
+	Type:				|	CType:			| EResultDataType
 	---------------------------------------------------------------------
 	String				|	CStr			|	EResultDataType_CStr
 	64bit float			|	fp64			|	EResultDataType_fp64

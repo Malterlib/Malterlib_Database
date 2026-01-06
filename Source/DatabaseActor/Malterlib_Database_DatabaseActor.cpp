@@ -645,7 +645,7 @@ namespace NMib::NDatabase
 
 		if (f_IsDestroyed())
 			co_return DMibErrorInstance("Database actor destroyed");
-		
+
 		co_return mp_DatabaseEnvironment.f_GetPath();
 	}
 

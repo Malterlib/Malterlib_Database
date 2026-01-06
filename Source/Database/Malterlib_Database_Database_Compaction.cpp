@@ -394,7 +394,7 @@ namespace NMib::NDatabase
 		fg_Dispatch(CopyState.m_BlockingActorCheckout.f_Actor(), []{}).f_CallSync();
 		if (rc)
 			DMibError(NStr::fg_Format("Error compacting database: {}", mdb_strerror(rc)));
-		
+
 		rc = fg_DispatchCopyBuffer(CopyState); // Get status
 		if (rc)
 			DMibError(NStr::fg_Format("Error compacting database: {}", mdb_strerror(rc)));

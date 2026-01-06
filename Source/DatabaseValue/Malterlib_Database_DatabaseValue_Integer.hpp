@@ -31,11 +31,11 @@ namespace NMib::NDatabase
 		static void fs_Encode(tf_CStream &_Stream, t_CType const &_Value)
 		{
 			_Stream << _Value;
-		}			
+		}
 		template <typename tf_CStream>
 		static void fs_Decode(tf_CStream &_Stream, t_CType &o_Value)
 		{
 			_Stream >> o_Value;
-		}			
+		}
 	};
 }

@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 /*
@@ -170,7 +170,7 @@ namespace NMib::NDatabase
 			~CKeyPart();
 
 //				template<typename t_CType>
-//				inline CKeyPart& f_AddValue(t_CType&& _Value);				
+//				inline CKeyPart& f_AddValue(t_CType&& _Value);
 
 			inline CKeyPart& f_AddValue(uint32 _iValueIndex);
 		};

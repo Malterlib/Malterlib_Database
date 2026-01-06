@@ -42,7 +42,7 @@ namespace NMib::NDatabase
 			else
 				_Value.f_FeedLexicographic(_Stream);
 		}
-		
+
 		template <typename tf_CStream>
 		static void fs_Decode(tf_CStream &_Stream, t_CType &o_Value)
 		{
@@ -52,7 +52,7 @@ namespace NMib::NDatabase
 				o_Value.f_ConsumeLexicographic(_Stream);
 		}
 	};
-	
+
 	template <typename ...tfp_CValue>
 	CDatabaseValue CDatabaseValue::fs_ToLexicographic(CDatabaseValueCache &o_StreamCache, tfp_CValue const &...p_Value)
 	{
@@ -110,13 +110,13 @@ namespace NMib::NDatabase
 		}
 		return CDatabaseValue{o_StreamCache};
 	}
-	
+
 	template <typename ...tfp_CValue>
 	auto CDatabaseValue::f_TupleFromLexicographic() const
 	{
 		return NPrivate::fg_ConsumeLexicographicByteArrayImpl<tfp_CValue...>(*this, NMeta::TCConsecutiveIndices<sizeof...(tfp_CValue)>());
 	}
-	
+
 	template <typename tf_CValue>
 	void CDatabaseValue::f_FromLexicographic(tf_CValue &o_Value) const
 	{
@@ -189,7 +189,7 @@ namespace NMib::NDatabase
 			)
 		;
 	}
-	
+
 	template <typename tf_CStream, typename tf_CValue>
 	void CDatabaseValue::fs_ConsumeLexicographic(tf_CStream &_Stream, tf_CValue &&o_Value)
 	{
@@ -201,7 +201,7 @@ namespace NMib::NDatabase
 			)
 		;
 	}
-	
+
 	template <typename tf_CValue>
 	CDatabaseValue CDatabaseValue::fs_Raw(tf_CValue const &_Value)
 	{
@@ -210,7 +210,7 @@ namespace NMib::NDatabase
 		DatabaseValue.m_Size = sizeof(_Value);
 		return DatabaseValue;
 	}
-	
+
 	template <typename tf_CValue>
 	tf_CValue const &CDatabaseValue::f_Raw() const
 	{

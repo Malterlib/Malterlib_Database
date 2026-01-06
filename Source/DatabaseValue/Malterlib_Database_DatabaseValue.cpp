@@ -1,4 +1,4 @@
-// Copyright © 2019 Nonna Holding AB 
+// Copyright © 2019 Nonna Holding AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include "Malterlib_Database_DatabaseValue.h"
@@ -10,7 +10,7 @@ namespace NMib::NDatabase
 		mint nData = fg_Min(m_Size, _Right.m_Size);
 		if (auto Diff = NMemory::fg_MemCmp(m_pData, _Right.m_pData, nData); Diff != 0)
 			return Diff <=> 0;
-		
+
 		return m_Size <=> _Right.m_Size;
 	}
 

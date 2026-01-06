@@ -33,16 +33,16 @@ namespace NMib::NDatabase
 		static void fs_Decode(tf_CStream &_Stream, t_CType &o_Value)
 		{
 			CInteger Integer;
-			
+
 			_Stream >> Integer;
 
 			if (t_CType::mc_SignBits)
 			{
 				auto SignBit = CInteger(1) << t_CType::mc_SignBitPos;
 				auto SignExtended = ((~Integer) << ((sizeof(CInteger)*8 - 1) - t_CType::mc_SignBitPos)) >> (sizeof(CInteger)*8 - 1);
-				Integer ^= SignExtended | SignBit; 
+				Integer ^= SignExtended | SignBit;
 			}
-			
+
 			if constexpr (requires(CInteger _Int) { o_Value.f_SetAsInteger(_Int); })
 				o_Value.f_SetAsInteger(Integer);
 			else

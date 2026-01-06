@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 #include <Mib/Concurrency/ConcurrencyManager>
@@ -12,14 +12,14 @@ namespace NMib::NDatabase
 		NStr::CStr m_DatabaseDirectory;
 		NStr::CStr m_FileName;
 		CDatabaseEnvironment m_Environment;
-		
+
 		CTestEnvironment(CTestEnvironment &&_Other);
 		CTestEnvironment &operator =(CTestEnvironment &&_Other);
 		CTestEnvironment();
-		
+
 		~CTestEnvironment();
 	};
-	
+
 	CTestEnvironment fg_GetTestEnvironment
 		(
 			NStr::CStr const &_FileName

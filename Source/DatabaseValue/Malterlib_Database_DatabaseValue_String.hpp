@@ -12,12 +12,12 @@ namespace NMib::NDatabase
 		static void fs_Encode(tf_CStream &_Stream, NStr::TCStr<t_CTCStrTraits> const &_Value)
 		{
 			_Stream.f_FeedBytes(_Value.f_GetStr(), _Value.f_GetLen() + 1);
-		}			
+		}
 		template <typename tf_CStream>
 		static void fs_Decode(tf_CStream &_Stream, NStr::TCStr<t_CTCStrTraits> &o_Value)
 		{
 			NStr::TCStr<t_CTCStrTraits> Return;
-			
+
 			while (true)
 			{
 				ch8 Character;
@@ -26,9 +26,9 @@ namespace NMib::NDatabase
 					break;
 				Return.f_AddChar(Character);
 			}
-			
+
 			o_Value = fg_Move(Return);
-		}			
+		}
 	};
 
 	template <typename t_CTCStrTraits>
@@ -38,7 +38,7 @@ namespace NMib::NDatabase
 		static void fs_Encode(tf_CStream &_Stream, NStr::TCStrAggregate<t_CTCStrTraits> const &_Value)
 		{
 			_Stream.f_FeedBytes(_Value.f_GetStr(), _Value.f_GetLen() + 1);
-		}			
+		}
 		template <typename tf_CStream>
 		static void fs_Decode(tf_CStream &_Stream, NStr::TCStrAggregate<t_CTCStrTraits> &o_Value)
 		{
@@ -51,7 +51,7 @@ namespace NMib::NDatabase
 					break;
 				o_Value.f_AddChar(Character);
 			}
-		}			
+		}
 	};
 
 	template <>
@@ -61,7 +61,7 @@ namespace NMib::NDatabase
 		static void fs_Encode(tf_CStream &_Stream, ch8 const *_pValue)
 		{
 			_Stream.f_FeedBytes(_pValue, NStr::fg_StrLen(_pValue) + 1);
-		}			
+		}
 	};
 
 	template <mint t_Len>
@@ -72,6 +72,6 @@ namespace NMib::NDatabase
 		{
 			DMibRequire(_Value[t_Len - 1] == 0);
 			_Stream.f_FeedBytes(_Value, t_Len);
-		}			
+		}
 	};
 }

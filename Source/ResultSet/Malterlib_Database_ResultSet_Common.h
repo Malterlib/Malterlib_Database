@@ -1,4 +1,4 @@
-// Copyright © 2015 Hansoft AB 
+// Copyright © 2015 Hansoft AB
 // Distributed under the MIT license, see license text in LICENSE.Malterlib
 
 /*
@@ -20,7 +20,7 @@ namespace NMib::NDatabase
 		, EResultDataType_int32
 		, EResultDataType_int64
 		, EResultDataType_fp32
-*/			
+*/
 	};
 
 
@@ -164,7 +164,7 @@ namespace NMib::NDatabase
 //				static_assert( false, "The type you pass in must be one of: CStr, int32, int64, fp32, fp64, TCVector<uin8> or convertible to one.");
 
 //				using CDataType = _OutType;
-//				static constexpr EResultDataType mc_Type = <DataTypeEnum>; 
+//				static constexpr EResultDataType mc_Type = <DataTypeEnum>;
 //				static _OutType fs_Convert(_InType _V) { return _OutType (_V); }
 		};
 	}

@@ -137,7 +137,7 @@ namespace NMib::NDatabase
 		{
 			o_Str += typename tf_CStr::CFormat("{}: {}") << m_iReaderSlot << m_Description;
 		}
-		
+
 		mint m_iReaderSlot;
 		NStr::CStr m_Description;
 	};

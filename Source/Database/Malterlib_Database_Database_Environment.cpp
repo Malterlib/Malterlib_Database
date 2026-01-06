@@ -1321,7 +1321,7 @@ namespace NMib::NDatabase
 		share = FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE;
 		disp = OPEN_ALWAYS;
 		attrs = FILE_ATTRIBUTE_NORMAL;
-		switch (which) 
+		switch (which)
 		{
 		case MDB_O_RDONLY:			/* read-only datafile */
 			acc = GENERIC_READ;
@@ -1348,7 +1348,7 @@ namespace NMib::NDatabase
 		if (fd == INVALID_HANDLE_VALUE)
 			rc = ErrCode();
 	#ifndef DPlatformFamily_Windows
-		else 
+		else
 		{
 			fg_SetUnixHandleOptions(fd);
 
@@ -1374,7 +1374,7 @@ namespace NMib::NDatabase
 		return rc;
 	}
 
-	#ifdef DPlatformFamily_Windows		
+	#ifdef DPlatformFamily_Windows
 	NtCreateSectionFunc *NPrivate::g_fDatabase_NtCreateSection = nullptr;
 	NtMapViewOfSectionFunc *NPrivate::g_fDatabase_NtMapViewOfSection = nullptr;
 	NtCloseFunc *NPrivate::g_fDatabase_NtClose = nullptr;
@@ -1388,7 +1388,7 @@ namespace NMib::NDatabase
 		int newenv = 0;
 		MDB_meta meta;
 
-	#ifdef DPlatformFamily_Windows		
+	#ifdef DPlatformFamily_Windows
 		if (NLocal::g_VersionInfo.dwMajorVersion >= 6)
 			me_pidquery = MDB_PROCESS_QUERY_LIMITED_INFORMATION;
 		else

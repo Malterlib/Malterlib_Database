@@ -578,7 +578,7 @@ namespace NMib::NDatabase
 				goto fail_errno;
 			}
 			me_wmutex = OpenMutexA(SYNCHRONIZE, FALSE, MUTEXNAME(this, 'w'));
-			if (!me_wmutex) 
+			if (!me_wmutex)
 			{
 				error_location = 17;
 				goto fail_errno;
@@ -592,7 +592,7 @@ namespace NMib::NDatabase
 				goto fail_errno;
 			}
 			me_wmutex = sem_open(MUTEXNAME(this, 'w'), 0);
-			if (me_wmutex == SEM_FAILED) 
+			if (me_wmutex == SEM_FAILED)
 			{
 				error_location = 19;
 				goto fail_errno;
