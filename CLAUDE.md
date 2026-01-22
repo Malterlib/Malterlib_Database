@@ -245,7 +245,7 @@ The module includes comprehensive tests in `Test/Test_Malterlib_Database_*.cpp`:
 
 ```bash
 # Build and run database tests
-MalterlibBuildShowProgress=false ./mib build Tests macOS arm64 Debug
+MalterlibBuildShowProgress=false ./mib build Tests
 /opt/Deploy/Tests/RunAllTests --paths '["Malterlib/Database/*"]'
 
 # Run specific database tests
