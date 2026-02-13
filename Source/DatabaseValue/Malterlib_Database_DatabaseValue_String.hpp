@@ -31,29 +31,6 @@ namespace NMib::NDatabase
 		}
 	};
 
-	template <typename t_CTCStrTraits>
-	struct TCDatabaseStreamLexicographic<NStr::TCStrAggregate<t_CTCStrTraits>, false>
-	{
-		template <typename tf_CStream>
-		static void fs_Encode(tf_CStream &_Stream, NStr::TCStrAggregate<t_CTCStrTraits> const &_Value)
-		{
-			_Stream.f_FeedBytes(_Value.f_GetStr(), _Value.f_GetLen() + 1);
-		}
-		template <typename tf_CStream>
-		static void fs_Decode(tf_CStream &_Stream, NStr::TCStrAggregate<t_CTCStrTraits> &o_Value)
-		{
-			o_Value.f_Clear();
-			while (true)
-			{
-				ch8 Character;
-				_Stream >> Character;
-				if (!Character)
-					break;
-				o_Value.f_AddChar(Character);
-			}
-		}
-	};
-
 	template <>
 	struct TCDatabaseStreamLexicographic<ch8 const *, false>
 	{
