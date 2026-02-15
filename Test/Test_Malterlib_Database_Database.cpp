@@ -44,7 +44,7 @@ namespace NMib::NDatabase
 			}
 			catch (NException::CException const &_Exception)
 			{
-				DMibConOut2("Exception deleting test database: {}\n", _Exception);
+				DMibConOut("Exception deleting test database: {}\n", _Exception);
 			}
 		}
 	}

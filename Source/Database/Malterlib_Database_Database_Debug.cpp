@@ -106,25 +106,25 @@ namespace NMib::NDatabase::NPrivate
 		case P_LEAF|P_LEAF2:        type = "LEAF2 page";		break;
 		case P_LEAF|P_LEAF2|P_SUBP: type = "LEAF2 sub-page";	break;
 		case P_OVERFLOW:
-			DMibConErrOut2("Overflow page {} pages {}{}\n", pgno, mp->mp_pages, state);
+			DMibConErrOut("Overflow page {} pages {}{}\n", pgno, mp->mp_pages, state);
 			return;
 		case P_META:
-			DMibConErrOut2("Meta-page {} txnid {}\n", pgno, fg_RemoveQualifiers(((MDB_meta *)METADATA(mp))->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed)));
+			DMibConErrOut("Meta-page {} txnid {}\n", pgno, fg_RemoveQualifiers(((MDB_meta *)METADATA(mp))->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed)));
 			return;
 		default:
-			DMibConErrOut2("Bad page {} flags 0x{nfh,sf0,sj4}\n", pgno, mp->mp_flags);
+			DMibConErrOut("Bad page {} flags 0x{nfh,sf0,sj4}\n", pgno, mp->mp_flags);
 			return;
 		}
 
 		nkeys = NUMKEYS(mp);
-		DMibConErrOut2("{} {} numkeys {}{}\n", type, pgno, nkeys, state);
+		DMibConErrOut("{} {} numkeys {}{}\n", type, pgno, nkeys, state);
 
 		for (i=0; i<nkeys; i++) {
 			if (IS_LEAF2(mp)) {	/* LEAF2 pages have no mp_ptrs[] or node headers */
 				key.m_Size = nsize = mp->mp_pad;
 				key.m_pData = LEAF2KEY(mp, i, nsize);
 				total += nsize;
-				DMibConErrOut2("key {}: nsize {}, {}\n", i, nsize, DKEY(&key));
+				DMibConErrOut("key {}: nsize {}, {}\n", i, nsize, DKEY(&key));
 				continue;
 			}
 			node = NODEPTR(mp, i);
@@ -133,7 +133,7 @@ namespace NMib::NDatabase::NPrivate
 			nsize = uint32(NODESIZE + key.m_Size);
 			if (IS_BRANCH(mp))
 			{
-				DMibConErrOut2("key {}: page {}, {}\n", i, NODEPGNO(node), DKEY(&key));
+				DMibConErrOut("key {}: page {}, {}\n", i, NODEPGNO(node), DKEY(&key));
 				total += nsize;
 			}
 			else
@@ -144,11 +144,11 @@ namespace NMib::NDatabase::NPrivate
 					nsize += NODEDSZ(node);
 				total += nsize;
 				nsize += sizeof(indx_t);
-				DMibConErrOut2("key {}: nsize {}, {}{}\n", i, nsize, DKEY(&key), mdb_leafnode_type(node));
+				DMibConErrOut("key {}: nsize {}, {}{}\n", i, nsize, DKEY(&key), mdb_leafnode_type(node));
 			}
 			total = EVEN(total);
 		}
-		DMibConErrOut2("Total: header {} + contents {} + unused {}\n", IS_LEAF2(mp) ? PAGEHDRSZ : PAGEBASE + mp->mp_lower, total, SIZELEFT(mp));
+		DMibConErrOut("Total: header {} + contents {} + unused {}\n", IS_LEAF2(mp) ? PAGEHDRSZ : PAGEBASE + mp->mp_lower, total, SIZELEFT(mp));
 	}
 
 	void mdb_cursor_chk(MDB_cursor const *mc)
@@ -229,7 +229,7 @@ namespace NMib::NDatabase::NPrivate
 		}
 		if (freecount + count + NUM_METAS != txn->mt_next_pgno)
 		{
-			DMibConErrOut2
+			DMibConErrOut
 				(
 					"audit: {} freecount: {} count: {} total: {} next_pgno: {}\n"
 					, txn->mt_txnid
