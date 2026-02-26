@@ -793,7 +793,7 @@ namespace NMib::NDatabase
 			return {};
 
 		NContainer::TCVector<CDatabaseReaderInfo> ReaderInfos;
-		mint nReaders = Environment.m_pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Load(NAtomic::EMemoryOrder_Relaxed);
+		mint nReaders = Environment.m_pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Load(NAtomic::gc_MemoryOrder_Relaxed);
 		MDB_reader *pReaders = Environment.m_pLocksMemoryMap->m_Readers;
 		for (mint i = 0; i < nReaders; i++)
 		{
@@ -925,8 +925,8 @@ namespace NMib::NDatabase
 					||
 					(
 						prev
-						? m->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed) < meta->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed)
-						: m->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed) > meta->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed)
+						? m->mm_txnid.f_Load(NAtomic::gc_MemoryOrder_Relaxed) < meta->mm_txnid.f_Load(NAtomic::gc_MemoryOrder_Relaxed)
+						: m->mm_txnid.f_Load(NAtomic::gc_MemoryOrder_Relaxed) > meta->mm_txnid.f_Load(NAtomic::gc_MemoryOrder_Relaxed)
 					)
 				)
 				*meta = *m;
@@ -1057,7 +1057,7 @@ namespace NMib::NDatabase
 			/* LY: issue a memory barrier, if not x86. ITS#7969 */
 			__sync_synchronize();
 	#endif
-			mp->mm_txnid.f_Store(txn->mt_txnid, NAtomic::EMemoryOrder_Relaxed);
+			mp->mm_txnid.f_Store(txn->mt_txnid, NAtomic::gc_MemoryOrder_Relaxed);
 			if (!(flags & (EDatabaseEnvironmentFlag_NoMetaSync|EDatabaseEnvironmentFlag_NoSync))) {
 				unsigned meta_size = env->me_psize;
 				rc = (env->me_flags & EDatabaseEnvironmentFlag_WriteMapAsync) ? MS_ASYNC : MS_SYNC;
@@ -1074,14 +1074,14 @@ namespace NMib::NDatabase
 			}
 			goto done;
 		}
-		metab.mm_txnid.f_Store(mp->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed), NAtomic::EMemoryOrder_Relaxed);
+		metab.mm_txnid.f_Store(mp->mm_txnid.f_Load(NAtomic::gc_MemoryOrder_Relaxed), NAtomic::gc_MemoryOrder_Relaxed);
 		metab.mm_last_pg = mp->mm_last_pg;
 
 		meta.mm_mapsize = mapsize;
 		meta.mm_dbs[FREE_DBI] = txn->mt_dbs[FREE_DBI];
 		meta.mm_dbs[MAIN_DBI] = txn->mt_dbs[MAIN_DBI];
 		meta.mm_last_pg = txn->mt_next_pgno - 1;
-		meta.mm_txnid.f_Store(txn->mt_txnid, NAtomic::EMemoryOrder_Relaxed);
+		meta.mm_txnid.f_Store(txn->mt_txnid, NAtomic::gc_MemoryOrder_Relaxed);
 
 		off = offsetof(MDB_meta, mm_mapsize);
 		ptr = (char *)&meta + off;
@@ -1116,7 +1116,7 @@ namespace NMib::NDatabase
 			 * Use the non-SYNC fd; we know it will fail anyway.
 			 */
 			meta.mm_last_pg = metab.mm_last_pg;
-			meta.mm_txnid.f_Store(metab.mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed), NAtomic::EMemoryOrder_Relaxed);
+			meta.mm_txnid.f_Store(metab.mm_txnid.f_Load(NAtomic::gc_MemoryOrder_Relaxed), NAtomic::gc_MemoryOrder_Relaxed);
 	#ifdef DPlatformFamily_Windows
 			memset(&ov, 0, sizeof(ov));
 			ov.Offset = off;
@@ -1139,7 +1139,7 @@ namespace NMib::NDatabase
 		 * how stale their view of these values is.
 		 */
 		if (env->m_pLocksMemoryMap)
-			env->m_pLocksMemoryMap->m_TransactionBody.m_TransactionID.f_Store(txn->mt_txnid, NAtomic::EMemoryOrder_Release);
+			env->m_pLocksMemoryMap->m_TransactionBody.m_TransactionID.f_Store(txn->mt_txnid, NAtomic::gc_MemoryOrder_Release);
 
 		return MDB_SUCCESS;
 	}
@@ -1150,7 +1150,7 @@ namespace NMib::NDatabase
 	NPrivate::MDB_meta *CDatabaseEnvironment_Internal::mdb_env_pick_meta() const
 	{
 		MDB_meta *const *metas = me_metas;
-		return metas[ (metas[0]->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed) < metas[1]->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed)) ^
+		return metas[ (metas[0]->mm_txnid.f_Load(NAtomic::gc_MemoryOrder_Relaxed) < metas[1]->mm_txnid.f_Load(NAtomic::gc_MemoryOrder_Relaxed)) ^
 			((me_flags & EDatabaseEnvironmentFlag_PreviousSnapshot) != 0) ]
 		;
 	}
@@ -1493,7 +1493,7 @@ namespace NMib::NDatabase
 		me_maxpg = m_MapSize / me_psize;
 
 		if (m_pLocksMemoryMap)
-			m_pLocksMemoryMap->m_TransactionBody.m_TransactionID.f_Store(meta.mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed), NAtomic::EMemoryOrder_Release);
+			m_pLocksMemoryMap->m_TransactionBody.m_TransactionID.f_Store(meta.mm_txnid.f_Load(NAtomic::gc_MemoryOrder_Relaxed), NAtomic::gc_MemoryOrder_Release);
 
 	#if DMibDatabaseDebug
 		{
@@ -1501,7 +1501,7 @@ namespace NMib::NDatabase
 			MDB_db *db = &meta->mm_dbs[MAIN_DBI];
 
 			DMibDatabaseTrace("opened database version {}, pagesize {}", meta->mm_version, me_psize);
-			DMibDatabaseTrace("using meta page {}",    (int) (meta->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed) & 1));
+			DMibDatabaseTrace("using meta page {}",    (int) (meta->mm_txnid.f_Load(NAtomic::gc_MemoryOrder_Relaxed) & 1));
 			DMibDatabaseTrace("depth: {}",             db->md_depth);
 			DMibDatabaseTrace("entries: {}",        db->md_entries);
 			DMibDatabaseTrace("branch pages: {}",   db->md_branch_pages);
@@ -1586,7 +1586,7 @@ namespace NMib::NDatabase
 			 * data owned by this process (me_close_readers and
 			 * our readers), and clear each reader atomically.
 			 */
-			for (i = me_close_readers.f_Load(NAtomic::EMemoryOrder_Relaxed); --i >= 0; )
+			for (i = me_close_readers.f_Load(NAtomic::gc_MemoryOrder_Relaxed); --i >= 0; )
 				if (m_pLocksMemoryMap->m_Readers[i].m_OwningProcessID.f_Load() == pid)
 					m_pLocksMemoryMap->m_Readers[i].m_OwningProcessID.f_Store(0);
 	#ifdef DPlatformFamily_Windows

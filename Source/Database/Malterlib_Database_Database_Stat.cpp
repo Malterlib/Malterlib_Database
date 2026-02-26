@@ -74,11 +74,11 @@ namespace NMib::NDatabase
 		meta = mdb_env_pick_meta();
 		Info.m_pMapAddress = meta->mm_address;
 		Info.m_LastPageID = meta->mm_last_pg;
-		Info.m_LastCommittedTransactionID = meta->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed);
+		Info.m_LastCommittedTransactionID = meta->mm_txnid.f_Load(NAtomic::gc_MemoryOrder_Relaxed);
 
 		Info.m_MapSize = m_MapSize;
 		Info.m_MaxReaders = m_MaxReaders;
-		Info.m_nReaders = m_pLocksMemoryMap ? m_pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Load(NAtomic::EMemoryOrder_Relaxed) : 0;
+		Info.m_nReaders = m_pLocksMemoryMap ? m_pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Load(NAtomic::gc_MemoryOrder_Relaxed) : 0;
 
 		return Info;
 	}

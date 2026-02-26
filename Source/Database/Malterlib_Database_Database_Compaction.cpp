@@ -373,7 +373,7 @@ namespace NMib::NDatabase
 		}
 
 		if (root != P_INVALID || mm->mm_dbs[MAIN_DBI].md_flags)
-			mm->mm_txnid.f_Store(1, NAtomic::EMemoryOrder_Relaxed);		/* use metapage 1 */
+			mm->mm_txnid.f_Store(1, NAtomic::gc_MemoryOrder_Relaxed);		/* use metapage 1 */
 
 		CopyState.m_WriteBuffersLength[0] = me_psize * NUM_METAS;
 		CopyState.m_pInternalTransaction = pInternalTransaction;

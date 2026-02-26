@@ -130,7 +130,7 @@ namespace NMib::NDatabase
 		CProcessID *pids, pid;
 		mint nDead = 0;
 
-		rdrs = m_pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Load(NAtomic::EMemoryOrder_Relaxed);
+		rdrs = m_pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Load(NAtomic::gc_MemoryOrder_Relaxed);
 		pids = (CProcessID *)NMemory::fg_Alloc((rdrs+1) * sizeof(CProcessID));
 		auto Cleanup = g_OnScopeExit / [&]
 			{
@@ -140,7 +140,7 @@ namespace NMib::NDatabase
 		pids[0] = 0;
 		mr = m_pLocksMemoryMap->m_Readers;
 		for (i=0; i<rdrs; i++) {
-			pid = mr[i].m_OwningProcessID.f_Load(NAtomic::EMemoryOrder_Relaxed);
+			pid = mr[i].m_OwningProcessID.f_Load(NAtomic::gc_MemoryOrder_Relaxed);
 			if (pid && pid != me_pid) {
 				if (mdb_pid_insert(pids, pid) == 0) {
 					if (!mdb_reader_pid(Pidcheck, pid)) {
@@ -159,9 +159,9 @@ namespace NMib::NDatabase
 							}
 						}
 						for (; j<rdrs; j++)
-								if (mr[j].m_OwningProcessID.f_Load(NAtomic::EMemoryOrder_Acquire) == pid) {
+								if (mr[j].m_OwningProcessID.f_Load(NAtomic::gc_MemoryOrder_Acquire) == pid) {
 									DMibDatabaseTrace("clear stale reader pid {} txn {}", (unsigned) pid, fg_RemoveQualifiers(mr[j].m_BeginReadTransactionID.f_Load()));
-									mr[j].m_OwningProcessID.f_Store(0, NAtomic::EMemoryOrder_Release);
+									mr[j].m_OwningProcessID.f_Store(0, NAtomic::gc_MemoryOrder_Release);
 									nDead++;
 								}
 						if (rmutex)
@@ -213,7 +213,7 @@ namespace NMib::NDatabase
 				 * overwrite data which latest meta page refers to.
 				 */
 				meta = mdb_env_pick_meta();
-				m_pLocksMemoryMap->m_TransactionBody.m_TransactionID.f_Store(meta->mm_txnid.f_Load(NAtomic::EMemoryOrder_Relaxed), NAtomic::EMemoryOrder_Release);
+				m_pLocksMemoryMap->m_TransactionBody.m_TransactionID.f_Store(meta->mm_txnid.f_Load(NAtomic::gc_MemoryOrder_Relaxed), NAtomic::gc_MemoryOrder_Release);
 				/* env is hosed if the dead thread was ours */
 				if (me_txn)
 				{
@@ -541,8 +541,8 @@ namespace NMib::NDatabase
 
 			m_pLocksMemoryMap->m_TransactionBody.mtb_magic = MDB_MAGIC;
 			m_pLocksMemoryMap->m_TransactionBody.mtb_format = MDB_LOCK_FORMAT;
-			m_pLocksMemoryMap->m_TransactionBody.m_TransactionID.f_Store(0, NAtomic::EMemoryOrder_Release);
-			m_pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Store(0, NAtomic::EMemoryOrder_Release);
+			m_pLocksMemoryMap->m_TransactionBody.m_TransactionID.f_Store(0, NAtomic::gc_MemoryOrder_Release);
+			m_pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Store(0, NAtomic::gc_MemoryOrder_Release);
 		}
 		else
 		{
