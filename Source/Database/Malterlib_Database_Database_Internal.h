@@ -1235,7 +1235,7 @@ namespace NMib::NDatabase
 			 *	Actually the file may be shorter if the freeDB lists the final pages.
 			 */
 			pgno_t		mm_last_pg;
-			NAtomic::TCAtomicAggregate<CTransactionID> mm_txnid;	/**< txnid that committed this page */
+			NAtomic::TCAtomicIndeterminate<CTransactionID> mm_txnid;	/**< txnid that committed this page */
 		};
 
 			/** Buffer for a stack-allocated meta page.
