@@ -27,8 +27,8 @@ namespace NMib::NDatabase
 		CDatabaseValue(CDatabaseValueCache const &_Value);
 		CDatabaseValue(CDatabaseValueCache &_ValueCache, CDatabaseValue const &_CopyFromValue);
 
-		COrdering_Strong operator <=> (CDatabaseValue const &_Right) const;
-		bool operator == (CDatabaseValue const &_Right) const;
+		COrdering_Strong operator <=> (CDatabaseValue const &_Right) const noexcept;
+		bool operator == (CDatabaseValue const &_Right) const noexcept;
 		bool f_HasPrefix(CDatabaseValue const &_Right) const;
 
 		template <typename tf_CValue>
