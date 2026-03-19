@@ -16,7 +16,7 @@ namespace NMib::NDatabase
 		// Utilities to get the length of a vector contained in a variant.
 		struct CVectorVariantSizeVisitor
 		{
-			mint m_Length;
+			umint m_Length;
 
 			CVectorVariantSizeVisitor()
 				: m_Length(0)
@@ -31,7 +31,7 @@ namespace NMib::NDatabase
 		};
 
 		template<typename t_VectorVariant>
-		mint fg_GetVectorVariantLength(t_VectorVariant const& _VecVar)
+		umint fg_GetVectorVariantLength(t_VectorVariant const& _VecVar)
 		{
 			CVectorVariantSizeVisitor Visitor;
 
@@ -215,23 +215,23 @@ namespace NMib::NDatabase
 		mp_Metadata[_ID] = fg_Move(_Data);
 	}
 
-	void CResultSetBuilder::f_SetKeyPartMetadata(mint _iKeyPart, CResultMetadata _Data)
+	void CResultSetBuilder::f_SetKeyPartMetadata(umint _iKeyPart, CResultMetadata _Data)
 	{
 		DMibCheck( mp_KeyPartInfos.f_IsPosValid(_iKeyPart))("Invalid key part");
 		mp_KeyPartInfos[_iKeyPart].m_Metadata = fg_Move(_Data);
 	}
 
-	void CResultSetBuilder::f_SetColumnMetadata(mint _iColumn, CResultMetadata _Data)
+	void CResultSetBuilder::f_SetColumnMetadata(umint _iColumn, CResultMetadata _Data)
 	{
 		DMibCheck( mp_ColumnInfos.f_IsPosValid(_iColumn))("Invalid column");
 		mp_ColumnInfos[_iColumn].m_Metadata = fg_Move(_Data);
 	}
 
-	mint CResultSetBuilder::f_AddKeyPartVariantValue(uint32 _iKeyPart, NResultSet::CValue const& _Value)
+	umint CResultSetBuilder::f_AddKeyPartVariantValue(uint32 _iKeyPart, NResultSet::CValue const& _Value)
 	{
 		DMibCheck( mp_KeyPartInfos.f_IsPosValid(_iKeyPart) )("Values for too many key parts are being specified!" );
 
-		mint iIndex = 0;
+		umint iIndex = 0;
 
 		switch(mp_KeyPartInfos[_iKeyPart].m_Type)
 		{
@@ -288,7 +288,7 @@ namespace NMib::NDatabase
 		return iIndex;
 	}
 
-	mint CResultSetBuilder::f_SetKeyPartVariantValues(uint32 _iKeyPart, NContainer::TCVector<NResultSet::CValue>  const& _lValues)
+	umint CResultSetBuilder::f_SetKeyPartVariantValues(uint32 _iKeyPart, NContainer::TCVector<NResultSet::CValue>  const& _lValues)
 	{
 		DMibCheck( mp_KeyPartInfos.f_IsPosValid(_iKeyPart) )("Values for too many key parts are being specified!" );
 

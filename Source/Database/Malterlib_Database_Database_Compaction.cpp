@@ -38,7 +38,7 @@
 namespace NMib::NDatabase::NPrivate
 {
 	using namespace NConcurrency;
-	static constexpr mint gc_CopyBufferSize = 1024*1024;
+	static constexpr umint gc_CopyBufferSize = 1024*1024;
 
 	struct CCompactingCopyState
 	{
@@ -55,7 +55,7 @@ namespace NMib::NDatabase::NPrivate
 				NMemory::fg_Free(m_WriteBuffers[0], gc_CopyBufferSize*2);
 		}
 
-		void f_Init(mint _PageSize)
+		void f_Init(umint _PageSize)
 		{
 			m_WriteBuffers[0] = (uint8 *)NMemory::fg_AllocAligned(gc_CopyBufferSize*2, _PageSize);
 			NMemory::fg_MemClear(m_WriteBuffers[0], gc_CopyBufferSize*2);
@@ -66,8 +66,8 @@ namespace NMib::NDatabase::NPrivate
 
 		uint8 *m_WriteBuffers[2] = {nullptr, nullptr};
 		uint8 *m_OverflowPages[2] = {nullptr, nullptr};
-		mint m_WriteBuffersLength[2] = {0, 0};
-		mint m_OverflowPagesLength[2] = {0, 0};
+		umint m_WriteBuffersLength[2] = {0, 0};
+		umint m_OverflowPagesLength[2] = {0, 0};
 		MDB_env *m_pEnvironment = nullptr;
 		MDB_txn *m_pInternalTransaction = nullptr;
 		pgno_t m_NextPageNo = NUM_METAS;
@@ -77,7 +77,7 @@ namespace NMib::NDatabase::NPrivate
 	};
 
 	/** Dedicated writer thread for compacting copy. */
-	void DMibDatabaseInfrequentSection fg_DoBufferWrite(CCompactingCopyState &_CopyState, mint _iBuffer)
+	void DMibDatabaseInfrequentSection fg_DoBufferWrite(CCompactingCopyState &_CopyState, umint _iBuffer)
 	{
 		CCompactingCopyState &CopyState = _CopyState;
 		int wsize;
@@ -126,7 +126,7 @@ namespace NMib::NDatabase::NPrivate
 	int DMibDatabaseInfrequentSection fg_DispatchCopyBuffer(CCompactingCopyState &_CopyState)
 	{
 		auto &CopyState = _CopyState;
-		mint iBuffer = CopyState.m_iBuffer;
+		umint iBuffer = CopyState.m_iBuffer;
 		// Block on last write finishing
 		fg_Dispatch(CopyState.m_BlockingActorCheckout.f_Actor(), []{}).f_CallSync();
 
@@ -176,7 +176,7 @@ namespace NMib::NDatabase::NPrivate
 			return rc;
 
 		/* Make cursor pages writable */
-		mint BuffAllocSize = CopyState.m_pEnvironment->me_psize * mc.mc_snum;
+		umint BuffAllocSize = CopyState.m_pEnvironment->me_psize * mc.mc_snum;
 		buf = ptr = (char *)NMemory::fg_Alloc(BuffAllocSize);
 
 		for (i=0; i<mc.mc_top; i++) {

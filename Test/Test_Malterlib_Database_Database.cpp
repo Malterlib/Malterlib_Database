@@ -87,7 +87,7 @@ namespace
 	{
 	public:
 
-		void fp_PopulateEnvironment(CDatabaseEnvironment &_Environment, mint _nDatabases = 16, mint _nValuesPerDatabase = 4*1024)
+		void fp_PopulateEnvironment(CDatabaseEnvironment &_Environment, umint _nDatabases = 16, umint _nValuesPerDatabase = 4*1024)
 		{
 			_Environment.f_SetMapSize(_nDatabases * _nValuesPerDatabase * 256 * fg_Max(NSys::fg_Mem_PageSize() / 4096u, 1u));
 			auto Transaction = _Environment.f_BeginWriteTransaction();
@@ -108,7 +108,7 @@ namespace
 			Transaction.f_Commit();
 		}
 
-		void fp_PopulateEnvironmentSingleDB(CDatabaseEnvironment &_Environment, mint _nValuesPerDatabase = 4*1024)
+		void fp_PopulateEnvironmentSingleDB(CDatabaseEnvironment &_Environment, umint _nValuesPerDatabase = 4*1024)
 		{
 			_Environment.f_SetMapSize(_nValuesPerDatabase * 256 * fg_Max(NSys::fg_Mem_PageSize() / 4096u, 1u));
 			auto Transaction = _Environment.f_BeginWriteTransaction();
@@ -505,7 +505,7 @@ namespace
 				DMibTestSuite("CheckForStaleReaders")
 				{
 					auto TestEnvironment = fg_GetTestEnvironment("TestDatabase_StaleReaders", true);
-					mint ClearedReaderCount = TestEnvironment.m_Environment.f_CheckForStaleReaders();
+					umint ClearedReaderCount = TestEnvironment.m_Environment.f_CheckForStaleReaders();
 					DMibExpect(ClearedReaderCount, >=, 0u);
 				};
 
@@ -585,7 +585,7 @@ namespace
 
 					auto WriteTrasaction = co_await DatabaseActor(&CDatabaseActor::f_OpenTransactionWrite);
 
-					mint nStartEntries = 0;
+					umint nStartEntries = 0;
 					{
 						auto iData = WriteTrasaction.m_Transaction.f_ReadCursor();
 						iData.f_First();
@@ -604,7 +604,7 @@ namespace
 					co_await DatabaseActor(&CDatabaseActor::f_Compact, fg_Move(WriteTrasaction), 0);
 
 					WriteTrasaction = co_await DatabaseActor(&CDatabaseActor::f_OpenTransactionWrite);
-					mint nEndEntries = 0;
+					umint nEndEntries = 0;
 					{
 						auto iData = WriteTrasaction.m_Transaction.f_ReadCursor();
 						iData.f_First();

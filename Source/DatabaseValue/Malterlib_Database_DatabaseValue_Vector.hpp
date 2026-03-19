@@ -61,7 +61,7 @@ namespace NMib::NDatabase
 			{
 				NEncoding::TCBinaryStream_Bin128<> Stream(true);
 				Stream.f_Open(&_Stream, NFile::EFileOpen_Write);
-				mint ValuesLen = _Values.f_GetLen();
+				umint ValuesLen = _Values.f_GetLen();
 				if (ValuesLen != 0)
 					Stream.f_FeedBytes(_Values.f_GetArray(), ValuesLen);
 			}

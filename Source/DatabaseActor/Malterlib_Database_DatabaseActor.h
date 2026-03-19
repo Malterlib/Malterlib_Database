@@ -103,7 +103,7 @@ namespace NMib::NDatabase
 		NConcurrency::TCFuture<CTransactionWrite> f_OpenTransactionWrite();
 		NConcurrency::TCFuture<void> f_CommitWriteTransaction(CTransactionWrite _WriteTransaction);
 		NConcurrency::TCFuture<void> f_WaitForAllReaders();
-		NConcurrency::TCFuture<mint> f_CheckForStaleReaders();
+		NConcurrency::TCFuture<umint> f_CheckForStaleReaders();
 		NConcurrency::TCFuture<void> f_Compact(CTransactionWrite _WriteTransaction, uint64 _MaxSize);
 
 		NConcurrency::TCFuture<CDatabaseStatistics> f_Statistics();
@@ -141,8 +141,8 @@ namespace NMib::NDatabase
 		NConcurrency::CSequencer mp_WriteSequencer{"DatabaseActor WriteSequencer"};
 		NConcurrency::CSequencer mp_ReadSequencer{"DatabaseActor ReadSequencer"};
 		NContainer::TCVector<NConcurrency::TCPromise<void>> mp_WaitingForReaders;
-		mint mp_CompactionSequence = 0;
-		NAtomic::TCAtomic<mint> mp_nReaders = 0;
+		umint mp_CompactionSequence = 0;
+		NAtomic::TCAtomic<umint> mp_nReaders = 0;
 		bool mp_bOpened = false;
 	};
 }

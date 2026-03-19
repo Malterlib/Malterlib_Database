@@ -1627,8 +1627,8 @@ namespace NMib::NDatabase
 	#define MDB_ERPAGE_MAX	(MDB_ERPAGE_SIZE-1)
 		uint32 me_rpcheck;
 	#endif
-		mint m_LockedThreadID = 0;
-		NAtomic::TCAtomic<mint> m_nReferences = 0;
+		umint m_LockedThreadID = 0;
+		NAtomic::TCAtomic<umint> m_nReferences = 0;
 		// Publics
 		NDatabase::CDatabaseTransactionCommon mdb_txn_begin(NPrivate::MDB_txn *parent, uint32 flags);
 		void mdb_dbi_close(CDatabaseSubID dbi);
@@ -1643,10 +1643,10 @@ namespace NMib::NDatabase
 		bool mdb_env_read_header(int prev, NPrivate::MDB_meta *meta);
 		NPrivate::MDB_meta *mdb_env_pick_meta() const;
 		void mdb_env_close0(int excl);
-		mint mdb_leaf_size(CDatabaseValue *key, CDatabaseValue *data);
-		mint mdb_branch_size(CDatabaseValue *key);
+		umint mdb_leaf_size(CDatabaseValue *key, CDatabaseValue *data);
+		umint mdb_branch_size(CDatabaseValue *key);
 #ifdef MDB_ROBUST_SUPPORTED
-		void mdb_reader_check0(bool _bReadLock, mint *_pDead);
+		void mdb_reader_check0(bool _bReadLock, umint *_pDead);
 #endif
 		void mdb_page_free(NPrivate::MDB_page *mp);
 		void mdb_dpage_free(NPrivate::MDB_page *dp);

@@ -85,7 +85,7 @@ namespace NMib::NDatabase
 						if (CFile::fs_FileExists(CompactTempPath))
 							CFile::fs_DeleteDirectoryRecursive(CompactTempPath);
 
-						mint iDisambiguate = 0;
+						umint iDisambiguate = 0;
 						while (CFile::fs_FileExists(TempDeletePath))
 							TempDeletePath = OriginalPath + CStr(".tempdelete{}"_f << iDisambiguate++);
 
@@ -160,9 +160,9 @@ namespace NMib::NDatabase
 		if (mp_OldDatabaseEnvironments.f_IsEmpty())
 			co_return {};
 
-		NContainer::TCVector<mint> ToRemoveIndexes;
+		NContainer::TCVector<umint> ToRemoveIndexes;
 		NContainer::TCVector<COldEnvironment> ToRemove;
-		mint iEnv = 0;
+		umint iEnv = 0;
 		for (auto &Environment : mp_OldDatabaseEnvironments)
 		{
 			if (*Environment.m_DatabaseEnvironment.f_GetReferencesPointer() != 0)
@@ -365,7 +365,7 @@ namespace NMib::NDatabase
 		co_return {};
 	}
 
-	TCFuture<mint> CDatabaseActor::f_CheckForStaleReaders()
+	TCFuture<umint> CDatabaseActor::f_CheckForStaleReaders()
 	{
 		co_return mp_DatabaseEnvironment.f_CheckForStaleReaders();
 	}

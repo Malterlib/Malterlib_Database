@@ -35,7 +35,7 @@ namespace NMib::NDatabase
 	// CResultSet::CKeyPartIterator Private Implementation
 	//
 
-	CResultSet::CKeyPartIterator::CKeyPartIterator(CResultSet const& _ResultSet, mint _iRow, mint _iKeyPart)
+	CResultSet::CKeyPartIterator::CKeyPartIterator(CResultSet const& _ResultSet, umint _iRow, umint _iKeyPart)
 		: mp_pResultSet(&_ResultSet)
 		, mp_iRow(_iRow)
 		, mp_nKeyParts(_ResultSet.mp_KeyPartInfos.f_GetLen())
@@ -73,7 +73,7 @@ namespace NMib::NDatabase
 	// CResultSet::CColumnValueIterator Private Implementation
 	//
 
-	CResultSet::CColumnValueIterator::CColumnValueIterator(CResultSet const& _ResultSet, mint _iRow, NContainer::TCVector<mint> const& _ColumnValueIterators, mint _iColumn)
+	CResultSet::CColumnValueIterator::CColumnValueIterator(CResultSet const& _ResultSet, umint _iRow, NContainer::TCVector<umint> const& _ColumnValueIterators, umint _iColumn)
 		: mp_pResultSet(&_ResultSet)
 		, mp_ColumnValueIterators(_ColumnValueIterators)
 		, mp_iRow(_iRow)
@@ -97,7 +97,7 @@ namespace NMib::NDatabase
 	{
 	}
 
-	CResultSet::CRowIterator::CRowIterator(CResultSet const& _ResultSet, mint _iRow)
+	CResultSet::CRowIterator::CRowIterator(CResultSet const& _ResultSet, umint _iRow)
 		: mp_pResultSet(&_ResultSet)
 		, mp_nRows(_ResultSet.mp_nRows)
 		, mp_iCurRow(0)
@@ -121,10 +121,10 @@ namespace NMib::NDatabase
 		// to visit each column and advance the corresponding value iterator
 		struct CRowIteratorAdvanceVisitor
 		{
-			mint & m_ColumnValueIterator;
-			mint m_iRow;
+			umint & m_ColumnValueIterator;
+			umint m_iRow;
 
-			CRowIteratorAdvanceVisitor(mint &_ColumnValueIterator, mint _iRow)
+			CRowIteratorAdvanceVisitor(umint &_ColumnValueIterator, umint _iRow)
 				: m_ColumnValueIterator(_ColumnValueIterator)
 				, m_iRow(_iRow)
 			{
@@ -133,8 +133,8 @@ namespace NMib::NDatabase
 			template <typename tf_CVector>
 			void operator ()(tf_CVector const& _Vector)
 			{
-				mint VectorLen = _Vector.f_GetLen();
-				mint Iter = m_ColumnValueIterator;
+				umint VectorLen = _Vector.f_GetLen();
+				umint Iter = m_ColumnValueIterator;
 				while (Iter < VectorLen && _Vector[Iter].m_iRow < m_iRow)
 					++Iter;
 
@@ -148,7 +148,7 @@ namespace NMib::NDatabase
 		if (mp_iCurRow >= mp_nRows)
 			DMibErrorListBoundCheck("Row iterator out of bounds");
 
-		mint iCurRow = ++mp_iCurRow;
+		umint iCurRow = ++mp_iCurRow;
 
 		auto iColumn = mp_pResultSet->mp_Columns.f_GetIterator();
 		for (auto iColumnValueIterator = mp_ColumnValueIterators.f_GetIterator()
@@ -175,7 +175,7 @@ namespace NMib::NDatabase
 	}
 
 	// Returns an iterator allowing for iteration over each key part.
-	CResultSet::CKeyPartIterator CResultSet::CRowIterator::f_GetKeyPartIterator(mint _iKP) const
+	CResultSet::CKeyPartIterator CResultSet::CRowIterator::f_GetKeyPartIterator(umint _iKP) const
 	{
 		return CKeyPartIterator(*mp_pResultSet, mp_iCurRow, _iKP);
 	}
@@ -187,7 +187,7 @@ namespace NMib::NDatabase
 	}
 
 	// Returns an iterator allowing for iteration over each column value.
-	CResultSet::CColumnValueIterator CResultSet::CRowIterator::f_GetColumnIterator(mint _iCol) const
+	CResultSet::CColumnValueIterator CResultSet::CRowIterator::f_GetColumnIterator(umint _iCol) const
 	{
 		return CColumnValueIterator(*mp_pResultSet, mp_iCurRow, mp_ColumnValueIterators, _iCol);
 	}
@@ -233,39 +233,39 @@ namespace NMib::NDatabase
 		return mp_nRows == 0;
 	}
 
-	mint CResultSet::f_GetNumKeyParts() const
+	umint CResultSet::f_GetNumKeyParts() const
 	{
 		return mp_KeyPartInfos.f_GetLen();
 	}
 
-	mint CResultSet::f_GetNumColumns() const
+	umint CResultSet::f_GetNumColumns() const
 	{
 		return mp_ColumnInfos.f_GetLen();
 	}
 
 
-	EResultDataType CResultSet::f_GetKeyPartType(mint _iKeyPart) const
+	EResultDataType CResultSet::f_GetKeyPartType(umint _iKeyPart) const
 	{
 		return mp_KeyPartInfos[_iKeyPart].m_Type;
 	}
 
-	NResultSet::CSubType CResultSet::f_GetKeyPartSubType(mint _iKeyPart) const
+	NResultSet::CSubType CResultSet::f_GetKeyPartSubType(umint _iKeyPart) const
 	{
 		return mp_KeyPartInfos[_iKeyPart].m_SubType;
 
 	}
 
-	EResultDataType CResultSet::f_GetColumnType(mint _iColumn) const
+	EResultDataType CResultSet::f_GetColumnType(umint _iColumn) const
 	{
 		return mp_ColumnInfos[_iColumn].m_Type;
 	}
 
-	NResultSet::CSubType CResultSet::f_GetColumnSubType(mint _iColumn) const
+	NResultSet::CSubType CResultSet::f_GetColumnSubType(umint _iColumn) const
 	{
 		return mp_ColumnInfos[_iColumn].m_SubType;
 	}
 
-	mint CResultSet::f_GetNumRows() const
+	umint CResultSet::f_GetNumRows() const
 	{
 		return mp_nRows;
 	}
@@ -298,12 +298,12 @@ namespace NMib::NDatabase
 			return &mp_Metadata[iMetadata].m_Data;
 	}
 
-	CResultMetadata const& CResultSet::f_GetKeyPartMetadata(mint _iKeyPart) const
+	CResultMetadata const& CResultSet::f_GetKeyPartMetadata(umint _iKeyPart) const
 	{
 		return mp_KeyPartInfos[_iKeyPart].m_Metadata;
 	}
 
-	CResultMetadata const& CResultSet::f_GetColumnMetadata(mint _iKeyPart) const
+	CResultMetadata const& CResultSet::f_GetColumnMetadata(umint _iKeyPart) const
 	{
 		return mp_ColumnInfos[_iKeyPart].m_Metadata;
 	}
@@ -314,7 +314,7 @@ namespace NMib::NDatabase
 		return CRowIterator(*this);
 	}
 
-	CResultSet::CRowIterator CResultSet::f_GetRowIterator(mint _iRow) const
+	CResultSet::CRowIterator CResultSet::f_GetRowIterator(umint _iRow) const
 	{
 		return CRowIterator(*this, _iRow);
 	}

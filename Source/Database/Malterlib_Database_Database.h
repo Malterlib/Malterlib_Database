@@ -46,7 +46,7 @@ namespace NMib::NDatabase
 		using CDatabaseOffset = uint64;
 #	else
 #		define DMibDatabase_IDBits DMibPPtrBits
-		using CDatabaseOffset = mint;
+		using CDatabaseOffset = umint;
 #	endif
 
 	struct CDatabaseEnvironment;
@@ -138,7 +138,7 @@ namespace NMib::NDatabase
 			o_Str += typename tf_CStr::CFormat("{}: {}") << m_iReaderSlot << m_Description;
 		}
 
-		mint m_iReaderSlot;
+		umint m_iReaderSlot;
 		NStr::CStr m_Description;
 	};
 
@@ -165,19 +165,19 @@ namespace NMib::NDatabase
 		CDatabaseStatistics f_Statistics();
 		CDatabaseSizeStatistics f_SizeStatistics();
 		CDatabaseEnvironmentInfo f_Info();
-		mint f_MaxKeySize(); ///< The maximum key size supported by the database
+		umint f_MaxKeySize(); ///< The maximum key size supported by the database
 
 		NStr::CStr f_GetPath();
 		void *f_GetFD();
 
 		void f_SetMaxReaders(uint32 _nReaders);
 		uint32 f_MaxReaders();
-		mint f_CheckForStaleReaders();
+		umint f_CheckForStaleReaders();
 
 		void f_SetMapSize(CDatabaseOffset _Size);
 		void f_SetMaxDatabases(CDatabaseSubID _DatabaseID);
 
-		NAtomic::TCAtomic<mint> *f_GetReferencesPointer();
+		NAtomic::TCAtomic<umint> *f_GetReferencesPointer();
 
 		NContainer::TCVector<CDatabaseReaderInfo> f_GetReaderInfos();
 

@@ -7,7 +7,7 @@
 
 namespace NMib::NDatabase
 {
-	template <mint t_Size, typename t_CHash>
+	template <umint t_Size, typename t_CHash>
 	struct TCDatabaseStreamLexicographic<NCryptography::TCMessageDigest<t_Size, t_CHash>, false>
 	{
 		template <typename tf_CStream>

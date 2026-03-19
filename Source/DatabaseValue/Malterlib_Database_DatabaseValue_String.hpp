@@ -41,7 +41,7 @@ namespace NMib::NDatabase
 		}
 	};
 
-	template <mint t_Len>
+	template <umint t_Len>
 	struct TCDatabaseStreamLexicographic<ch8 [t_Len], false>
 	{
 		template <typename tf_CStream>

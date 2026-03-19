@@ -114,7 +114,7 @@ namespace NMib::NDatabase
 		MDB_db dummy;
 		int dbflag, exact;
 		uint32 unused = 0, seq;
-		mint len;
+		umint len;
 
 		if (_Flags & ~VALID_FLAGS)
 			DMibError("Invalid flags specified");
@@ -191,7 +191,7 @@ namespace NMib::NDatabase
 
 		/* Done here so we cannot fail after creating a new DB */
 		char *namedup;
-		mint NameLen = NStr::fg_StrLen(_pName);
+		umint NameLen = NStr::fg_StrLen(_pName);
 		{
 			namedup = (char *)NMemory::fg_Alloc(NameLen + 1);
 			NStr::fg_StrCopy(namedup, _pName, NameLen + 1);
@@ -388,7 +388,7 @@ namespace NMib::NDatabase
 			return;
 		auto &StaticDatabaseInfo = Environment.m_StaticDasabaseInfo[_DatabaseID];
 		char *pNamePointer = (char *)StaticDatabaseInfo.m_DatabaseName.m_pData;
-		mint NameSize = StaticDatabaseInfo.m_DatabaseName.m_Size;
+		umint NameSize = StaticDatabaseInfo.m_DatabaseName.m_Size;
 		/* If there was no name, this was already closed */
 		if (pNamePointer) {
 			StaticDatabaseInfo.m_DatabaseName.m_pData = nullptr;

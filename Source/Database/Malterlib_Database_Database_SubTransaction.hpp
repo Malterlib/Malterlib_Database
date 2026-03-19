@@ -69,7 +69,7 @@ namespace NMib::NDatabase
 	}
 
 	template <typename tf_CKey>
-	CDatabaseValue CDatabaseSubWriteTransaction::f_InsertInplace(tf_CKey const &_Key, mint _DataSize, bool _bAppend)
+	CDatabaseValue CDatabaseSubWriteTransaction::f_InsertInplace(tf_CKey const &_Key, umint _DataSize, bool _bAppend)
 	{
 		auto &ThreadLocal = **g_DatabaseThreadLocal;
 
@@ -103,7 +103,7 @@ namespace NMib::NDatabase
 	}
 
 	template <typename tf_CKey>
-	CDatabaseValue CDatabaseSubWriteTransaction::f_UpsertInplace(tf_CKey const &_Key, mint _DataSize, bool _bAppend)
+	CDatabaseValue CDatabaseSubWriteTransaction::f_UpsertInplace(tf_CKey const &_Key, umint _DataSize, bool _bAppend)
 	{
 		auto &ThreadLocal = **g_DatabaseThreadLocal;
 

@@ -77,7 +77,7 @@ namespace NMib::NDatabase
 
 		NContainer::CByteVector f_ToVector() const;
 
-		mint m_Size = 0;				///< Size of the data item
+		umint m_Size = 0;				///< Size of the data item
 		uint8 const *m_pData = nullptr;	///< Address of the data item
 	};
 

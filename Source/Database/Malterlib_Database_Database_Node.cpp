@@ -188,7 +188,7 @@ namespace NMib::NDatabase
 	int NPrivate::mdb_node_add(MDB_cursor *mc, indx_t indx, CDatabaseValue *key, CDatabaseValue *data, pgno_t pgno, uint32 flags)
 	{
 		uint32	 i;
-		mint		 node_size = NODESIZE;
+		umint		 node_size = NODESIZE;
 		smint		 room;
 		indx_t		 ofs;
 		MDB_node	*node;
@@ -436,7 +436,7 @@ namespace NMib::NDatabase
 			flags = 0;
 		} else {
 			srcnode = NODEPTR(csrc->mc_pg[csrc->mc_top], csrc->mc_ki[csrc->mc_top]);
-			DMibCheck(!((mint)srcnode & 1));
+			DMibCheck(!((umint)srcnode & 1));
 			srcpg = NODEPGNO(srcnode);
 			flags = srcnode->mn_flags;
 			if (csrc->mc_ki[csrc->mc_top] == 0 && IS_BRANCH(csrc->mc_pg[csrc->mc_top])) {
@@ -645,9 +645,9 @@ namespace NMib::NDatabase
 	 * @param[in] data The data for the node.
 	 * @return The number of bytes needed to store the node.
 	 */
-	mint CDatabaseEnvironment_Internal::mdb_leaf_size(CDatabaseValue *key, CDatabaseValue *data)
+	umint CDatabaseEnvironment_Internal::mdb_leaf_size(CDatabaseValue *key, CDatabaseValue *data)
 	{
-		mint		 sz;
+		umint		 sz;
 
 		sz = LEAFSIZE(key, data);
 		if (sz > me_nodemax) {
@@ -668,9 +668,9 @@ namespace NMib::NDatabase
 	 * @param[in] key The key for the node.
 	 * @return The number of bytes needed to store the node.
 	 */
-	mint CDatabaseEnvironment_Internal::mdb_branch_size(CDatabaseValue *key)
+	umint CDatabaseEnvironment_Internal::mdb_branch_size(CDatabaseValue *key)
 	{
-		mint		 sz;
+		umint		 sz;
 
 		sz = INDXSIZE(key);
 		if (sz > me_nodemax) {
@@ -693,7 +693,7 @@ namespace NMib::NDatabase
 		MDB_page		*mp;
 		MDB_node		*node;
 		char			*base;
-		mint			 len;
+		umint			 len;
 		int				 delta, ksize, oksize;
 		indx_t			 ptr, i, numkeys, indx;
 		DKBUF;

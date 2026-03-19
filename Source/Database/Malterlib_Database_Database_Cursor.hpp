@@ -78,7 +78,7 @@ namespace NMib::NDatabase
 	}
 
 	template <typename tf_CKey>
-	CDatabaseValue CDatabaseCursorWrite::f_InsertInplace(tf_CKey const &_Key, mint _DataSize, bool _bAppend)
+	CDatabaseValue CDatabaseCursorWrite::f_InsertInplace(tf_CKey const &_Key, umint _DataSize, bool _bAppend)
 	{
 		auto &ThreadLocal = **g_DatabaseThreadLocal;
 
@@ -99,7 +99,7 @@ namespace NMib::NDatabase
 	}
 
 	template <typename tf_CKey>
-	CDatabaseValue CDatabaseCursorWrite::f_UpsertInplace(tf_CKey const &_Key, mint _DataSize, bool _bAppend)
+	CDatabaseValue CDatabaseCursorWrite::f_UpsertInplace(tf_CKey const &_Key, umint _DataSize, bool _bAppend)
 	{
 		auto &ThreadLocal = **g_DatabaseThreadLocal;
 		return f_UpsertInplace(CDatabaseValue::fs_ToLexicographic(ThreadLocal.m_KeyCache, _Key), _bAppend);

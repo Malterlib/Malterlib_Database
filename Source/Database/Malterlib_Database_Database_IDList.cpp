@@ -78,7 +78,7 @@ namespace NMib::NDatabase::NPrivate
 		if (ids)
 		{
 			--ids;
-			mint nIds = *ids;
+			umint nIds = *ids;
 			NMib::NMemory::fg_Free(ids, (nIds + 2) * sizeof(MDB_ID));
 		}
 	}
@@ -86,7 +86,7 @@ namespace NMib::NDatabase::NPrivate
 	void mdb_midl_shrink( MDB_IDL *idp )
 	{
 		MDB_IDL ids = *idp;
-		mint NewSize = (MDB_IDL_UM_MAX+2) * sizeof(MDB_ID);
+		umint NewSize = (MDB_IDL_UM_MAX+2) * sizeof(MDB_ID);
 		if (*(--ids) > MDB_IDL_UM_MAX && (ids = (MDB_IDL)NMib::NMemory::fg_Resize(ids, NewSize, 0)))
 		{
 			*ids++ = MDB_IDL_UM_MAX;
@@ -98,7 +98,7 @@ namespace NMib::NDatabase::NPrivate
 	{
 		MDB_IDL idn = *idp-1;
 		/* grow it */
-		mint NewSize = (*idn + num + 2) * sizeof(MDB_ID);
+		umint NewSize = (*idn + num + 2) * sizeof(MDB_ID);
 		idn = (MDB_IDL)NMib::NMemory::fg_Resize(idn, NewSize, 0, EAllocationFlag_SizeNotNeeded);
 		*idn++ += num;
 		*idp = idn;
@@ -110,7 +110,7 @@ namespace NMib::NDatabase::NPrivate
 		num += ids[0];
 		if (num > ids[-1]) {
 			num = (num + num/4 + (256 + 2)) & -256;
-			mint NewSize = num * sizeof(MDB_ID);
+			umint NewSize = num * sizeof(MDB_ID);
 			ids = (MDB_IDL)NMib::NMemory::fg_Resize(ids-1, NewSize, 0, EAllocationFlag_SizeNotNeeded);
 			*ids++ = num - 2;
 			*idp = ids;

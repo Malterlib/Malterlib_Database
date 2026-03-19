@@ -101,7 +101,7 @@ namespace NMib::NDatabase
 
 		NContainer::TCVector< NResultSet::CValueVector > mp_KeyPartValues;		// Index by iKeyPart, then by iKeyPartValue
 
-		mint mp_nRows;											// Cached for easy access, == mp_KeyParse[X].f_GetLen()
+		umint mp_nRows;											// Cached for easy access, == mp_KeyParse[X].f_GetLen()
 		NContainer::TCVector< NContainer::TCVector<uint32> > mp_KeyPartRowValueIndices;		// Index by iKeyPart and then by iRow to get value index.
 		NContainer::TCVector< NResultSet::CSparseValueVector > mp_Columns;	// Index by iColumn, then by iterator (as values are sparse)
 
@@ -125,24 +125,24 @@ namespace NMib::NDatabase
 			inline EResultDataType f_GetType() const;
 			inline NResultSet::CSubType f_GetSubType() const;
 
-			inline mint f_GetIndex() const;
+			inline umint f_GetIndex() const;
 
 			CKeyPartIterator & operator ++ ();
 
 			explicit operator bool () const;
 
 		private:
-			CKeyPartIterator(CResultSet const& _ResultSet, mint _iRow, mint _iKeyPart = 0);
+			CKeyPartIterator(CResultSet const& _ResultSet, umint _iRow, umint _iKeyPart = 0);
 
 		private:
 			friend class CResultSet;
 
 			CResultSet const* mp_pResultSet;
-			mint mp_iRow;
+			umint mp_iRow;
 
-			mint mp_nKeyParts;	// Cached from mp_pResultSet
+			umint mp_nKeyParts;	// Cached from mp_pResultSet
 
-			mint mp_iKeyPart;
+			umint mp_iKeyPart;
 		};
 
 		// Allows iteration over all column values for a specific row.
@@ -157,23 +157,23 @@ namespace NMib::NDatabase
 			EResultDataType f_GetType() const;
 			NResultSet::CSubType f_GetSubType() const;
 
-			mint f_GetIndex() const;
+			umint f_GetIndex() const;
 
 			CColumnValueIterator & operator ++ ();
 
 			explicit operator bool () const;
 
 		private:
-			CColumnValueIterator(CResultSet const& _ResultSet, mint _iRow, NContainer::TCVector<mint> const& _ColumnValueIterators, mint _iCol = 0);
+			CColumnValueIterator(CResultSet const& _ResultSet, umint _iRow, NContainer::TCVector<umint> const& _ColumnValueIterators, umint _iCol = 0);
 
 		private:
 			friend class CResultSet;
 
 			CResultSet const* mp_pResultSet;
-			NContainer::TCVector<mint> mp_ColumnValueIterators;
-			mint mp_iRow;
+			NContainer::TCVector<umint> mp_ColumnValueIterators;
+			umint mp_iRow;
 
-			mint mp_iColumn;
+			umint mp_iColumn;
 		};
 
 		// Allows forward iteration over all rows in a result set.
@@ -191,40 +191,40 @@ namespace NMib::NDatabase
 
 			// Allows type-safe access to a specific key part of the current row.
 			template <typename tf_CType>
-			tf_CType const& f_GetKeyPart(mint _iKeyPart) const;
+			tf_CType const& f_GetKeyPart(umint _iKeyPart) const;
 
-			inline uint32 f_GetKeyPartValueIndex(mint _iKeyPart) const;
+			inline uint32 f_GetKeyPartValueIndex(umint _iKeyPart) const;
 
 			// Allows type-safe access to a specific column value of the current row.
 			// This may return nullptr if the row does not have a value for the specified column.
 			template <typename tf_CType>
-			tf_CType const* f_GetColumnValue(mint _iColumn) const;
+			tf_CType const* f_GetColumnValue(umint _iColumn) const;
 
 			// Returns an iterator allowing for iteration over each key part.
 			CKeyPartIterator f_GetKeyPartIterator() const;
 
 			// Returns an iterator starting at the specified key part allowing for iteration over each key part.
-			CKeyPartIterator f_GetKeyPartIterator(mint _iKP) const;
+			CKeyPartIterator f_GetKeyPartIterator(umint _iKP) const;
 
 			// Returns an iterator allowing for iteration over each column value.
 			CColumnValueIterator f_GetColumnIterator() const;
 
 			// Returns an iterator allowing for iteration over each column value.
-			CColumnValueIterator f_GetColumnIterator(mint _iCol) const;
+			CColumnValueIterator f_GetColumnIterator(umint _iCol) const;
 
-			mint f_GetIndex() const;
-			mint f_GetNumRows() const;
+			umint f_GetIndex() const;
+			umint f_GetNumRows() const;
 
 		private:
 			friend class CResultSet;
 
-			CRowIterator(CResultSet const& _ResultSet, mint _iRow = 0);
+			CRowIterator(CResultSet const& _ResultSet, umint _iRow = 0);
 
 			CResultSet const* mp_pResultSet;
-			mint const mp_nRows;		// Cached from mp_pResultSet
+			umint const mp_nRows;		// Cached from mp_pResultSet
 
-			mint mp_iCurRow;	// The index of the current row , The iterator is only valid if within bounds [0, mp_pResultSet->f_GetNumRows).
-			NContainer::TCVector<mint> mp_ColumnValueIterators; // The position in each of the column sparse data vectors we are currently at.
+			umint mp_iCurRow;	// The index of the current row , The iterator is only valid if within bounds [0, mp_pResultSet->f_GetNumRows).
+			NContainer::TCVector<umint> mp_ColumnValueIterators; // The position in each of the column sparse data vectors we are currently at.
 		};
 
 
@@ -242,27 +242,27 @@ namespace NMib::NDatabase
 
 		bool f_IsEmpty() const;
 
-		mint f_GetNumKeyParts() const;
-		mint f_GetNumColumns() const;
+		umint f_GetNumKeyParts() const;
+		umint f_GetNumColumns() const;
 
-		EResultDataType f_GetKeyPartType(mint _iKeyPart) const;
-		NResultSet::CSubType f_GetKeyPartSubType(mint _iKeyPart) const;
+		EResultDataType f_GetKeyPartType(umint _iKeyPart) const;
+		NResultSet::CSubType f_GetKeyPartSubType(umint _iKeyPart) const;
 
 		template<typename t_CType>
-		NContainer::TCVector<t_CType> const& f_GetKeyPartValues(mint _iKeyPart) const;
+		NContainer::TCVector<t_CType> const& f_GetKeyPartValues(umint _iKeyPart) const;
 
-		EResultDataType f_GetColumnType(mint _iColumn) const;
-		NResultSet::CSubType f_GetColumnSubType(mint _iColumn) const;
+		EResultDataType f_GetColumnType(umint _iColumn) const;
+		NResultSet::CSubType f_GetColumnSubType(umint _iColumn) const;
 
-		mint f_GetNumRows() const;
+		umint f_GetNumRows() const;
 
 		CResultMetadata const*f_GetMetadata(uint32 _ID) const;
-		CResultMetadata const& f_GetKeyPartMetadata(mint _iKeyPart) const;
-		CResultMetadata const& f_GetColumnMetadata(mint _iKeyPart) const;
+		CResultMetadata const& f_GetKeyPartMetadata(umint _iKeyPart) const;
+		CResultMetadata const& f_GetColumnMetadata(umint _iKeyPart) const;
 
 		CRowIterator f_GetRowIterator() const;
 		// Returns an iterator starting at the specified row allowing for iteration over each row.
-		CRowIterator f_GetRowIterator(mint _iRow) const;
+		CRowIterator f_GetRowIterator(umint _iRow) const;
 
 		template <typename tf_CStream>
 		void f_Feed(tf_CStream &_Stream) const;

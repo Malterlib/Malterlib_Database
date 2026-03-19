@@ -5,7 +5,7 @@
 
 namespace NMib::NDatabase::NPrivate
 {
-	template <typename ...tfp_CValue, mint ...tfp_Indices>
+	template <typename ...tfp_CValue, umint ...tfp_Indices>
 	NStorage::TCTuple<typename TCGetDescending<NTraits::TCRemoveQualifiers<tfp_CValue>>::CType...> fg_ConsumeLexicographicByteArrayImpl
 		(
 			CDatabaseValue const &_Value

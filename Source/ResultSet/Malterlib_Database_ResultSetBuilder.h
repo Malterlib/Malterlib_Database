@@ -25,13 +25,13 @@ Usage Example:
 
 // Step 3: Add each key part value:
 	// Note: Indices within each key part start from 0
-	mint iIndex0 = Builder.f_AddKeyPartValue(_iKeyPart, 10);
-	mint iIndex1 = Builder.f_AddKeyPartValue(_iKeyPart, 1000);
-	mint iIndex2 = Builder.f_AddKeyPartValue(_iKeyPart, 2.0);
+	umint iIndex0 = Builder.f_AddKeyPartValue(_iKeyPart, 10);
+	umint iIndex1 = Builder.f_AddKeyPartValue(_iKeyPart, 1000);
+	umint iIndex2 = Builder.f_AddKeyPartValue(_iKeyPart, 2.0);
 
 	// OR
 
-	mint iFirstIndex = Builder.f_SetKeyPartValues(_iKeyPart, lValues);
+	umint iFirstIndex = Builder.f_SetKeyPartValues(_iKeyPart, lValues);
 
 // Step 3: Add each row, specifying all key parts and columns (in order):
 	Builder.f_AddRow()
@@ -105,7 +105,7 @@ namespace NMib::NDatabase
 
 		NContainer::TCVector< NResultSet::CValueVector > mp_KeyPartValues;		// Index by iKeyPart, then by iKeyPartValue
 
-		mint mp_nRows;											// Cached for easy access, == mp_KeyParse[X].f_GetLen()
+		umint mp_nRows;											// Cached for easy access, == mp_KeyParse[X].f_GetLen()
 		NContainer::TCVector< NContainer::TCVector<uint32> > mp_KeyPartRowValueIndices;		// Index by iKeyPart and then by iRow to get value index.
 		NContainer::TCVector< NResultSet::CSparseValueVector > mp_Columns;	// Index by iColumn, then by iterator (as values are sparse)
 
@@ -114,7 +114,7 @@ namespace NMib::NDatabase
 		//
 
 		bool mp_bRowActive;			// We are adding rows
-		mint mp_nColumnWiseActive;	// We are adding values by keypart/column
+		umint mp_nColumnWiseActive;	// We are adding values by keypart/column
 
 	public:
 
@@ -215,20 +215,20 @@ namespace NMib::NDatabase
 		void f_SetDescription( CResultSetDescription const& _Desc );
 
 		void f_AddMetadata(uint32 _ID, CResultMetadata _Data);
-		void f_SetKeyPartMetadata(mint _iKeyPart, CResultMetadata _Data);
-		void f_SetColumnMetadata(mint _iColumn, CResultMetadata _Data);
+		void f_SetKeyPartMetadata(umint _iKeyPart, CResultMetadata _Data);
+		void f_SetColumnMetadata(umint _iColumn, CResultMetadata _Data);
 
 		template<typename t_CType>
-		inline mint f_AddKeyPartValue(uint32 _iKeyPart, t_CType && _Value);
+		inline umint f_AddKeyPartValue(uint32 _iKeyPart, t_CType && _Value);
 
 		template<typename t_CType>
-		inline mint f_SetKeyPartValues(uint32 _iKeyPart, NContainer::TCVector<t_CType> && _lValues);
+		inline umint f_SetKeyPartValues(uint32 _iKeyPart, NContainer::TCVector<t_CType> && _lValues);
 
-		mint f_AddKeyPartVariantValue(uint32 _iKeyPart, NResultSet::CValue const & _Value);
-		mint f_SetKeyPartVariantValues(uint32 _iKeyPart, NContainer::TCVector<NResultSet::CValue> const& _lValues);
+		umint f_AddKeyPartVariantValue(uint32 _iKeyPart, NResultSet::CValue const & _Value);
+		umint f_SetKeyPartVariantValues(uint32 _iKeyPart, NContainer::TCVector<NResultSet::CValue> const& _lValues);
 
 		CRow f_AddRow();
-		inline mint f_GetNumRows() const;
+		inline umint f_GetNumRows() const;
 
 		CKeyPart f_KeyPart(uint32 _iKeyPart);
 		CColumn f_Column(uint32 _iColumn);

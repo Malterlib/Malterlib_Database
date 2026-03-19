@@ -245,7 +245,7 @@ namespace NMib::NDatabase
 	//
 
 	template<typename t_CType>
-	mint CResultSetBuilder::f_AddKeyPartValue(uint32 _iKeyPart, t_CType && _Value)
+	umint CResultSetBuilder::f_AddKeyPartValue(uint32 _iKeyPart, t_CType && _Value)
 	{
 		using NResultSet::TCTypeToDataType;
 
@@ -264,7 +264,7 @@ namespace NMib::NDatabase
 	}
 
 	template<typename t_CType>
-	mint CResultSetBuilder::f_SetKeyPartValues(uint32 _iKeyPart, NContainer::TCVector<t_CType> && _lValues)
+	umint CResultSetBuilder::f_SetKeyPartValues(uint32 _iKeyPart, NContainer::TCVector<t_CType> && _lValues)
 	{
 		using NResultSet::TCTypeToDataType;
 
@@ -280,7 +280,7 @@ namespace NMib::NDatabase
 		return 0;
 	}
 
-	mint CResultSetBuilder::f_GetNumRows() const
+	umint CResultSetBuilder::f_GetNumRows() const
 	{
 		return mp_nRows;
 	}

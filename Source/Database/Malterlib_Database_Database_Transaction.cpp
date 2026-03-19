@@ -201,7 +201,7 @@ namespace NMib::NDatabase
 	{
 		using namespace NPrivate;
 
-		mint Size = 0;
+		umint Size = 0;
 		if (_pTransaction->mt_parent)
 		{
 			Size = me_maxdbs * (sizeof(MDB_db)+sizeof(MDB_cursor *)+1);
@@ -327,7 +327,7 @@ namespace NMib::NDatabase
 			ntxn->mnt_pgstate = me_pgstate; /* save parent me_pgstate.mf_pghead & co */
 			if (me_pgstate.mf_pghead)
 			{
-				mint size = MDB_IDL_SIZEOF(me_pgstate.mf_pghead);
+				umint size = MDB_IDL_SIZEOF(me_pgstate.mf_pghead);
 				me_pgstate.mf_pghead = mdb_midl_alloc(me_pgstate.mf_pghead[0]);
 				memcpy(me_pgstate.mf_pghead, ntxn->mnt_pgstate.mf_pghead, size);
 			}
@@ -926,7 +926,7 @@ namespace NMib::NDatabase
 				} else {
 					auto &StaticDatabaseInfo = pStaticDatabasesInfos[i];
 					char *ptr = (char *)StaticDatabaseInfo.m_DatabaseName.m_pData;
-					mint Size = StaticDatabaseInfo.m_DatabaseName.m_Size;
+					umint Size = StaticDatabaseInfo.m_DatabaseName.m_Size;
 					if (ptr) {
 						StaticDatabaseInfo.m_DatabaseName.m_pData = nullptr;
 						StaticDatabaseInfo.m_DatabaseName.m_Size = 0;

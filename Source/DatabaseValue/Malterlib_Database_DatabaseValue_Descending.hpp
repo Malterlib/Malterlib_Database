@@ -67,13 +67,13 @@ namespace NMib::NDatabase
 			{
 			}
 
-			void f_FeedBytes(void const *_pMem, mint _nBytes)
+			void f_FeedBytes(void const *_pMem, umint _nBytes)
 			{
 				uint8 const *pSource = (uint8 const *)_pMem;
 				if (_nBytes <= 1024)
 				{
 					uint8 Buffer[1024];
-					for (mint i = 0; i < _nBytes; ++i)
+					for (umint i = 0; i < _nBytes; ++i)
 						Buffer[i] = ~pSource[i];
 
 					mp_pStream->f_FeedBytes(Buffer, _nBytes);
@@ -83,21 +83,21 @@ namespace NMib::NDatabase
 					NContainer::CByteVector Buffer;
 					Buffer.f_SetLen(_nBytes);
 					auto pDestination = Buffer.f_GetArray();
-					for (mint i = 0; i < _nBytes; ++i)
+					for (umint i = 0; i < _nBytes; ++i)
 						pDestination[i] = ~pSource[i];
 
 					mp_pStream->f_FeedBytes(pDestination, _nBytes);
 				}
 			}
 
-			void f_ConsumeBytes(void *_pMem, mint _nBytes)
+			void f_ConsumeBytes(void *_pMem, umint _nBytes)
 			{
 				uint8 *pDestination = (uint8 *)_pMem;
 				if (_nBytes <= 1024)
 				{
 					uint8 Buffer[1024];
 					mp_pStream->f_ConsumeBytes(Buffer, _nBytes);
-					for (mint i = 0; i < _nBytes; ++i)
+					for (umint i = 0; i < _nBytes; ++i)
 						pDestination[i] = ~Buffer[i];
 				}
 				else
@@ -107,7 +107,7 @@ namespace NMib::NDatabase
 					auto pSource = Buffer.f_GetArray();
 					mp_pStream->f_ConsumeBytes(pSource, _nBytes);
 
-					for (mint i = 0; i < _nBytes; ++i)
+					for (umint i = 0; i < _nBytes; ++i)
 						pDestination[i] = ~pSource[i];
 				}
 			}
@@ -152,7 +152,7 @@ namespace NMib::NDatabase
 				mp_pStream->f_Flush(_bLocalCacheOnly);
 			}
 
-			void f_SetCacheSize(mint _CacheSize)
+			void f_SetCacheSize(umint _CacheSize)
 			{
 				mp_pStream->f_SetCacheSize(_CacheSize);
 			}
@@ -162,7 +162,7 @@ namespace NMib::NDatabase
 				return mp_pStream->f_GetLength();
 			}
 
-			mint f_ContainerLengthLimit() const
+			umint f_ContainerLengthLimit() const
 			{
 				return NStream::fg_CapLengthLimit(f_GetLength() - f_GetPosition());
 			}

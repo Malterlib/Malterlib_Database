@@ -321,8 +321,8 @@ namespace NMib::NDatabase
 		if (!(flags & EDatabaseEnvironmentFlag_ReadOnly))
 		{
 			MDB_txn *txn;
-			mint tsize = sizeof(MDB_txn);
-			mint size = tsize + Environment.me_maxdbs * (sizeof(MDB_db)+sizeof(MDB_cursor *)+sizeof(uint32)+1);
+			umint tsize = sizeof(MDB_txn);
+			umint size = tsize + Environment.me_maxdbs * (sizeof(MDB_db)+sizeof(MDB_cursor *)+sizeof(uint32)+1);
 			Environment.me_pbuf = NMemory::fg_AllocInitZero(Environment.me_psize);
 			txn = (MDB_txn *)NMemory::fg_AllocInitZero(size);
 			auto Cleanup1 = g_OnScopeExit / [&]()
@@ -390,7 +390,7 @@ namespace NMib::NDatabase
 			}
 		;
 
-		f_Copy((void *)(mint)newfd, _Flags);
+		f_Copy((void *)(umint)newfd, _Flags);
 	}
 
 	/** @brief Copy an LMDB environment to the specified file descriptor,
@@ -414,9 +414,9 @@ namespace NMib::NDatabase
 
 		auto &Environment = *mp_pEnvironment;
 		if (_Flags & EDatabaseEnvironmentCopyFlag_Compact)
-			Environment.f_CopyCompact((HANDLE)(mint)_FileHandle);
+			Environment.f_CopyCompact((HANDLE)(umint)_FileHandle);
 		else
-			Environment.f_Copy((HANDLE)(mint)_FileHandle);
+			Environment.f_Copy((HANDLE)(umint)_FileHandle);
 	}
 
 	/** @brief Return statistics about the LMDB environment.
@@ -610,10 +610,10 @@ namespace NMib::NDatabase
 		fp_CheckOpened();
 
 		auto &Environment = *mp_pEnvironment;
-		return (void *)(mint)Environment.me_fd;
+		return (void *)(umint)Environment.me_fd;
 	}
 
-	NAtomic::TCAtomic<mint> *CDatabaseEnvironment::f_GetReferencesPointer()
+	NAtomic::TCAtomic<umint> *CDatabaseEnvironment::f_GetReferencesPointer()
 	{
 		auto &Environment = *mp_pEnvironment;
 		return &Environment.m_nReferences;
@@ -768,7 +768,7 @@ namespace NMib::NDatabase
 	 * See @ref CDatabaseValue.
 	 * @return The maximum size of a key we can write
 	 */
-	mint DMibDatabaseInfrequentSection CDatabaseEnvironment::f_MaxKeySize()
+	umint DMibDatabaseInfrequentSection CDatabaseEnvironment::f_MaxKeySize()
 	{
 		fp_CheckOpened();
 
@@ -793,9 +793,9 @@ namespace NMib::NDatabase
 			return {};
 
 		NContainer::TCVector<CDatabaseReaderInfo> ReaderInfos;
-		mint nReaders = Environment.m_pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Load(NAtomic::gc_MemoryOrder_Relaxed);
+		umint nReaders = Environment.m_pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Load(NAtomic::gc_MemoryOrder_Relaxed);
 		MDB_reader *pReaders = Environment.m_pLocksMemoryMap->m_Readers;
-		for (mint i = 0; i < nReaders; i++)
+		for (umint i = 0; i < nReaders; i++)
 		{
 			auto &Reader = pReaders[i];
 			auto OwningProcessID = Reader.m_OwningProcessID.f_Load();
@@ -805,9 +805,9 @@ namespace NMib::NDatabase
 
 				NStr::CStr Data;
 				if (TransactionID == (CTransactionID)-1)
-					Data = NStr::fg_Format("{sj10} {} -\n", OwningProcessID, (void *)(mint)OwningProcessID);
+					Data = NStr::fg_Format("{sj10} {} -\n", OwningProcessID, (void *)(umint)OwningProcessID);
 				else
-					Data = NStr::fg_Format("{sj10} {} {}\n", OwningProcessID, (void *)(mint)OwningProcessID, TransactionID);
+					Data = NStr::fg_Format("{sj10} {} {}\n", OwningProcessID, (void *)(umint)OwningProcessID, TransactionID);
 				auto &Info = ReaderInfos.f_Insert();
 				Info.m_Description = fg_Move(Data);
 				Info.m_iReaderSlot = i;
@@ -821,11 +821,11 @@ namespace NMib::NDatabase
 	 * @param[out] dead Number of stale slots that were cleared
 	 * @return 0 on success, non-zero on failure.
 	 */
-	mint DMibDatabaseInfrequentSection CDatabaseEnvironment::f_CheckForStaleReaders()
+	umint DMibDatabaseInfrequentSection CDatabaseEnvironment::f_CheckForStaleReaders()
 	{
 		fp_CheckOpened();
 
-		mint nDead = 0;
+		umint nDead = 0;
 #ifdef MDB_ROBUST_SUPPORTED
 		auto &Environment = *mp_pEnvironment;
 		if (Environment.m_pLocksMemoryMap)
@@ -1548,7 +1548,7 @@ namespace NMib::NDatabase
 		}
 	#endif
 		{
-			mint size = sizeof(MDB_txn) + me_maxdbs * (sizeof(MDB_db)+sizeof(MDB_cursor *)+sizeof(uint32)+1);
+			umint size = sizeof(MDB_txn) + me_maxdbs * (sizeof(MDB_db)+sizeof(MDB_cursor *)+sizeof(uint32)+1);
 			NMemory::fg_Free(me_txn0, size);
 		}
 		mdb_midl_free(me_free_pgs);
@@ -1665,7 +1665,7 @@ namespace NMib::NDatabase
 	#define DO_WRITE(rc, fd, ptr, w2, len)	rc = WriteFile(fd, ptr, w2, &len, nullptr)
 	#else
 		smint len;
-		mint w2;
+		umint w2;
 	#define DO_WRITE(rc, fd, ptr, w2, len)	len = write(fd, ptr, w2); rc = (len >= 0)
 	#endif
 

@@ -82,10 +82,10 @@ namespace NMib::NDatabase
 		void f_DropDatabase(bool _bDelete);
 
 		void f_Insert(CDatabaseValue const &_Key, CDatabaseValue const &_Value, bool _bAppend = false);
-		CDatabaseValue f_InsertInplace(CDatabaseValue const &_Key, mint _DataSize, bool _bAppend = false);
+		CDatabaseValue f_InsertInplace(CDatabaseValue const &_Key, umint _DataSize, bool _bAppend = false);
 
 		void f_Upsert(CDatabaseValue const &_Key, CDatabaseValue const &_Value, bool _bAppend = false);
-		CDatabaseValue f_UpsertInplace(CDatabaseValue const &_Key, mint _DataSize, bool _bAppend = false);
+		CDatabaseValue f_UpsertInplace(CDatabaseValue const &_Key, umint _DataSize, bool _bAppend = false);
 
 		void f_Delete(CDatabaseValue const &_Key);
 		void f_DeleteData(CDatabaseValue const &_Key, CDatabaseValue const &_Data); // Only for duplicate data databases
@@ -95,14 +95,14 @@ namespace NMib::NDatabase
 		template <typename tf_CKey, typename tf_CValue>
 		void f_InsertDuplicateData(tf_CKey const &_Key, tf_CValue const &_Value, bool _bAppend = false); // Only for duplicate data databases
 		template <typename tf_CKey>
-		CDatabaseValue f_InsertInplace(tf_CKey const &_Key, mint _DataSize, bool _bAppend = false);
+		CDatabaseValue f_InsertInplace(tf_CKey const &_Key, umint _DataSize, bool _bAppend = false);
 
 		template <typename tf_CKey, typename tf_CValue>
 		void f_Upsert(tf_CKey const &_Key, tf_CValue const &_Value, bool _bAppend = false);
 		template <typename tf_CKey, typename tf_CValue>
 		void f_UpsertDuplicateData(tf_CKey const &_Key, tf_CValue const &_Value, bool _bAppend = false); // Only for duplicate data databases
 		template <typename tf_CKey>
-		CDatabaseValue f_UpsertInplace(tf_CKey const &_Key, mint _DataSize, bool _bAppend = false);
+		CDatabaseValue f_UpsertInplace(tf_CKey const &_Key, umint _DataSize, bool _bAppend = false);
 
 		template <typename tf_CKey>
 		void f_Delete(tf_CKey const &_Key);

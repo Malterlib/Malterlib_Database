@@ -130,7 +130,7 @@ namespace NMib::NDatabase
 		Transaction.f_Put(mp_DatabaseID, &Key, &Value, Flags);
 	}
 
-	CDatabaseValue CDatabaseSubWriteTransaction::f_InsertInplace(CDatabaseValue const &_Key, mint _DataSize, bool _bAppend)
+	CDatabaseValue CDatabaseSubWriteTransaction::f_InsertInplace(CDatabaseValue const &_Key, umint _DataSize, bool _bAppend)
 	{
 		auto &Transaction = *mp_pTransaction;
 		CDatabaseValue Key = _Key;
@@ -150,7 +150,7 @@ namespace NMib::NDatabase
 		Transaction.f_Put(mp_DatabaseID, &Key, &Value, Flags);
 	}
 
-	CDatabaseValue CDatabaseSubWriteTransaction::f_UpsertInplace(CDatabaseValue const &_Key, mint _DataSize, bool _bAppend)
+	CDatabaseValue CDatabaseSubWriteTransaction::f_UpsertInplace(CDatabaseValue const &_Key, umint _DataSize, bool _bAppend)
 	{
 		auto &Transaction = *mp_pTransaction;
 		CDatabaseValue Key = _Key;

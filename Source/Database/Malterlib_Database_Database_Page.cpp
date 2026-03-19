@@ -44,7 +44,7 @@ namespace NMib::NDatabase
 	{
 		MDB_env *env = txn->mt_env;
 		MDB_page *ret = env->me_dpages;
-		mint psize = env->me_psize, sz = psize, off;
+		umint psize = env->me_psize, sz = psize, off;
 		/* For ! #EDatabaseEnvironmentFlag_NoMemoryInit, psize counts how much to init.
 		 * For a single page alloc, we init everything after the page header.
 		 * For multi-page, we init the final page; if the caller needed that
@@ -814,7 +814,7 @@ namespace NMib::NDatabase
 		MDB_ID2L	dl = txn->mt_u.dirty_list;
 		unsigned	psize = env->me_psize, j;
 		int			i, pagecount = dl[0].mid, rc;
-		mint		size = 0;
+		umint		size = 0;
 		off_t		pos = 0;
 		pgno_t		pgno = 0;
 		MDB_page	*dp = nullptr;
@@ -1030,7 +1030,7 @@ namespace NMib::NDatabase
 		if (rc) rc = mdb_nt2win32(rc)
 	#else
 		off_t off;
-		mint len;
+		umint len;
 	#define SET_OFF(off,val)	off = val
 	#define MAP(rc,env,addr,len,off)	\
 		addr = mmap(nullptr, len, PROT_READ, MAP_SHARED, env->me_fd, off); \

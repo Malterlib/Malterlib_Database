@@ -147,7 +147,7 @@ namespace NMib::NDatabase
 		mp_Value = Value;
 	}
 
-	CDatabaseValue CDatabaseCursorWrite::f_SetValueInplace(mint _DataSize, bool _bAppend)
+	CDatabaseValue CDatabaseCursorWrite::f_SetValueInplace(umint _DataSize, bool _bAppend)
 	{
 		auto &Cursor = *mp_pInternal;
 		CDatabaseValue Value;
@@ -171,7 +171,7 @@ namespace NMib::NDatabase
 		mp_Value = Value;
 	}
 
-	CDatabaseValue CDatabaseCursorWrite::f_InsertInplace(CDatabaseValue const &_Key, mint _DataSize, bool _bAppend)
+	CDatabaseValue CDatabaseCursorWrite::f_InsertInplace(CDatabaseValue const &_Key, umint _DataSize, bool _bAppend)
 	{
 		auto &Cursor = *mp_pInternal;
 		CDatabaseValue Value;
@@ -195,7 +195,7 @@ namespace NMib::NDatabase
 		mp_Value = Value;
 	}
 
-	CDatabaseValue CDatabaseCursorWrite::f_UpsertInplace(CDatabaseValue const &_Key, mint _DataSize, bool _bAppend)
+	CDatabaseValue CDatabaseCursorWrite::f_UpsertInplace(CDatabaseValue const &_Key, umint _DataSize, bool _bAppend)
 	{
 		auto &Cursor = *mp_pInternal;
 		CDatabaseValue Value;
@@ -536,7 +536,7 @@ namespace NMib::NDatabase
 		using namespace NPrivate;
 
 		MDB_cursor	*mc;
-		mint size = sizeof(MDB_cursor);
+		umint size = sizeof(MDB_cursor);
 
 		if (!TXN_DBI_EXIST(this, dbi, DB_VALID))
 			DMibError("Database does not exists");
@@ -592,7 +592,7 @@ namespace NMib::NDatabase::NPrivate
 				if (*prev == mc)
 					*prev = mc->mc_next;
 			}
-			mint Size = sizeof(MDB_cursor);
+			umint Size = sizeof(MDB_cursor);
 			if (mc->mc_xcursor)
 				Size += sizeof(MDB_xcursor);
 
@@ -876,7 +876,7 @@ namespace NMib::NDatabase::NPrivate
 		MDB_db dummy;
 		int do_sub = 0, insert_key, insert_data;
 		uint32 mcount = 0, dcount = 0, nospill;
-		mint nsize;
+		umint nsize;
 		int rc, rc2;
 		uint32 nflags;
 		DKBUF;
@@ -1213,7 +1213,7 @@ namespace NMib::NDatabase::NPrivate
 					 */
 					if (level > 1) {
 						/* It is writable only in a parent txn */
-						mint sz = (mint) env->me_psize * ovpages, off;
+						umint sz = (umint) env->me_psize * ovpages, off;
 						MDB_page *np = mdb_page_malloc(mc->mc_txn, ovpages);
 						MDB_ID2 id2;
 						id2.mid = pg;
@@ -1230,9 +1230,9 @@ namespace NMib::NDatabase::NPrivate
 							 * Copy end of page, adjusting alignment so
 							 * compiler may copy words instead of bytes.
 							 */
-							off = (PAGEHDRSZ + data->m_Size) & -sizeof(mint);
-							memcpy((mint *)((char *)np + off),
-								(mint *)((char *)omp + off), sz - off);
+							off = (PAGEHDRSZ + data->m_Size) & -sizeof(umint);
+							memcpy((umint *)((char *)np + off),
+								(umint *)((char *)omp + off), sz - off);
 							sz = PAGEHDRSZ;
 						}
 						memcpy(np, omp, sz); /* Copy beginning of page */
@@ -1600,7 +1600,7 @@ namespace NMib::NDatabase::NPrivate
 	{
 		MDB_cursor *mc, *bk;
 		MDB_xcursor *mx;
-		mint size;
+		umint size;
 		int i;
 
 		for (i = src->mt_numdbs; --i >= 0; ) {
@@ -1663,7 +1663,7 @@ namespace NMib::NDatabase::NPrivate
 					mc = bk;
 				}
 				/* Only malloced cursors are permanently tracked. */
-				mint Size = sizeof(MDB_cursor);
+				umint Size = sizeof(MDB_cursor);
 				if (mc->mc_xcursor)
 					Size += sizeof(MDB_xcursor);
 

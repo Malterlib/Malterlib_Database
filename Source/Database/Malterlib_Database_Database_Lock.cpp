@@ -121,14 +121,14 @@ namespace NMib::NDatabase
 
 #ifdef MDB_ROBUST_SUPPORTED
 	/** As #mdb_reader_check(). bReadLock = <caller locked the reader mutex>. */
-	void DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::mdb_reader_check0(bool _bReadLock, mint *_pDead)
+	void DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::mdb_reader_check0(bool _bReadLock, umint *_pDead)
 	{
 		using namespace NPrivate;
 		mdb_mutexref_t rmutex = _bReadLock ? nullptr : me_rmutex;
 		uint32 i, j, rdrs;
 		MDB_reader *mr;
 		CProcessID *pids, pid;
-		mint nDead = 0;
+		umint nDead = 0;
 
 		rdrs = m_pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Load(NAtomic::gc_MemoryOrder_Relaxed);
 		pids = (CProcessID *)NMemory::fg_Alloc((rdrs+1) * sizeof(CProcessID));

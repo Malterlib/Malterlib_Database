@@ -107,7 +107,7 @@ namespace NMib::NDatabase
 			>
 		;
 
-		using CRowKeyPartValueIndices = NContainer::TCVector<mint>;
+		using CRowKeyPartValueIndices = NContainer::TCVector<umint>;
 
 		// Represents the index of a row (from 0)
 		using CRowIndex = uint32;
