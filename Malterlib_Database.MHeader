@@ -1,7 +1,14 @@
-// Copyright © 2015 Hansoft AB 
-// Distributed under the MIT license, see license text in LICENSE.Malterlib
+// Copyright © Unbroken AB
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 Import "../Core/Lib_Malterlib.MTarget"
+
+Repository
+{
+	!!MalterlibRepoName "Malterlib_Database.git"
+
+	License #<Exclude> =+ "Source/Database/LICENSE.OpenLDAP"
+}
 
 %Group "{Malterlib}/{Lib_Malterlib_Database}"
 {
@@ -72,7 +79,7 @@ Property
 Property
 {
 	!!MalterlibEnableInternalTests true
-	
+
 	MalterlibTests =+ "Malterlib_Database"
 	MalterlibTestFiles_Malterlib_Database: [type(CEntity)] = ["Test/*"->MakeAbsolute()]
 	MalterlibTestDependencies_Malterlib_Database: [type(CEntity)] = ["Lib_Malterlib_Database"]

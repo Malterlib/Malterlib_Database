@@ -1,6 +1,9 @@
-// Copyright © 2019 Nonna Holding AB
-// Distributed under the MIT license, see license text in LICENSE.Malterlib
+// Copyright © Unbroken AB
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 /*
+ SPDX-License-Identifier: OLDAP-2.8
+ SPDX-License-Identifier: ISC
  This code is derived from lmdb with the following copyright:
 
  Copyright 2011-2019 Howard Chu, Symas Corp.

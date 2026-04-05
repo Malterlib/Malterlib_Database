@@ -1,6 +1,8 @@
-// Copyright © 2019 Nonna Holding AB
-// Distributed under the MIT license, see license text in LICENSE.Malterlib
+// Copyright © Unbroken AB
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 /*
+ SPDX-License-Identifier: OLDAP-2.8
  This code is derived from lmdb with the following copyright:
 
  This work is part of OpenLDAP Software <http://www.openldap.org/>.
