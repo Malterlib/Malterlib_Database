@@ -9,8 +9,9 @@
 
 namespace NMib::NDatabase
 {
-	template <typename t_CType>
-	struct TCDatabaseStreamLexicographic<NStorage::TCOptional<t_CType>, false> : public TCDatabaseStreamLexicographic<typename NStorage::TCOptional<t_CType>::CVariant, false>
+	template <typename t_CType, NStorage::EOptionalMoveSemantics t_MoveSemantics>
+	struct TCDatabaseStreamLexicographic<NStorage::TCOptional<t_CType, t_MoveSemantics>, false>
+		: public TCDatabaseStreamLexicographic<typename NStorage::TCOptional<t_CType, t_MoveSemantics>::CVariant, false>
 	{
 	};
 
