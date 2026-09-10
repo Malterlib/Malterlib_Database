@@ -387,9 +387,13 @@ namespace NMib::NDatabase
 
 		auto BlockingActorCheckout = fg_BlockingActor();
 
+		// Taken here, on this actor, since the blocking thread must not read this actor's self while it is being
+		// destroyed; weak, since an open transaction must not keep the actor alive
+		auto ThisActor = fg_ThisActor(this).f_Weak();
+
 		co_return co_await
 			(
-				g_Dispatch(BlockingActorCheckout.f_Actor()) / [this, pCanDestroy = mp_pCanDestroyTracker]() mutable -> TCFuture<CTransactionRead>
+				g_Dispatch(BlockingActorCheckout.f_Actor()) / [this, ThisActor, pCanDestroy = mp_pCanDestroyTracker]() mutable -> TCFuture<CTransactionRead>
 				{
 					auto CaptureScope = co_await g_CaptureExceptions;
 
@@ -405,7 +409,7 @@ namespace NMib::NDatabase
 			#ifndef DMibClangAnalyzerWorkaround
 					co_return CTransactionRead
 						{
-							g_BlockingActorSubscription / [this, pReferences, pState, pCanDestroy = fg_Move(pCanDestroy)]() mutable
+							g_BlockingActorSubscription / [this, ThisActor, pReferences, pState, pCanDestroy = fg_Move(pCanDestroy)]() mutable
 							{
 								pState.f_Clear();
 								auto NewReaders = --mp_nReaders;
@@ -413,7 +417,12 @@ namespace NMib::NDatabase
 								if (NewReaders != 0)
 									return;
 
-								g_Dispatch(fg_ThisActor(this)) / [this, pCanDestroy = fg_Move(pCanDestroy)]() -> TCFuture<void>
+								// A destroyed actor has nothing left waiting for readers
+								auto Actor = ThisActor.f_Lock();
+								if (!Actor)
+									return;
+
+								g_Dispatch(Actor) / [this, pCanDestroy = fg_Move(pCanDestroy)]() -> TCFuture<void>
 									{
 										if (mp_nReaders.f_Load() == 0)
 										{
@@ -461,10 +470,14 @@ namespace NMib::NDatabase
 		auto BlockingActorCheckout = fg_BlockingActor();
 		auto BlockingActor = BlockingActorCheckout.f_Actor();
 
+		// Taken here, on this actor, since the blocking thread must not read this actor's self while it is being
+		// destroyed; weak, since an open transaction must not keep the actor alive
+		auto ThisActor = fg_ThisActor(this).f_Weak();
+
 		co_return co_await
 			(
 				g_Dispatch(BlockingActor)
-				/ [this, pCanDestroy = fg_Move(pCanDestroy), SequenceSubscription = fg_Move(SequenceSubscription), BlockingActorCheckout = fg_Move(BlockingActorCheckout)]
+				/ [this, ThisActor, pCanDestroy = fg_Move(pCanDestroy), SequenceSubscription = fg_Move(SequenceSubscription), BlockingActorCheckout = fg_Move(BlockingActorCheckout)]
 				() mutable -> TCFuture<CTransactionWrite>
 				{
 					if (mp_bDestroyed.f_Load())
@@ -480,7 +493,6 @@ namespace NMib::NDatabase
 					++(*pReferences);
 
 					auto BlockingActor = BlockingActorCheckout.f_Actor();
-					auto ThisActor = fg_ThisActor(this);
 
 #ifndef DMibClangAnalyzerWorkaround
 					co_return CTransactionWrite
@@ -489,7 +501,12 @@ namespace NMib::NDatabase
 							{
 								pState.f_Clear();
 								--(*pReferences);
-								g_Dispatch(ThisActor) / [this, pCanDestroy = fg_Move(pCanDestroy)]() -> TCFuture<void>
+
+								auto Actor = ThisActor.f_Lock();
+								if (!Actor)
+									return;
+
+								g_Dispatch(Actor) / [this, pCanDestroy = fg_Move(pCanDestroy)]() -> TCFuture<void>
 									{
 										if (mp_bDestroyed.f_Load())
 											co_return {};
