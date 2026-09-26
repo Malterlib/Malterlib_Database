@@ -628,7 +628,7 @@ namespace NMib::NDatabase
 			 *	Requires double parenthesis around 2 or more args.
 			 */
 		#	define DMibDatabaseTraceMSVC(d_Expand) d_Expand
-		#	define DMibDatabaseTrace(...) { if (NPrivate::mdb_debug) DMibDatabaseTraceMSVC( DMibDatabaseTrace0(__VA_ARGS__) ); }
+		#	define DMibDatabaseTrace(...) do { if (NPrivate::mdb_debug) DMibDatabaseTraceMSVC( DMibDatabaseTrace0(__VA_ARGS__) ); } while (false)
 		#	define DMibDatabaseTrace0(d_Format, ...) DMibTrace(DMibPFileLineFormat d_Format "{\n}", DMibPFile, DMibPLine, __VA_ARGS__)
 		#else
 		# define DMibDatabaseTrace(...)	((void) 0)
