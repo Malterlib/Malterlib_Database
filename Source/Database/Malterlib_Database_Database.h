@@ -2,35 +2,35 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 /*
- SPDX-License-Identifier: OLDAP-2.8
- SPDX-License-Identifier: ISC
- This code is derived from lmdb with the following copyright:
+SPDX-License-Identifier: OLDAP-2.8
+SPDX-License-Identifier: ISC
+This code is derived from lmdb with the following copyright:
 
- Copyright 2011-2019 Howard Chu, Symas Corp. All rights reserved.
+Copyright 2011-2019 Howard Chu, Symas Corp. All rights reserved.
 
- Redistribution and use in source and binary forms, with or without
- modification, are permitted only as authorized by the OpenLDAP
- Public License.
+Redistribution and use in source and binary forms, with or without
+modification, are permitted only as authorized by the OpenLDAP
+Public License.
 
- A copy of this license is available in the file LICENSE.OpenLDAP in the
- top-level directory of the distribution or, alternatively, at
- <http://www.OpenLDAP.org/license.html>.
+A copy of this license is available in the file LICENSE.OpenLDAP in the
+top-level directory of the distribution or, alternatively, at
+<http://www.OpenLDAP.org/license.html>.
 
- This code is derived from btree.c written by Martin Hedenfalk.
+This code is derived from btree.c written by Martin Hedenfalk.
 
- Copyright (c) 2009, 2010 Martin Hedenfalk <martin@bzero.se>
+Copyright (c) 2009, 2010 Martin Hedenfalk <martin@bzero.se>
 
- Permission to use, copy, modify, and distribute this software for any
- purpose with or without fee is hereby granted, provided that the above
- copyright notice and this permission notice appear in all copies.
+Permission to use, copy, modify, and distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
 
- THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
- WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
- MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
- ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
- ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
- OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
 #pragma once
@@ -44,13 +44,13 @@
 
 namespace NMib::NDatabase
 {
-#	ifdef DMibDatabase_Always64BitSupport
-#		define DMibDatabase_IDBits 64
-		using CDatabaseOffset = uint64;
-#	else
-#		define DMibDatabase_IDBits DMibPPtrBits
-		using CDatabaseOffset = umint;
-#	endif
+#ifdef DMibDatabase_Always64BitSupport
+#	define DMibDatabase_IDBits 64
+	using CDatabaseOffset = uint64;
+#else
+#	define DMibDatabase_IDBits DMibPPtrBits
+	using CDatabaseOffset = umint;
+#endif
 
 	struct CDatabaseEnvironment;
 	struct CDatabaseEnvironment_Internal;
@@ -79,27 +79,24 @@ namespace NMib::NDatabase
 	/// Database Flags
 	enum EDatabaseEnvironmentFlag : uint32
 	{
-		EDatabaseEnvironmentFlag_None = 0
-		, EDatabaseEnvironmentFlag_FixedMap = 0x01						///< Memory map at a fixed address (experimental)
-		, EDatabaseEnvironmentFlag_NoSubdir = 0x4000					///< No environment directory
-		, EDatabaseEnvironmentFlag_NoSync = 0x10000						///< Don't fsync after commit
-		, EDatabaseEnvironmentFlag_ReadOnly = 0x20000					///< Read only
-		, EDatabaseEnvironmentFlag_NoMetaSync = 0x40000					///< Don't fsync metapage after commit
-		, EDatabaseEnvironmentFlag_WriteMap = 0x80000					///< Use writable mmap
-		, EDatabaseEnvironmentFlag_WriteMapAsync = 0x100000				///< Use asynchronous msync when #EDatabaseEnvironmentFlag_WriteMap is used
-		, EDatabaseEnvironmentFlag_NoTls = 0x200000						///< Tie reader locktable slots to #NMib::NDatabase::CDatabaseReadTransaction objects instead of to threads
-		, EDatabaseEnvironmentFlag_NoLock = 0x400000					///< Don't do any locking, caller must manage their own locks
-		, EDatabaseEnvironmentFlag_NoReadAhead = 0x800000				///< Don't do readahead (no effect on Windows)
-		, EDatabaseEnvironmentFlag_NoMemoryInit = 0x1000000				///< Don't initialize malloc'd memory before writing to datafile
-		, EDatabaseEnvironmentFlag_PreviousSnapshot = 0x2000000			///< Use the previous snapshot rather than the latest one
- 		, EDatabaseEnvironmentFlag_AllowOneProcessLocking = 0x4000000	///< Allow one process only locking if a named mutex cannot be created due to access rights on Windows
+		EDatabaseEnvironmentFlag_None                     = 0
+		, EDatabaseEnvironmentFlag_FixedMap               = 0x01      ///< Memory map at a fixed address (experimental)
+		, EDatabaseEnvironmentFlag_NoSubdir               = 0x4000    ///< No environment directory
+		, EDatabaseEnvironmentFlag_NoSync                 = 0x10000   ///< Don't fsync after commit
+		, EDatabaseEnvironmentFlag_ReadOnly               = 0x20000   ///< Read only
+		, EDatabaseEnvironmentFlag_NoMetaSync             = 0x40000   ///< Don't fsync metapage after commit
+		, EDatabaseEnvironmentFlag_WriteMap               = 0x80000   ///< Use writable mmap
+		, EDatabaseEnvironmentFlag_WriteMapAsync          = 0x100000  ///< Use asynchronous msync when #EDatabaseEnvironmentFlag_WriteMap is used
+		, EDatabaseEnvironmentFlag_NoTls                  = 0x200000  ///< Tie reader locktable slots to #NMib::NDatabase::CDatabaseReadTransaction objects instead of to threads
+		, EDatabaseEnvironmentFlag_NoLock                 = 0x400000  ///< Don't do any locking, caller must manage their own locks
+		, EDatabaseEnvironmentFlag_NoReadAhead            = 0x800000  ///< Don't do readahead (no effect on Windows)
+		, EDatabaseEnvironmentFlag_NoMemoryInit           = 0x1000000 ///< Don't initialize malloc'd memory before writing to datafile
+		, EDatabaseEnvironmentFlag_PreviousSnapshot       = 0x2000000 ///< Use the previous snapshot rather than the latest one
+		, EDatabaseEnvironmentFlag_AllowOneProcessLocking = 0x4000000 ///< Allow one process only locking if a named mutex cannot be created due to access rights on Windows
 
 		, EDatabaseEnvironmentFlag_Changable =
 		(
-			EDatabaseEnvironmentFlag_NoSync
-			| EDatabaseEnvironmentFlag_NoMetaSync
-			| EDatabaseEnvironmentFlag_WriteMapAsync
-			| EDatabaseEnvironmentFlag_NoMemoryInit
+			EDatabaseEnvironmentFlag_NoSync | EDatabaseEnvironmentFlag_NoMetaSync | EDatabaseEnvironmentFlag_WriteMapAsync | EDatabaseEnvironmentFlag_NoMemoryInit
 		)
 		, EDatabaseEnvironmentFlag_Changeless =
 		(
@@ -118,19 +115,19 @@ namespace NMib::NDatabase
 	///	Database Copy Flags
 	enum EDatabaseEnvironmentCopyFlag
 	{
-		EDatabaseEnvironmentCopyFlag_None = 0
+		EDatabaseEnvironmentCopyFlag_None      = 0
 		, EDatabaseEnvironmentCopyFlag_Compact = 0x01 ///< Compacting copy: Omit free space from copy, and renumber all pages sequentially.
 	};
 
 	/** @brief Information about the environment */
 	struct CDatabaseEnvironmentInfo
 	{
-		void *m_pMapAddress;						///< Address of map, if fixed
-		CDatabaseOffset m_MapSize;					///< Size of the data memory map
-		CDatabaseOffset m_LastPageID;					///< ID of the last used page
-		CDatabaseOffset m_LastCommittedTransactionID;	///< ID of the last committed transaction
-		uint32 m_MaxReaders;						///< max reader slots in the environment
-		uint32 m_nReaders;							///< max reader slots used in the environment
+		void *m_pMapAddress;                          ///< Address of map, if fixed
+		CDatabaseOffset m_MapSize;                    ///< Size of the data memory map
+		CDatabaseOffset m_LastPageID;                 ///< ID of the last used page
+		CDatabaseOffset m_LastCommittedTransactionID; ///< ID of the last committed transaction
+		uint32 m_MaxReaders;                          ///< max reader slots in the environment
+		uint32 m_nReaders;                            ///< max reader slots used in the environment
 	};
 
 	struct CDatabaseReaderInfo
@@ -152,7 +149,7 @@ namespace NMib::NDatabase
 		~CDatabaseEnvironment();
 
 		CDatabaseEnvironment(CDatabaseEnvironment &&_Other);
-		CDatabaseEnvironment &operator =(CDatabaseEnvironment &&_Other);
+		CDatabaseEnvironment &operator = (CDatabaseEnvironment &&_Other);
 
 		void f_Open(NStr::CStr const &_Path, EDatabaseEnvironmentFlag _Flags, NFile::EFileAttrib _FileAttributes, uint32 _PageSize = 0);
 		void f_Close();
@@ -200,5 +197,5 @@ namespace NMib::NDatabase
 #include "Malterlib_Database_Database_SubTransaction.hpp"
 
 #ifndef DMibPNoShortCuts
-	using namespace NMib::NDatabase;
+using namespace NMib::NDatabase;
 #endif

@@ -13,20 +13,18 @@ namespace
 	class CResultSet_Tests : public NMib::NTest::CTest
 	{
 	public:
-
-		void f_PopulateBuilder(CResultSetBuilder& _Builder)
+		void f_PopulateBuilder(CResultSetBuilder &_Builder)
 		{
 			CResultSetDescription Desc;
 
 			// Specify a result set with two key parts and one column.
-			Desc
-				.f_KeyPart(EResultDataType_uint64, 0)
+			Desc.f_KeyPart(EResultDataType_uint64, 0)
 				.f_KeyPart(EResultDataType_fp64, 0)
 				.f_Column(EResultDataType_CStr)
 				.f_Column(EResultDataType_CStr)
 				.f_Column(EResultDataType_fp64)
-				.f_Column(EResultDataType_Binary);
-
+				.f_Column(EResultDataType_Binary)
+			;
 
 			// Add two rows to the result set
 			_Builder.f_SetDescription(Desc);
@@ -40,7 +38,8 @@ namespace
 				.f_Column("Hello")
 				.f_Column(nullptr)
 				.f_Column(fp64(1.0 / 3.0))
-				.f_Column(lBinData);
+				.f_Column(lBinData)
+			;
 
 			lBinData[0] = 200;
 
@@ -50,8 +49,8 @@ namespace
 				.f_Column(", World!")
 				.f_Column(nullptr)
 				.f_Column(fp64(2.0 / 3.0))
-				.f_Column(lBinData);
-
+				.f_Column(lBinData)
+			;
 
 			// Add result set metadata.
 			NMib::NContainer::CByteVector Metadata;
@@ -73,19 +72,18 @@ namespace
 			_Builder.f_SetColumnMetadata(0, Metadata);
 		}
 
-
-		void f_PopulateBuilderColumnWise(CResultSetBuilder& _Builder)
+		void f_PopulateBuilderColumnWise(CResultSetBuilder &_Builder)
 		{
 			CResultSetDescription Desc;
 
 			// Specify a result set with two key parts and one column.
-			Desc
-				.f_KeyPart(EResultDataType_uint64, 0)
+			Desc.f_KeyPart(EResultDataType_uint64, 0)
 				.f_KeyPart(EResultDataType_fp64, 0)
 				.f_Column(EResultDataType_CStr)
 				.f_Column(EResultDataType_CStr)
 				.f_Column(EResultDataType_fp64)
-				.f_Column(EResultDataType_Binary);
+				.f_Column(EResultDataType_Binary)
+			;
 
 			_Builder.f_SetDescription(Desc);
 
@@ -98,7 +96,6 @@ namespace
 				auto Column1 = _Builder.f_Column(1);
 				auto Column2 = _Builder.f_Column(2);
 				auto Column3 = _Builder.f_Column(3);
-
 
 				KeyPart0.f_AddValue(_Builder.f_AddKeyPartVariantValue(0, uint64(1)));
 				KeyPart0.f_AddValue(_Builder.f_AddKeyPartVariantValue(0, uint64(2)));
@@ -143,7 +140,7 @@ namespace
 			_Builder.f_SetColumnMetadata(0, Metadata);
 		}
 
-		void f_TestResultSet(CResultSet const& _RS)
+		void f_TestResultSet(CResultSet const &_RS)
 		{
 			DMibTest(DMibExpr(false) == DMibExpr(_RS.f_IsEmpty()));
 			DMibTest(DMibExpr(2) == DMibExpr(_RS.f_GetNumRows()));
@@ -158,10 +155,9 @@ namespace
 			DMibTest(DMibExpr(EResultDataType_fp64) == DMibExpr(_RS.f_GetColumnType(2)));
 			DMibTest(DMibExpr(EResultDataType_Binary) == DMibExpr(_RS.f_GetColumnType(3)));
 
-
 			{ // Check we can get the result set metadata OK, and that lookup by ID works.
 				DMibTestPath("Check Metadata 0");
-				NMib::NContainer::CByteVector const* pMetadata = nullptr;
+				NMib::NContainer::CByteVector const *pMetadata = nullptr;
 
 				pMetadata = _RS.f_GetMetadata(0);
 				DMibTest(DMibExpr(nullptr) == DMibExpr(pMetadata));
@@ -169,41 +165,41 @@ namespace
 
 			{
 				DMibTestPath("Check Metadata 1");
-				NMib::NContainer::CByteVector const* pMetadata = nullptr;
+				NMib::NContainer::CByteVector const *pMetadata = nullptr;
 				pMetadata = _RS.f_GetMetadata(1);
 				DMibTest(DMibExpr(nullptr) != DMibExpr(pMetadata));
 				DMibTest(DMibExpr(1) == DMibExpr(pMetadata->f_GetLen()));
-				DMibTest(DMibExpr(1) == DMibExpr(pMetadata->operator[](0)));
+				DMibTest(DMibExpr(1) == DMibExpr(pMetadata->operator [] (0)));
 			}
 
 			{
 				DMibTestPath("Check Metadata 2");
-				NMib::NContainer::CByteVector const* pMetadata = nullptr;
+				NMib::NContainer::CByteVector const *pMetadata = nullptr;
 				pMetadata = _RS.f_GetMetadata(2);
 				DMibTest(DMibExpr(nullptr) != DMibExpr(pMetadata));
 				DMibTest(DMibExpr(1) == DMibExpr(pMetadata->f_GetLen()));
-				DMibTest(DMibExpr(2) == DMibExpr(pMetadata->operator[](0)));
+				DMibTest(DMibExpr(2) == DMibExpr(pMetadata->operator [] (0)));
 			}
 
 			{
 				DMibTestPath("Check KeyPart 0 Metadata");
-				NMib::NContainer::CByteVector const& Metadata = _RS.f_GetKeyPartMetadata(0);
+				NMib::NContainer::CByteVector const &Metadata = _RS.f_GetKeyPartMetadata(0);
 				DMibTest(DMibExpr(1) == DMibExpr(Metadata.f_GetLen()));
-				DMibTest(DMibExpr(3) == DMibExpr(Metadata.operator[](0)));
+				DMibTest(DMibExpr(3) == DMibExpr(Metadata.operator [] (0)));
 			}
 
 			{
 				DMibTestPath("Check KeyPart 1 Metadata");
-				NMib::NContainer::CByteVector const& Metadata = _RS.f_GetKeyPartMetadata(1);
+				NMib::NContainer::CByteVector const &Metadata = _RS.f_GetKeyPartMetadata(1);
 				DMibTest(DMibExpr(1) == DMibExpr(Metadata.f_GetLen()));
-				DMibTest(DMibExpr(4) == DMibExpr(Metadata.operator[](0)));
+				DMibTest(DMibExpr(4) == DMibExpr(Metadata.operator [] (0)));
 			}
 
 			{
 				DMibTestPath("Check Column 0 Metadata");
-				NMib::NContainer::CByteVector const& Metadata = _RS.f_GetColumnMetadata(0);
+				NMib::NContainer::CByteVector const &Metadata = _RS.f_GetColumnMetadata(0);
 				DMibTest(DMibExpr(1) == DMibExpr(Metadata.f_GetLen()));
-				DMibTest(DMibExpr(5) == DMibExpr(Metadata.operator[](0)));
+				DMibTest(DMibExpr(5) == DMibExpr(Metadata.operator [] (0)));
 			}
 
 			// Check we have access to each row
@@ -252,7 +248,6 @@ namespace
 
 					DMibTest(DMibExpr(nullptr) != DMibExpr(iRow.f_GetColumnValue<NContainer::CByteVector>(3)));
 					DMibTest(DMibExpr(lBinData) == DMibExpr(*iRow.f_GetColumnValue<NContainer::CByteVector>(3)));
-
 				}
 
 				++iRow;
@@ -332,7 +327,7 @@ namespace
 
 		void f_DoTests()
 		{
-//			DMibTestCategory("Dynamic")
+			// DMibTestCategory("Dynamic")
 			{
 				DMibTestSuite("BuildingAndReading")
 				{
@@ -390,9 +385,7 @@ namespace
 
 						f_TestResultSet(RS);
 					}
-
 				};
-
 			};
 		}
 	};

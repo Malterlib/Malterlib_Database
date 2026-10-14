@@ -6,11 +6,8 @@
 namespace NMib::NDatabase::NPrivate
 {
 	template <typename ...tfp_CValue, umint ...tfp_Indices>
-	NStorage::TCTuple<typename TCGetDescending<NTraits::TCRemoveQualifiers<tfp_CValue>>::CType...> fg_ConsumeLexicographicByteArrayImpl
-		(
-			CDatabaseValue const &_Value
-			, NMeta::TCIndices<tfp_Indices...> _Dummy
-		)
+	auto fg_ConsumeLexicographicByteArrayImpl(CDatabaseValue const &_Value, NMeta::TCIndices<tfp_Indices...> _Dummy)
+		-> NStorage::TCTuple<typename TCGetDescending<NTraits::TCRemoveQualifiers<tfp_CValue>>::CType...>
 	{
 		NStream::CBinaryStreamMemoryPtr<NStream::CBinaryStreamBigEndian> Stream;
 		Stream.f_OpenRead(_Value.m_pData, _Value.m_Size);

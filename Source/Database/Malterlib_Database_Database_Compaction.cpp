@@ -2,36 +2,36 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 /*
- SPDX-License-Identifier: OLDAP-2.8
- SPDX-License-Identifier: ISC
- This code is derived from lmdb with the following copyright:
+SPDX-License-Identifier: OLDAP-2.8
+SPDX-License-Identifier: ISC
+This code is derived from lmdb with the following copyright:
 
- Copyright 2011-2019 Howard Chu, Symas Corp.
- All rights reserved.
+Copyright 2011-2019 Howard Chu, Symas Corp.
+All rights reserved.
 
- Redistribution and use in source and binary forms, with or without
- modification, are permitted only as authorized by the OpenLDAP
- Public License.
+Redistribution and use in source and binary forms, with or without
+modification, are permitted only as authorized by the OpenLDAP
+Public License.
 
- A copy of this license is available in the file LICENSE.OpenLDAP in the
- top-level directory of the distribution or, alternatively, at
- <http://www.OpenLDAP.org/license.html>.
+A copy of this license is available in the file LICENSE.OpenLDAP in the
+top-level directory of the distribution or, alternatively, at
+<http://www.OpenLDAP.org/license.html>.
 
- This code is derived from btree.c written by Martin Hedenfalk.
+This code is derived from btree.c written by Martin Hedenfalk.
 
- Copyright (c) 2009, 2010 Martin Hedenfalk <martin@bzero.se>
+Copyright (c) 2009, 2010 Martin Hedenfalk <martin@bzero.se>
 
- Permission to use, copy, modify, and distribute this software for any
- purpose with or without fee is hereby granted, provided that the above
- copyright notice and this permission notice appear in all copies.
+Permission to use, copy, modify, and distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
 
- THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
- WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
- MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
- ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
- ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
- OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
 #include "Malterlib_Database_Database.h"
@@ -41,7 +41,7 @@
 namespace NMib::NDatabase::NPrivate
 {
 	using namespace NConcurrency;
-	static constexpr umint gc_CopyBufferSize = 1024*1024;
+	static constexpr umint gc_CopyBufferSize = 1024 * 1024;
 
 	struct CCompactingCopyState
 	{
@@ -55,13 +55,13 @@ namespace NMib::NDatabase::NPrivate
 		~CCompactingCopyState()
 		{
 			if (m_WriteBuffers[0])
-				NMemory::fg_Free(m_WriteBuffers[0], gc_CopyBufferSize*2);
+				NMemory::fg_Free(m_WriteBuffers[0], gc_CopyBufferSize * 2);
 		}
 
 		void f_Init(umint _PageSize)
 		{
-			m_WriteBuffers[0] = (uint8 *)NMemory::fg_AllocAligned(gc_CopyBufferSize*2, _PageSize);
-			NMemory::fg_MemClear(m_WriteBuffers[0], gc_CopyBufferSize*2);
+			m_WriteBuffers[0] = (uint8 *)NMemory::fg_AllocAligned(gc_CopyBufferSize * 2, _PageSize);
+			NMemory::fg_MemClear(m_WriteBuffers[0], gc_CopyBufferSize * 2);
 			m_WriteBuffers[1] = m_WriteBuffers[0] + gc_CopyBufferSize;
 		}
 
@@ -85,38 +85,46 @@ namespace NMib::NDatabase::NPrivate
 		CCompactingCopyState &CopyState = _CopyState;
 		int wsize;
 		int rc = 0;
-	#ifdef DPlatformFamily_Windows
+#ifdef DPlatformFamily_Windows
 		DWORD len;
-	#define DO_WRITE(rc, fd, ptr, w2, len)	rc = WriteFile(fd, ptr, w2, &len, nullptr)
-	#else
+#	define DO_WRITE(rc, fd, ptr, w2, len)	rc = WriteFile(fd, ptr, w2, &len, nullptr)
+#else
 		int len;
-	#define DO_WRITE(rc, fd, ptr, w2, len)	len = write(fd, ptr, w2); rc = (len >= 0)
-	#endif
+#	define DO_WRITE(rc, fd, ptr, w2, len)	len = write(fd, ptr, w2); rc = (len >= 0)
+#endif
 
 		wsize = CopyState.m_WriteBuffersLength[_iBuffer];
 		uint8 *pWriteBuffer = CopyState.m_WriteBuffers[_iBuffer];
 	again:
-		while (wsize > 0) {
+		while (wsize > 0)
+		{
 			DO_WRITE(rc, CopyState.m_OutputFileHandle, pWriteBuffer, wsize, len);
-			if (!rc) {
+			if (!rc)
+			{
 				rc = ErrCode();
 				break;
-			} else if (len > 0) {
+			}
+			else if (len > 0)
+			{
 				rc = MDB_SUCCESS;
 				pWriteBuffer += len;
 				wsize -= len;
 				continue;
-			} else {
+			}
+			else
+			{
 				rc = EIO;
 				break;
 			}
 		}
-		if (rc) {
+		if (rc)
+		{
 			CopyState.m_Status = rc;
 			return;
 		}
 		/* If there's an overflow page tail, write it too */
-		if (CopyState.m_OverflowPagesLength[_iBuffer]) {
+		if (CopyState.m_OverflowPagesLength[_iBuffer])
+		{
 			wsize = CopyState.m_OverflowPagesLength[_iBuffer];
 			pWriteBuffer = CopyState.m_OverflowPages[_iBuffer];
 			CopyState.m_OverflowPagesLength[_iBuffer] = 0;
@@ -131,7 +139,15 @@ namespace NMib::NDatabase::NPrivate
 		auto &CopyState = _CopyState;
 		umint iBuffer = CopyState.m_iBuffer;
 		// Block on last write finishing
-		fg_Dispatch(CopyState.m_BlockingActorCheckout.f_Actor(), []{}).f_CallSync();
+		fg_Dispatch
+			(
+				CopyState.m_BlockingActorCheckout.f_Actor()
+				, []
+				{
+				}
+			)
+			.f_CallSync()
+		;
 
 		if (CopyState.m_Status)
 			return CopyState.m_Status;
@@ -169,7 +185,7 @@ namespace NMib::NDatabase::NPrivate
 
 		mc.mc_snum = 1;
 		mc.mc_txn = CopyState.m_pInternalTransaction;
-		mc.mc_flags = CopyState.m_pInternalTransaction->mt_flags & (C_ORIG_RDONLY|C_WRITEMAP);
+		mc.mc_flags = CopyState.m_pInternalTransaction->mt_flags & (C_ORIG_RDONLY | C_WRITEMAP);
 
 		rc = mdb_page_get(&mc, *pg, &mc.mc_pg[0], nullptr);
 		if (rc)
@@ -182,7 +198,8 @@ namespace NMib::NDatabase::NPrivate
 		umint BuffAllocSize = CopyState.m_pEnvironment->me_psize * mc.mc_snum;
 		buf = ptr = (char *)NMemory::fg_Alloc(BuffAllocSize);
 
-		for (i=0; i<mc.mc_top; i++) {
+		for (i = 0; i < mc.mc_top; i++)
+		{
 			mdb_page_copy((MDB_page *)ptr, mc.mc_pg[i], CopyState.m_pEnvironment->me_psize);
 			mc.mc_pg[i] = (MDB_page *)ptr;
 			ptr += CopyState.m_pEnvironment->me_psize;
@@ -192,21 +209,27 @@ namespace NMib::NDatabase::NPrivate
 		leaf = (MDB_page *)ptr;
 
 		auto iBuffer = CopyState.m_iBuffer;
-		while (mc.mc_snum > 0) {
+		while (mc.mc_snum > 0)
+		{
 			unsigned n;
 			mp = mc.mc_pg[mc.mc_top];
 			n = NUMKEYS(mp);
 
-			if (IS_LEAF(mp)) {
-				if (!IS_LEAF2(mp) && !(flags & F_DUPDATA)) {
-					for (i=0; i<n; i++) {
+			if (IS_LEAF(mp))
+			{
+				if (!IS_LEAF2(mp) && !(flags & F_DUPDATA))
+				{
+					for (i = 0; i < n; i++)
+					{
 						ni = NODEPTR(mp, i);
-						if (ni->mn_flags & F_BIGDATA) {
+						if (ni->mn_flags & F_BIGDATA)
+						{
 							MDB_page *omp;
 							pgno_t pg;
 
 							/* Need writable leaf */
-							if (mp != leaf) {
+							if (mp != leaf)
+							{
 								mc.mc_pg[mc.mc_top] = leaf;
 								mdb_page_copy(leaf, mp, CopyState.m_pEnvironment->me_psize);
 								mp = leaf;
@@ -230,7 +253,8 @@ namespace NMib::NDatabase::NPrivate
 							mo->mp_p.p_pgno = CopyState.m_NextPageNo;
 							CopyState.m_NextPageNo += omp->mp_pages;
 							CopyState.m_WriteBuffersLength[iBuffer] += CopyState.m_pEnvironment->me_psize;
-							if (omp->mp_pages > 1) {
+							if (omp->mp_pages > 1)
+							{
 								CopyState.m_OverflowPagesLength[iBuffer] = CopyState.m_pEnvironment->me_psize * (omp->mp_pages - 1);
 								CopyState.m_OverflowPages[iBuffer] = (uint8 *)omp + CopyState.m_pEnvironment->me_psize;
 								rc = fg_DispatchCopyBuffer(CopyState);
@@ -238,11 +262,14 @@ namespace NMib::NDatabase::NPrivate
 									goto done;
 								iBuffer = CopyState.m_iBuffer;
 							}
-						} else if (ni->mn_flags & F_SUBDATA) {
+						}
+						else if (ni->mn_flags & F_SUBDATA)
+						{
 							MDB_db db;
 
 							/* Need writable leaf */
-							if (mp != leaf) {
+							if (mp != leaf)
+							{
 								mc.mc_pg[mc.mc_top] = leaf;
 								mdb_page_copy(leaf, mp, CopyState.m_pEnvironment->me_psize);
 								mp = leaf;
@@ -259,11 +286,14 @@ namespace NMib::NDatabase::NPrivate
 						}
 					}
 				}
-			} else {
+			}
+			else
+			{
 				mc.mc_ki[mc.mc_top]++;
-				if (mc.mc_ki[mc.mc_top] < n) {
+				if (mc.mc_ki[mc.mc_top] < n)
+				{
 					pgno_t pg;
-	again:
+				again:
 					ni = NODEPTR(mp, mc.mc_ki[mc.mc_top]);
 					pg = NODEPGNO(ni);
 					rc = mdb_page_get(&mc, pg, &mp, nullptr);
@@ -279,7 +309,8 @@ namespace NMib::NDatabase::NPrivate
 						 */
 						mdb_page_copy(mc.mc_pg[mc.mc_top], mp, CopyState.m_pEnvironment->me_psize);
 						goto again;
-					} else
+					}
+					else
 						mc.mc_pg[mc.mc_top] = mp;
 					continue;
 				}
@@ -295,12 +326,15 @@ namespace NMib::NDatabase::NPrivate
 			mdb_page_copy(mo, mp, CopyState.m_pEnvironment->me_psize);
 			mo->mp_p.p_pgno = CopyState.m_NextPageNo++;
 			CopyState.m_WriteBuffersLength[iBuffer] += CopyState.m_pEnvironment->me_psize;
-			if (mc.mc_top) {
+			if (mc.mc_top)
+			{
 				/* Update parent if there is one */
-				ni = NODEPTR(mc.mc_pg[mc.mc_top-1], mc.mc_ki[mc.mc_top-1]);
+				ni = NODEPTR(mc.mc_pg[mc.mc_top - 1], mc.mc_ki[mc.mc_top - 1]);
 				SETPGNO(ni, mo->mp_p.p_pgno);
 				mdb_cursor_pop(&mc);
-			} else {
+			}
+			else
+			{
 				/* Otherwise we're done */
 				*pg = mo->mp_p.p_pgno;
 				break;
@@ -357,9 +391,9 @@ namespace NMib::NDatabase
 				freecount += *(MDB_ID *)data.m_pData;
 			if (rc != MDB_NOTFOUND)
 				DMibError(NStr::fg_Format("Error compacting database (read cursor): {}", mdb_strerror(rc)));
-			freecount += pInternalTransaction->mt_dbs[FREE_DBI].md_branch_pages +
-				pInternalTransaction->mt_dbs[FREE_DBI].md_leaf_pages +
-				pInternalTransaction->mt_dbs[FREE_DBI].md_overflow_pages;
+			freecount
+				+= pInternalTransaction->mt_dbs[FREE_DBI].md_branch_pages + pInternalTransaction->mt_dbs[FREE_DBI].md_leaf_pages + pInternalTransaction->mt_dbs[FREE_DBI].md_overflow_pages
+			;
 
 			/* Set metapage 1 */
 			new_root = pInternalTransaction->mt_next_pgno - 1 - freecount;
@@ -376,16 +410,24 @@ namespace NMib::NDatabase
 		}
 
 		if (root != P_INVALID || mm->mm_dbs[MAIN_DBI].md_flags)
-			mm->mm_txnid.f_Store(1, NAtomic::gc_MemoryOrder_Relaxed);		/* use metapage 1 */
+			mm->mm_txnid.f_Store(1, NAtomic::gc_MemoryOrder_Relaxed); // use metapage 1
 
 		CopyState.m_WriteBuffersLength[0] = me_psize * NUM_METAS;
 		CopyState.m_pInternalTransaction = pInternalTransaction;
 		fg_DispatchCopyBuffer(CopyState);
-		fg_Dispatch(CopyState.m_BlockingActorCheckout.f_Actor(), []{}).f_CallSync();
+		fg_Dispatch
+			(
+				CopyState.m_BlockingActorCheckout.f_Actor()
+				, []
+				{
+				}
+			)
+			.f_CallSync()
+		;
 		rc = fg_TraverseTreeCopyRecursive(CopyState, &root, 0);
 
 		if (rc == MDB_SUCCESS && root != new_root)
-			rc = MDB_INCOMPATIBLE;	/* page leak or corrupt DB */
+			rc = MDB_INCOMPATIBLE; // page leak or corrupt DB
 
 		if (rc)
 			DMibError(NStr::fg_Format("Error compacting database: {}", mdb_strerror(rc)));
@@ -394,13 +436,29 @@ namespace NMib::NDatabase
 			rc = fg_DispatchCopyBuffer(CopyState);
 
 		// Block
-		fg_Dispatch(CopyState.m_BlockingActorCheckout.f_Actor(), []{}).f_CallSync();
+		fg_Dispatch
+			(
+				CopyState.m_BlockingActorCheckout.f_Actor()
+				, []
+				{
+				}
+			)
+			.f_CallSync()
+		;
 		if (rc)
 			DMibError(NStr::fg_Format("Error compacting database: {}", mdb_strerror(rc)));
 
 		rc = fg_DispatchCopyBuffer(CopyState); // Get status
 		if (rc)
 			DMibError(NStr::fg_Format("Error compacting database: {}", mdb_strerror(rc)));
-		fg_Dispatch(CopyState.m_BlockingActorCheckout.f_Actor(), []{}).f_CallSync();
+		fg_Dispatch
+			(
+				CopyState.m_BlockingActorCheckout.f_Actor()
+				, []
+				{
+				}
+			)
+			.f_CallSync()
+		;
 	}
 }

@@ -6,7 +6,8 @@
 namespace NMib::NDatabase
 {
 	template <typename tf_CFunctor, typename ...tfp_CHandlers>
-	auto CDatabaseActor::CTransactionRead::f_BlockingDispatch(tf_CFunctor &&_Functor, tfp_CHandlers && ...p_Handlers) && -> NConcurrency::TCUnsafeFuture
+	auto CDatabaseActor::CTransactionRead::f_BlockingDispatch(tf_CFunctor &&_Functor, tfp_CHandlers && ...p_Handlers) &&
+		-> NConcurrency::TCUnsafeFuture
 		<
 			typename NConcurrency::NPrivate::TCIsFuture
 			<
@@ -15,13 +16,6 @@ namespace NMib::NDatabase
 		>
 	{
 		auto BlockingActorCheckout = NConcurrency::fg_BlockingActor();
-		co_return co_await
-			(
-				(
-					NConcurrency::fg_Dispatch(BlockingActorCheckout.f_Actor(), fg_Move(_Functor), fg_Move(*this))
-					% ... % p_Handlers
-				)
-			)
-		;
+		co_return co_await ((NConcurrency::fg_Dispatch(BlockingActorCheckout.f_Actor(), fg_Move(_Functor), fg_Move(*this)) % ... % p_Handlers));
 	}
 }

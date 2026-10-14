@@ -2,35 +2,35 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 /*
- SPDX-License-Identifier: OLDAP-2.8
- SPDX-License-Identifier: ISC
- This code is derived from lmdb with the following copyright:
+SPDX-License-Identifier: OLDAP-2.8
+SPDX-License-Identifier: ISC
+This code is derived from lmdb with the following copyright:
 
- Copyright 2011-2019 Howard Chu, Symas Corp. All rights reserved.
+Copyright 2011-2019 Howard Chu, Symas Corp. All rights reserved.
 
- Redistribution and use in source and binary forms, with or without
- modification, are permitted only as authorized by the OpenLDAP
- Public License.
+Redistribution and use in source and binary forms, with or without
+modification, are permitted only as authorized by the OpenLDAP
+Public License.
 
- A copy of this license is available in the file LICENSE.OpenLDAP in the
- top-level directory of the distribution or, alternatively, at
- <http://www.OpenLDAP.org/license.html>.
+A copy of this license is available in the file LICENSE.OpenLDAP in the
+top-level directory of the distribution or, alternatively, at
+<http://www.OpenLDAP.org/license.html>.
 
- This code is derived from btree.c written by Martin Hedenfalk.
+This code is derived from btree.c written by Martin Hedenfalk.
 
- Copyright (c) 2009, 2010 Martin Hedenfalk <martin@bzero.se>
+Copyright (c) 2009, 2010 Martin Hedenfalk <martin@bzero.se>
 
- Permission to use, copy, modify, and distribute this software for any
- purpose with or without fee is hereby granted, provided that the above
- copyright notice and this permission notice appear in all copies.
+Permission to use, copy, modify, and distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
 
- THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
- WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
- MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
- ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
- ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
- OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
 #include "Malterlib_Database_Database.h"
@@ -70,8 +70,8 @@ namespace NMib::NDatabase
 		DMibRequire(data);
 
 		using namespace NPrivate;
-		MDB_cursor	mc;
-		MDB_xcursor	mx;
+		MDB_cursor mc;
+		MDB_xcursor mx;
 		int exact = 0;
 		DKBUF;
 
@@ -158,8 +158,22 @@ namespace NMib::NDatabase
 		if (!TXN_DBI_EXIST(this, dbi, DB_USRVALID))
 			DMibError("Database does not exists");
 
-		if (_WriteFlags & ~(EDatabaseWriteFlag_NoOverwrite|EDatabaseWriteFlag_NoDuplicateData|EDatabaseWriteFlag_ReserveSpace|EDatabaseWriteFlag_Append|EDatabaseWriteFlag_AppendDuplicateData|EDatabaseWriteFlag_OverwriteAtCurrentCursorPos))
+		if
+		(
+			_WriteFlags
+			& ~
+			(
+				EDatabaseWriteFlag_NoOverwrite
+				| EDatabaseWriteFlag_NoDuplicateData
+				| EDatabaseWriteFlag_ReserveSpace
+				| EDatabaseWriteFlag_Append
+				| EDatabaseWriteFlag_AppendDuplicateData
+				| EDatabaseWriteFlag_OverwriteAtCurrentCursorPos
+			)
+		)
+		{
 			DMibError("Invalid flags");
+		}
 
 		f_CheckBlocked();
 
@@ -213,7 +227,8 @@ namespace NMib::NDatabase
 		if (mt_flags & (MDB_TXN_RDONLY))
 			DMibError("Trying to write to read only transaction");
 
-		if (!F_ISSET(mt_dbs[dbi].md_flags, EDatabaseSubFlag_SortedDuplicates)) {
+		if (!F_ISSET(mt_dbs[dbi].md_flags, EDatabaseSubFlag_SortedDuplicates))
+		{
 			/* must ignore any data */
 			data = nullptr;
 		}
@@ -233,7 +248,7 @@ namespace NMib::NDatabase
 	 * @param[in] b The second item to compare
 	 * @return < 0 if a < b, 0 if a == b, > 0 if a > b
 	 */
-	int CDatabaseTransactionCommon::CInternal::f_KeyCompare(CDatabaseSubID dbi, const CDatabaseValue *a, const CDatabaseValue *b)
+	int CDatabaseTransactionCommon::CInternal::f_KeyCompare(CDatabaseSubID dbi, CDatabaseValue const *a, CDatabaseValue const *b)
 	{
 		return mt_dbxs[dbi].m_fKeyCompare(*a, *b);
 	}
@@ -248,13 +263,13 @@ namespace NMib::NDatabase
 	 * @param[in] b The second item to compare
 	 * @return < 0 if a < b, 0 if a == b, > 0 if a > b
 	 */
-	int CDatabaseTransactionCommon::CInternal::f_DataCompare(CDatabaseSubID dbi, const CDatabaseValue *a, const CDatabaseValue *b)
+	int CDatabaseTransactionCommon::CInternal::f_DataCompare(CDatabaseSubID dbi, CDatabaseValue const *a, CDatabaseValue const *b)
 	{
 		FDatabaseCompare const &DataCompare = mt_dbxs[dbi].m_fDataCompare;
-	#if DMibPPtrBits > 32 || defined(DMibDatabase_Always64BitSupport)
+#if DMibPPtrBits > 32 || defined(DMibDatabase_Always64BitSupport)
 		if (a->m_Size == sizeof(CDatabaseOffset) && DataCompare == NPrivate::g_mdb_cmp_int)
 			return NPrivate::g_mdb_cmp_clong(*a, *b);
-	#endif
+#endif
 		return DataCompare(*a, *b);
 	}
 
@@ -268,25 +283,29 @@ namespace NMib::NDatabase
 		MDB_xcursor mx;
 		EDatabaseCursorGet op;
 		CDatabaseValue rdata, *xdata;
-		int		 rc, exact = 0;
+		int rc, exact = 0;
 		DKBUF;
 
 		DMibDatabaseTrace("====> delete db {} key [{}]", dbi, DKEY(key));
 
 		mdb_cursor_init(&mc, txn, dbi, &mx);
 
-		if (data) {
+		if (data)
+		{
 			op = MDB_GET_BOTH;
 			rdata = *data;
 			xdata = &rdata;
-		} else {
+		}
+		else
+		{
 			op = MDB_SET;
 			xdata = nullptr;
 			_Flags |= EDatabaseWriteFlag_NoDuplicateData;
 		}
 		auto Key = *key;
 		rc = mdb_cursor_set(&mc, &Key, xdata, op, &exact);
-		if (rc == 0) {
+		if (rc == 0)
+		{
 			/* let mdb_page_split know about this cursor if needed:
 			 * delete will trigger a rebalance; if it needs to move
 			 * a node from one page to another, it will have to
