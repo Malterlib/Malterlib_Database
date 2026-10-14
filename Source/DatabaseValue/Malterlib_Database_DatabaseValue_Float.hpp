@@ -14,15 +14,23 @@ namespace NMib::NDatabase
 		static void fs_Encode(tf_CStream &_Stream, t_CType const &_Value)
 		{
 			CInteger Integer;
-			if constexpr (requires() { _Value.f_GetAsInteger(); })
+			if constexpr
+			(
+				requires ()
+				{
+					_Value.f_GetAsInteger();
+				}
+			)
+			{
 				Integer = _Value.f_GetAsInteger();
+			}
 			else
 				Integer = fg_BitCast<CInteger>(_Value);
 
 			if (t_CType::mc_SignBits)
 			{
 				auto SignBit = CInteger(1) << t_CType::mc_SignBitPos;
-				auto SignExtended = (Integer << ((sizeof(CInteger)*8 - 1) - t_CType::mc_SignBitPos)) >> (sizeof(CInteger)*8 - 1);
+				auto SignExtended = (Integer << ((sizeof(CInteger) * 8 - 1) - t_CType::mc_SignBitPos)) >> (sizeof(CInteger) * 8 - 1);
 				Integer ^= (SignExtended | SignBit);
 			}
 
@@ -39,12 +47,20 @@ namespace NMib::NDatabase
 			if (t_CType::mc_SignBits)
 			{
 				auto SignBit = CInteger(1) << t_CType::mc_SignBitPos;
-				auto SignExtended = ((~Integer) << ((sizeof(CInteger)*8 - 1) - t_CType::mc_SignBitPos)) >> (sizeof(CInteger)*8 - 1);
+				auto SignExtended = ((~Integer) << ((sizeof(CInteger) * 8 - 1) - t_CType::mc_SignBitPos)) >> (sizeof(CInteger) * 8 - 1);
 				Integer ^= SignExtended | SignBit;
 			}
 
-			if constexpr (requires(CInteger _Int) { o_Value.f_SetAsInteger(_Int); })
+			if constexpr
+			(
+				requires (CInteger _Int)
+				{
+					o_Value.f_SetAsInteger(_Int);
+				}
+			)
+			{
 				o_Value.f_SetAsInteger(Integer);
+			}
 			else
 				o_Value = fg_BitCast<t_CType>(Integer);
 		}

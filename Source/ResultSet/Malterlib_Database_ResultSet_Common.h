@@ -16,20 +16,18 @@ namespace NMib::NDatabase
 		, EResultDataType_fp64
 		, EResultDataType_uint64
 		, EResultDataType_Binary
-/* Deprecated:
+		/* Deprecated:
 		, EResultDataType_int32
 		, EResultDataType_int64
 		, EResultDataType_fp32
-*/
+		*/
 	};
-
 
 	// Represents a single bit of metadata in a binary blob
 	using CResultMetadata = NContainer::CByteVector;
 
 	namespace NResultSet
 	{
-
 		//
 		// Result Set Implementation Data Types
 		//
@@ -38,7 +36,6 @@ namespace NMib::NDatabase
 		{
 			EResultSetFormatVersion = 2
 		};
-
 
 		// Represents a bit of metadata with a specified ID
 		// Used for metadata attached to the result set itself.
@@ -60,9 +57,9 @@ namespace NMib::NDatabase
 		// Represents information about either a key part or a column.
 		struct CElementInfo
 		{
-			EResultDataType m_Type;		// Type of key part or column
-			CSubType m_SubType;			// Subtype of key part or column
-			CResultMetadata m_Metadata;		// Metadata for the key part or column
+			EResultDataType m_Type;     // Type of key part or column
+			CSubType m_SubType;         // Subtype of key part or column
+			CResultMetadata m_Metadata; // Metadata for the key part or column
 
 			template <typename tf_CStream>
 			inline void f_Feed(tf_CStream &_Stream) const;
@@ -99,11 +96,11 @@ namespace NMib::NDatabase
 				, NStorage::TCMember<NContainer::TCVector<fp64>, EResultDataType_fp64>
 				, NStorage::TCMember<NContainer::TCVector<uint64>, EResultDataType_uint64>
 				, NStorage::TCMember<NContainer::TCVector<CBlob>, EResultDataType_Binary>
-			/* Deprecated:
+				/* Deprecated:
 				, NStorage::TCMember<NContainer::TCVector<int32>, EResultDataType_int32>
 				, NStorage::TCMember<NContainer::TCVector<int64>, EResultDataType_int64>
 				, NStorage::TCMember<NContainer::TCVector<fp32>, EResultDataType_fp32>
-			*/
+				*/
 			>
 		;
 
@@ -115,22 +112,22 @@ namespace NMib::NDatabase
 		// Base class for storing a column value
 		struct CSparseDataEntryBase
 		{
-			CRowIndex m_iRow;	// The row the value stored in a subclass is for.
+			CRowIndex m_iRow; // The row the value stored in a subclass is for.
 
 			inline CSparseDataEntryBase(CRowIndex _iRow);
 
-			inline CSparseDataEntryBase(CSparseDataEntryBase&& _ToMove);
+			inline CSparseDataEntryBase(CSparseDataEntryBase &&_ToMove);
 		};
 
 		// Represents a value of a column for a specified (by m_ID) row.
-		template<typename t_CType>
+		template <typename t_CType>
 		struct TCSparseDataEntry : public CSparseDataEntryBase
 		{
 			t_CType m_Data;
 
 			inline TCSparseDataEntry();
-			inline TCSparseDataEntry(CRowIndex _iRow, t_CType&& _Data);
-			inline TCSparseDataEntry(TCSparseDataEntry&& _ToMove);
+			inline TCSparseDataEntry(CRowIndex _iRow, t_CType &&_Data);
+			inline TCSparseDataEntry(TCSparseDataEntry &&_ToMove);
 
 			template <typename tf_CStream>
 			inline void f_Feed(tf_CStream &_Stream) const;
@@ -147,25 +144,25 @@ namespace NMib::NDatabase
 				, NStorage::TCMember<NContainer::TCVector<TCSparseDataEntry<fp64>>, EResultDataType_fp64>
 				, NStorage::TCMember<NContainer::TCVector<TCSparseDataEntry<uint64>>, EResultDataType_uint64>
 				, NStorage::TCMember<NContainer::TCVector<TCSparseDataEntry<CBlob>>, EResultDataType_Binary>
-		/*	Deprecated
+				/*
+				Deprecated
 				, NStorage::TCMember<NContainer::TCVector<TCSparseDataEntry<int32>>, EResultDataType_int32>
 				, NStorage::TCMember<NContainer::TCVector<TCSparseDataEntry<int64>>, EResultDataType_int64>
 				, NStorage::TCMember<NContainer::TCVector<TCSparseDataEntry<fp32>>, EResultDataType_fp32>
-		*/
+				*/
 			>
 		;
 
 		// Utility class for converting to/from result data types
 
-
-		template<typename t_CType>
+		template <typename t_CType>
 		struct TCTypeToDataType
 		{
-//				static_assert( false, "The type you pass in must be one of: CStr, int32, int64, fp32, fp64, TCVector<uin8> or convertible to one.");
+			// static_assert( false, "The type you pass in must be one of: CStr, int32, int64, fp32, fp64, TCVector<uin8> or convertible to one.");
 
-//				using CDataType = _OutType;
-//				static constexpr EResultDataType mc_Type = <DataTypeEnum>;
-//				static _OutType fs_Convert(_InType _V) { return _OutType (_V); }
+			// using CDataType = _OutType;
+			// static constexpr EResultDataType mc_Type = <DataTypeEnum>;
+			// static _OutType fs_Convert(_InType _V) { return _OutType (_V); }
 		};
 	}
 }
@@ -173,5 +170,5 @@ namespace NMib::NDatabase
 #include "Malterlib_Database_ResultSet_Common.hpp"
 
 #ifndef DMibPNoShortCuts
-	using namespace NMib::NDatabase::NResultSet;
+using namespace NMib::NDatabase::NResultSet;
 #endif

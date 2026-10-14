@@ -24,14 +24,14 @@ namespace NMib::NDatabase
 			}
 
 			template <typename tf_CVector>
-			void operator ()(tf_CVector const& _Vector)
+			void operator () (tf_CVector const &_Vector)
 			{
 				m_Length = _Vector.f_GetLen();
 			}
 		};
 
-		template<typename t_VectorVariant>
-		umint fg_GetVectorVariantLength(t_VectorVariant const& _VecVar)
+		template <typename t_VectorVariant>
+		umint fg_GetVectorVariantLength(t_VectorVariant const &_VecVar)
 		{
 			CVectorVariantSizeVisitor Visitor;
 
@@ -46,10 +46,9 @@ namespace NMib::NDatabase
 		, mp_bRowActive(false)
 		, mp_nColumnWiseActive(0)
 	{
-
 	}
 
-	CResultSetBuilder::CResultSetBuilder(CResultSetBuilder&& _ToMove)
+	CResultSetBuilder::CResultSetBuilder(CResultSetBuilder &&_ToMove)
 		: mp_Metadata(fg_Move(_ToMove.mp_Metadata))
 		, mp_KeyPartInfos(fg_Move(_ToMove.mp_KeyPartInfos))
 		, mp_ColumnInfos(fg_Move(_ToMove.mp_ColumnInfos))
@@ -64,14 +63,20 @@ namespace NMib::NDatabase
 		DMibCheck(!_ToMove.mp_nColumnWiseActive)("You cannot move a result set builder when you are still constructing it!");
 	}
 
-	CResultSetBuilder::CResultSetBuilder(NContainer::TCVector<EResultDataType> const& _lKeyPartTypes, NContainer::TCVector<NResultSet::CSubType> const& _lKeyPartSubTypes, NContainer::TCVector<EResultDataType> const& _lColumnTypes, NContainer::TCVector<NResultSet::CSubType> const& _lColumnSubTypes)
+	CResultSetBuilder::CResultSetBuilder
+		(
+			NContainer::TCVector<EResultDataType> const &_lKeyPartTypes
+			, NContainer::TCVector<NResultSet::CSubType> const &_lKeyPartSubTypes
+			, NContainer::TCVector<EResultDataType> const &_lColumnTypes
+			, NContainer::TCVector<NResultSet::CSubType> const &_lColumnSubTypes
+		)
 		: mp_nRows(0)
 		, mp_bRowActive(false)
 	{
 		f_SetDescription(_lKeyPartTypes, _lKeyPartSubTypes, _lColumnTypes, _lColumnSubTypes);
 	}
 
-	CResultSetBuilder::CResultSetBuilder(CResultSetDescription const& _Desc)
+	CResultSetBuilder::CResultSetBuilder(CResultSetDescription const &_Desc)
 		: mp_nRows(0)
 		, mp_bRowActive(false)
 		, mp_nColumnWiseActive(0)
@@ -86,7 +91,7 @@ namespace NMib::NDatabase
 	bool CResultSetBuilder::f_IsValid() const
 	{
 		// Check that each key part has the same number of rows as we think they have.
-		for (auto const& KeyPartValueIndices : mp_KeyPartRowValueIndices)
+		for (auto const &KeyPartValueIndices : mp_KeyPartRowValueIndices)
 		{
 			if (mp_nRows != KeyPartValueIndices.f_GetLen())
 				return false;
@@ -108,7 +113,13 @@ namespace NMib::NDatabase
 		mp_Columns.f_Clear();
 	}
 
-	void CResultSetBuilder::f_SetDescription(NContainer::TCVector<EResultDataType> const& _lKeyPartTypes, NContainer::TCVector<NResultSet::CSubType> const& _lKeyPartSubTypes, NContainer::TCVector<EResultDataType> const& _lColumnTypes, NContainer::TCVector<NResultSet::CSubType> const& _lColumnSubTypes)
+	void CResultSetBuilder::f_SetDescription
+		(
+			NContainer::TCVector<EResultDataType> const &_lKeyPartTypes
+			, NContainer::TCVector<NResultSet::CSubType> const &_lKeyPartSubTypes
+			, NContainer::TCVector<EResultDataType> const &_lColumnTypes
+			, NContainer::TCVector<NResultSet::CSubType> const &_lColumnSubTypes
+		)
 	{
 		f_Clear();
 
@@ -120,43 +131,42 @@ namespace NMib::NDatabase
 		auto iKeyPartType = _lKeyPartTypes.f_GetIterator();
 		auto iKeyPartSubType = _lKeyPartSubTypes.f_GetIterator();
 		auto iKeyPartValues = mp_KeyPartValues.f_GetIterator();
-		for (auto& KeyPartInfo : mp_KeyPartInfos)
+		for (auto &KeyPartInfo : mp_KeyPartInfos)
 		{
 			KeyPartInfo.m_Type = *iKeyPartType;
 			KeyPartInfo.m_SubType = *iKeyPartSubType;
 
-			switch(*iKeyPartType)
+			switch (*iKeyPartType)
 			{
-				case EResultDataType_CStr:
-					(*iKeyPartValues).f_Set<EResultDataType_CStr>();
-					break;
-				case EResultDataType_fp64:
-					(*iKeyPartValues).f_Set<EResultDataType_fp64>();
-					break;
-				case EResultDataType_uint64:
-					(*iKeyPartValues).f_Set<EResultDataType_uint64>();
-					break;
-				case EResultDataType_Binary:
-					(*iKeyPartValues).f_Set<EResultDataType_Binary>();
-					break;
-/* Deprecated:
-				case EResultDataType_int32:
-					(*iKeyPart).f_Set<EResultDataType_int32>();
-					break;
-				case EResultDataType_int64:
-					(*iKeyPart).f_Set<EResultDataType_int64>();
-					break;
-				case EResultDataType_fp32:
-					(*iKeyPart).f_Set<EResultDataType_fp32>();
-					break;
-*/
+			case EResultDataType_CStr:
+				(*iKeyPartValues).f_Set<EResultDataType_CStr>();
+				break;
+			case EResultDataType_fp64:
+				(*iKeyPartValues).f_Set<EResultDataType_fp64>();
+				break;
+			case EResultDataType_uint64:
+				(*iKeyPartValues).f_Set<EResultDataType_uint64>();
+				break;
+			case EResultDataType_Binary:
+				(*iKeyPartValues).f_Set<EResultDataType_Binary>();
+				break;
+				/* Deprecated:
+			case EResultDataType_int32:
+				(*iKeyPart).f_Set<EResultDataType_int32>();
+				break;
+			case EResultDataType_int64:
+				(*iKeyPart).f_Set<EResultDataType_int64>();
+				break;
+			case EResultDataType_fp32:
+				(*iKeyPart).f_Set<EResultDataType_fp32>();
+				break;
+				*/
 			}
 
 			++iKeyPartType;
 			++iKeyPartSubType;
 			++iKeyPartValues;
 		}
-
 
 		// Set the column types.
 		mp_ColumnInfos.f_SetLen(_lColumnTypes.f_GetLen());
@@ -165,47 +175,45 @@ namespace NMib::NDatabase
 		auto iColumnType = _lColumnTypes.f_GetIterator();
 		auto iColumnSubType = _lColumnSubTypes.f_GetIterator();
 		auto iColumn = mp_Columns.f_GetIterator();
-		for (auto& ColumnInfo : mp_ColumnInfos)
+		for (auto &ColumnInfo : mp_ColumnInfos)
 		{
 			ColumnInfo.m_Type = *iColumnType;
 			ColumnInfo.m_SubType = *iColumnSubType;
 
-			switch(*iColumnType)
+			switch (*iColumnType)
 			{
-				case EResultDataType_CStr:
-					(*iColumn).f_Set<EResultDataType_CStr>();
-					break;
-				case EResultDataType_fp64:
-					(*iColumn).f_Set<EResultDataType_fp64>();
-					break;
-				case EResultDataType_uint64:
-					(*iColumn).f_Set<EResultDataType_uint64>();
-					break;
-				case EResultDataType_Binary:
-					(*iColumn).f_Set<EResultDataType_Binary>();
-					break;
-/*
-				case EResultDataType_int32:
-					(*iColumn).f_Set<EResultDataType_int32>();
-					break;
-				case EResultDataType_int64:
-					(*iColumn).f_Set<EResultDataType_int64>();
-					break;
-				case EResultDataType_fp32:
-					(*iColumn).f_Set<EResultDataType_fp32>();
-					break;
-*/
+			case EResultDataType_CStr:
+				(*iColumn).f_Set<EResultDataType_CStr>();
+				break;
+			case EResultDataType_fp64:
+				(*iColumn).f_Set<EResultDataType_fp64>();
+				break;
+			case EResultDataType_uint64:
+				(*iColumn).f_Set<EResultDataType_uint64>();
+				break;
+			case EResultDataType_Binary:
+				(*iColumn).f_Set<EResultDataType_Binary>();
+				break;
+				/*
+			case EResultDataType_int32:
+				(*iColumn).f_Set<EResultDataType_int32>();
+				break;
+			case EResultDataType_int64:
+				(*iColumn).f_Set<EResultDataType_int64>();
+				break;
+			case EResultDataType_fp32:
+				(*iColumn).f_Set<EResultDataType_fp32>();
+				break;
+				*/
 			}
 
 			++iColumnType;
 			++iColumnSubType;
 			++iColumn;
 		}
-
 	}
 
-
-	void CResultSetBuilder::f_SetDescription( CResultSetDescription const& _Desc )
+	void CResultSetBuilder::f_SetDescription(CResultSetDescription const &_Desc)
 	{
 		f_SetDescription(_Desc.m_lKeyPartTypes, _Desc.m_lKeyPartSubTypes, _Desc.m_lColumnTypes, _Desc.m_lColumnSubTypes);
 	}
@@ -217,130 +225,110 @@ namespace NMib::NDatabase
 
 	void CResultSetBuilder::f_SetKeyPartMetadata(umint _iKeyPart, CResultMetadata _Data)
 	{
-		DMibCheck( mp_KeyPartInfos.f_IsPosValid(_iKeyPart))("Invalid key part");
+		DMibCheck(mp_KeyPartInfos.f_IsPosValid(_iKeyPart))("Invalid key part");
 		mp_KeyPartInfos[_iKeyPart].m_Metadata = fg_Move(_Data);
 	}
 
 	void CResultSetBuilder::f_SetColumnMetadata(umint _iColumn, CResultMetadata _Data)
 	{
-		DMibCheck( mp_ColumnInfos.f_IsPosValid(_iColumn))("Invalid column");
+		DMibCheck(mp_ColumnInfos.f_IsPosValid(_iColumn))("Invalid column");
 		mp_ColumnInfos[_iColumn].m_Metadata = fg_Move(_Data);
 	}
 
-	umint CResultSetBuilder::f_AddKeyPartVariantValue(uint32 _iKeyPart, NResultSet::CValue const& _Value)
+	umint CResultSetBuilder::f_AddKeyPartVariantValue(uint32 _iKeyPart, NResultSet::CValue const &_Value)
 	{
-		DMibCheck( mp_KeyPartInfos.f_IsPosValid(_iKeyPart) )("Values for too many key parts are being specified!" );
+		DMibCheck(mp_KeyPartInfos.f_IsPosValid(_iKeyPart))("Values for too many key parts are being specified!");
 
 		umint iIndex = 0;
 
-		switch(mp_KeyPartInfos[_iKeyPart].m_Type)
+		switch (mp_KeyPartInfos[_iKeyPart].m_Type)
 		{
-			case EResultDataType_CStr:
-				{
-					auto & lValues = mp_KeyPartValues[_iKeyPart]
-							.f_Get< EResultDataType_CStr >();
+		case EResultDataType_CStr:
+			{
+				auto &lValues = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_CStr>();
 
-					lValues.f_Insert(
-									_Value.f_Get<EResultDataType_CStr>()
-							);
-					iIndex = lValues.f_GetLen() - 1;
-					break;
-				}
-			case EResultDataType_fp64:
-				{
-					auto & lValues = mp_KeyPartValues[_iKeyPart]
-							.f_Get< EResultDataType_fp64 >();
-
-					lValues.f_Insert(
-									_Value.f_Get<EResultDataType_fp64>()
-							);
-					iIndex = lValues.f_GetLen() - 1;
-					break;
-				}
-			case EResultDataType_uint64:
-				{
-					auto & lValues = mp_KeyPartValues[_iKeyPart]
-							.f_Get< EResultDataType_uint64 >();
-
-					lValues.f_Insert(
-									_Value.f_Get<EResultDataType_uint64>()
-							);
-					iIndex = lValues.f_GetLen() - 1;
-					break;
-				}
-			case EResultDataType_Binary:
-				{
-					auto & lValues = mp_KeyPartValues[_iKeyPart]
-							.f_Get< EResultDataType_Binary >();
-
-					lValues.f_Insert(
-									_Value.f_Get<EResultDataType_Binary>()
-							);
-					iIndex = lValues.f_GetLen() - 1;
-					break;
-				}
-
-			default:
-				DMibNeverGetHere;
+				lValues.f_Insert(_Value.f_Get<EResultDataType_CStr>());
+				iIndex = lValues.f_GetLen() - 1;
 				break;
+			}
+		case EResultDataType_fp64:
+			{
+				auto &lValues = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_fp64>();
+
+				lValues.f_Insert(_Value.f_Get<EResultDataType_fp64>());
+				iIndex = lValues.f_GetLen() - 1;
+				break;
+			}
+		case EResultDataType_uint64:
+			{
+				auto &lValues = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_uint64>();
+
+				lValues.f_Insert(_Value.f_Get<EResultDataType_uint64>());
+				iIndex = lValues.f_GetLen() - 1;
+				break;
+			}
+		case EResultDataType_Binary:
+			{
+				auto &lValues = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_Binary>();
+
+				lValues.f_Insert(_Value.f_Get<EResultDataType_Binary>());
+				iIndex = lValues.f_GetLen() - 1;
+				break;
+			}
+
+		default: DMibNeverGetHere; break;
 		}
 
 		return iIndex;
 	}
 
-	umint CResultSetBuilder::f_SetKeyPartVariantValues(uint32 _iKeyPart, NContainer::TCVector<NResultSet::CValue>  const& _lValues)
+	umint CResultSetBuilder::f_SetKeyPartVariantValues(uint32 _iKeyPart, NContainer::TCVector<NResultSet::CValue> const &_lValues)
 	{
-		DMibCheck( mp_KeyPartInfos.f_IsPosValid(_iKeyPart) )("Values for too many key parts are being specified!" );
+		DMibCheck(mp_KeyPartInfos.f_IsPosValid(_iKeyPart))("Values for too many key parts are being specified!");
 
-		switch(mp_KeyPartInfos[_iKeyPart].m_Type)
+		switch (mp_KeyPartInfos[_iKeyPart].m_Type)
 		{
-			case EResultDataType_CStr:
-				{
-					auto & lValues = mp_KeyPartValues[_iKeyPart]
-							.f_Get< EResultDataType_CStr >();
+		case EResultDataType_CStr:
+			{
+				auto &lValues = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_CStr>();
 
-					lValues.f_Clear();
-					for (auto const& CurValue : _lValues)
-						lValues.f_Insert(CurValue.f_Get<EResultDataType_CStr>());
-					break;
-				}
-			case EResultDataType_fp64:
-				{
-					auto & lValues = mp_KeyPartValues[_iKeyPart]
-							.f_Get< EResultDataType_fp64 >();
-
-					lValues.f_Clear();
-					for (auto const& CurValue : _lValues)
-						lValues.f_Insert(CurValue.f_Get<EResultDataType_fp64>());
-
-					break;
-				}
-			case EResultDataType_uint64:
-				{
-					auto & lValues = mp_KeyPartValues[_iKeyPart]
-							.f_Get< EResultDataType_uint64 >();
-
-					lValues.f_Clear();
-					for (auto const& CurValue : _lValues)
-						lValues.f_Insert(CurValue.f_Get<EResultDataType_uint64>());
-
-					break;
-				}
-			case EResultDataType_Binary:
-				{
-					auto & lValues = mp_KeyPartValues[_iKeyPart]
-							.f_Get< EResultDataType_Binary >();
-
-					lValues.f_Clear();
-					for (auto const& CurValue : _lValues)
-						lValues.f_Insert(CurValue.f_Get<EResultDataType_Binary>());
-
-					break;
-				}
-
-			default:
-				DMibNeverGetHere;
+				lValues.f_Clear();
+				for (auto const &CurValue : _lValues)
+					lValues.f_Insert(CurValue.f_Get<EResultDataType_CStr>());
 				break;
+			}
+		case EResultDataType_fp64:
+			{
+				auto &lValues = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_fp64>();
+
+				lValues.f_Clear();
+				for (auto const &CurValue : _lValues)
+					lValues.f_Insert(CurValue.f_Get<EResultDataType_fp64>());
+
+				break;
+			}
+		case EResultDataType_uint64:
+			{
+				auto &lValues = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_uint64>();
+
+				lValues.f_Clear();
+				for (auto const &CurValue : _lValues)
+					lValues.f_Insert(CurValue.f_Get<EResultDataType_uint64>());
+
+				break;
+			}
+		case EResultDataType_Binary:
+			{
+				auto &lValues = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_Binary>();
+
+				lValues.f_Clear();
+				for (auto const &CurValue : _lValues)
+					lValues.f_Insert(CurValue.f_Get<EResultDataType_Binary>());
+
+				break;
+			}
+
+		default: DMibNeverGetHere; break;
 		}
 
 		return 0;
@@ -359,12 +347,11 @@ namespace NMib::NDatabase
 		return CRow(*this, iRow);
 	}
 
-
 	CResultSetBuilder::CKeyPart CResultSetBuilder::f_KeyPart(uint32 _iKeyPart)
 	{
 		DMibCheck(!mp_bRowActive)("You cannot mix and match row and column wise building!");
 
-		DMibCheck(_iKeyPart < mp_KeyPartInfos.f_GetLen() )("Invalid key part");
+		DMibCheck(_iKeyPart < mp_KeyPartInfos.f_GetLen())("Invalid key part");
 
 		++mp_nColumnWiseActive;
 
@@ -375,23 +362,21 @@ namespace NMib::NDatabase
 	{
 		DMibCheck(!mp_bRowActive)("You cannot mix and match row and column wise building!");
 
-		DMibCheck(_iColumn < mp_ColumnInfos.f_GetLen() )("Invalid column");
+		DMibCheck(_iColumn < mp_ColumnInfos.f_GetLen())("Invalid column");
 
 		++mp_nColumnWiseActive;
 
 		return CColumn(*this, _iColumn);
 	}
 
-	void CResultSetBuilder::f_ExtractTo(CResultSet& _oRS)
+	void CResultSetBuilder::f_ExtractTo(CResultSet &_oRS)
 	{
 		DMibCheck(!mp_bRowActive)("No row must be active when extracting.");
 
 		_oRS.f_Clear();
 
 		for (auto iMetadata = mp_Metadata.f_GetIterator(); iMetadata; ++iMetadata)
-		{
-			_oRS.mp_Metadata.f_Insert( { iMetadata.f_GetKey(), fg_Move(*iMetadata) } );
-		}
+			_oRS.mp_Metadata.f_Insert({iMetadata.f_GetKey(), fg_Move(*iMetadata)});
 
 		_oRS.mp_KeyPartInfos = fg_Move(mp_KeyPartInfos);
 		_oRS.mp_ColumnInfos = fg_Move(mp_ColumnInfos);
@@ -407,7 +392,7 @@ namespace NMib::NDatabase
 	// CResultSetBuilder::CRow Private Implementation
 	//
 
-	CResultSetBuilder::CRow::CRow(CResultSetBuilder& _Builder, uint32 _iRow)
+	CResultSetBuilder::CRow::CRow(CResultSetBuilder &_Builder, uint32 _iRow)
 		: mp_pBuilder(&_Builder)
 		, mp_nKeyParts(_Builder.mp_KeyPartInfos.f_GetLen())
 		, mp_nColumns(_Builder.mp_ColumnInfos.f_GetLen())
@@ -421,8 +406,7 @@ namespace NMib::NDatabase
 	// CResultSetBuilder::CRow Public Implementation
 	//
 
-
-	CResultSetBuilder::CRow::CRow(CRow&& _ToMove)
+	CResultSetBuilder::CRow::CRow(CRow &&_ToMove)
 		: mp_pBuilder(_ToMove.mp_pBuilder)
 		, mp_nKeyParts(_ToMove.mp_nKeyParts)
 		, mp_nColumns(_ToMove.mp_nColumns)
@@ -448,11 +432,11 @@ namespace NMib::NDatabase
 		}
 	}
 
-	CResultSetBuilder::CRow& CResultSetBuilder::CRow::f_Column(std::nullptr_t)
+	CResultSetBuilder::CRow &CResultSetBuilder::CRow::f_Column(std::nullptr_t)
 	{
-		DMibCheck( mp_pBuilder)("Adding a column value to an invalid row." );
-		DMibCheck( mp_iCurKeyPart == mp_nKeyParts)("A column value is being specified before all key parts have been." );
-		DMibCheck( mp_iCurColumn < mp_nColumns)("Too many column values are being specified!" );
+		DMibCheck(mp_pBuilder)("Adding a column value to an invalid row.");
+		DMibCheck(mp_iCurKeyPart == mp_nKeyParts)("A column value is being specified before all key parts have been.");
+		DMibCheck(mp_iCurColumn < mp_nColumns)("Too many column values are being specified!");
 
 		++mp_iCurColumn;
 
@@ -463,7 +447,7 @@ namespace NMib::NDatabase
 	// CResultSetBuilder::CKeyPart Private Implementation
 	//
 
-	CResultSetBuilder::CKeyPart::CKeyPart(CResultSetBuilder& _Builder, uint32 _iKeyPart)
+	CResultSetBuilder::CKeyPart::CKeyPart(CResultSetBuilder &_Builder, uint32 _iKeyPart)
 		: mp_pBuilder(&_Builder)
 		, mp_iKeyPart(_iKeyPart)
 	{
@@ -473,7 +457,7 @@ namespace NMib::NDatabase
 	// CResultSetBuilder::CKeyPart Public Implementation
 	//
 
-	CResultSetBuilder::CKeyPart::CKeyPart(CKeyPart&& _ToMove)
+	CResultSetBuilder::CKeyPart::CKeyPart(CKeyPart &&_ToMove)
 		: mp_pBuilder(_ToMove.mp_pBuilder)
 		, mp_iKeyPart(_ToMove.mp_iKeyPart)
 	{
@@ -483,17 +467,14 @@ namespace NMib::NDatabase
 	CResultSetBuilder::CKeyPart::~CKeyPart()
 	{
 		if (mp_pBuilder)
-		{
 			--mp_pBuilder->mp_nColumnWiseActive;
-		}
 	}
-
 
 	//
 	// CResultSetBuilder::CColumn Private Implementation
 	//
 
-	CResultSetBuilder::CColumn::CColumn(CResultSetBuilder& _Builder, uint32 _iColumn)
+	CResultSetBuilder::CColumn::CColumn(CResultSetBuilder &_Builder, uint32 _iColumn)
 		: mp_pBuilder(&_Builder)
 		, mp_iColumn(_iColumn)
 		, mp_iCurRow(0)
@@ -504,7 +485,7 @@ namespace NMib::NDatabase
 	// CResultSetBuilder::CColumn Public Implementation
 	//
 
-	CResultSetBuilder::CColumn::CColumn(CColumn&& _ToMove)
+	CResultSetBuilder::CColumn::CColumn(CColumn &&_ToMove)
 		: mp_pBuilder(_ToMove.mp_pBuilder)
 		, mp_iColumn(_ToMove.mp_iColumn)
 		, mp_iCurRow(0)
@@ -515,8 +496,6 @@ namespace NMib::NDatabase
 	CResultSetBuilder::CColumn::~CColumn()
 	{
 		if (mp_pBuilder)
-		{
 			--mp_pBuilder->mp_nColumnWiseActive;
-		}
 	}
 }

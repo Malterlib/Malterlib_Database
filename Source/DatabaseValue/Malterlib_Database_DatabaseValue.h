@@ -46,10 +46,10 @@ namespace NMib::NDatabase
 		static void fs_ConsumeLexicographic(tf_CStream &_Stream, tf_CValue &&o_Value);
 
 		template <typename ...tfp_CValue>
-		static CDatabaseValue fs_ToLexicographic(CDatabaseValueCache &o_StreamCache, tfp_CValue const &...p_Value);
+		static CDatabaseValue fs_ToLexicographic(CDatabaseValueCache &o_StreamCache, tfp_CValue const & ...p_Value);
 
 		template <typename ...tfp_CValue>
-		static CDatabaseValue fs_ToStream(CDatabaseValueCache &o_StreamCache, tfp_CValue const &...p_Value);
+		static CDatabaseValue fs_ToStream(CDatabaseValueCache &o_StreamCache, tfp_CValue const & ...p_Value);
 
 		template <typename ...tfp_CValue>
 		static CDatabaseValue fs_ToStream(CDatabaseValueCache &o_StreamCache, NStorage::TCTuple<tfp_CValue...> const &_Value);
@@ -77,8 +77,8 @@ namespace NMib::NDatabase
 
 		NContainer::CByteVector f_ToVector() const;
 
-		umint m_Size = 0;				///< Size of the data item
-		uint8 const *m_pData = nullptr;	///< Address of the data item
+		umint m_Size = 0;               ///< Size of the data item
+		uint8 const *m_pData = nullptr; ///< Address of the data item
 	};
 
 	template <typename t_CType, typename t_CEnableIf = void>

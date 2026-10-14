@@ -23,17 +23,14 @@ namespace NMib::NDatabase
 			CTransactionRead &operator = (CTransactionRead const &_Other) = delete;
 
 			bool f_HasDatabases() const;
-			CDatabaseSubReadTransaction f_OpenDatabaseTransaction
-				(
-					ch8 const *_pName = nullptr
-					, EDatabaseSubFlag _Flags = EDatabaseSubFlag_None
-					, CDatabaseSubProperties const &_Properties = CDatabaseSubProperties()
-				)
+			auto f_OpenDatabaseTransaction(ch8 const *_pName = nullptr, EDatabaseSubFlag _Flags = EDatabaseSubFlag_None, CDatabaseSubProperties const &_Properties = CDatabaseSubProperties())
+				-> CDatabaseSubReadTransaction
 			;
 			NContainer::TCSet<NStr::CStr> f_EnumDatabases();
 
 			template <typename tf_CFunctor, typename ...tfp_CHandlers>
-			auto f_BlockingDispatch(tf_CFunctor &&_Functor, tfp_CHandlers && ...p_Handlers) && -> NConcurrency::TCUnsafeFuture
+			auto f_BlockingDispatch(tf_CFunctor &&_Functor, tfp_CHandlers && ...p_Handlers) &&
+				-> NConcurrency::TCUnsafeFuture
 				<
 					typename NConcurrency::NPrivate::TCIsFuture
 					<
@@ -70,13 +67,7 @@ namespace NMib::NDatabase
 			void f_Clear();
 
 			bool f_HasDatabases() const;
-			CDatabaseSub f_OpenDatabase
-				(
-					ch8 const *_pName = nullptr
-					, EDatabaseSubFlag _Flags = EDatabaseSubFlag_Create
-					, CDatabaseSubProperties const &_Properties = CDatabaseSubProperties()
-				)
-			;
+			CDatabaseSub f_OpenDatabase(ch8 const *_pName = nullptr, EDatabaseSubFlag _Flags = EDatabaseSubFlag_Create, CDatabaseSubProperties const &_Properties = CDatabaseSubProperties());
 			NContainer::TCSet<NStr::CStr> f_EnumDatabases();
 			CDatabaseWriteTransaction f_BeginChildTransaction();
 
@@ -114,10 +105,8 @@ namespace NMib::NDatabase
 
 		NConcurrency::TCFuture<CDatabaseStatistics> f_GetAggregateStatistics();
 
-		NConcurrency::TCFuture<bool> f_WriteWithCompaction
-			(
-				NConcurrency::TCActorFunctorWeak<NConcurrency::TCFuture<CTransactionWrite> (CTransactionWrite _Transaction, bool _bCompacting)> _fDoWork
-			)
+		auto f_WriteWithCompaction(NConcurrency::TCActorFunctorWeak<NConcurrency::TCFuture<CTransactionWrite> (CTransactionWrite _Transaction, bool _bCompacting)> _fDoWork)
+			-> NConcurrency::TCFuture<bool>
 		;
 
 	private:
@@ -148,7 +137,7 @@ namespace NMib::NDatabase
 }
 
 #ifndef DMibPNoShortCuts
-	using namespace NMib::NDatabase;
+using namespace NMib::NDatabase;
 #endif
 
 #include "Malterlib_Database_DatabaseActor.hpp"

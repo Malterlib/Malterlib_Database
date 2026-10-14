@@ -54,7 +54,7 @@ namespace NMib::NDatabase
 	};
 
 	template <typename ...tfp_CValue>
-	CDatabaseValue CDatabaseValue::fs_ToLexicographic(CDatabaseValueCache &o_StreamCache, tfp_CValue const &...p_Value)
+	CDatabaseValue CDatabaseValue::fs_ToLexicographic(CDatabaseValueCache &o_StreamCache, tfp_CValue const & ...p_Value)
 	{
 		{
 			NStream::CBinaryStreamMemoryRef<NStream::CBinaryStreamBigEndian, CDatabaseValueCache> Stream{o_StreamCache, 0};
@@ -95,7 +95,7 @@ namespace NMib::NDatabase
 	}
 
 	template <typename ...tfp_CValue>
-	CDatabaseValue CDatabaseValue::fs_ToStream(CDatabaseValueCache &o_StreamCache, tfp_CValue const &...p_Value)
+	CDatabaseValue CDatabaseValue::fs_ToStream(CDatabaseValueCache &o_StreamCache, tfp_CValue const & ...p_Value)
 	{
 		{
 			NStream::CBinaryStreamMemoryRef<NStream::CBinaryStreamDefault, CDatabaseValueCache> Stream{o_StreamCache, 0};

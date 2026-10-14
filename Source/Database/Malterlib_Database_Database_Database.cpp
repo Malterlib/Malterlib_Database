@@ -2,35 +2,35 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 /*
- SPDX-License-Identifier: OLDAP-2.8
- SPDX-License-Identifier: ISC
- This code is derived from lmdb with the following copyright:
+SPDX-License-Identifier: OLDAP-2.8
+SPDX-License-Identifier: ISC
+This code is derived from lmdb with the following copyright:
 
- Copyright 2011-2019 Howard Chu, Symas Corp. All rights reserved.
+Copyright 2011-2019 Howard Chu, Symas Corp. All rights reserved.
 
- Redistribution and use in source and binary forms, with or without
- modification, are permitted only as authorized by the OpenLDAP
- Public License.
+Redistribution and use in source and binary forms, with or without
+modification, are permitted only as authorized by the OpenLDAP
+Public License.
 
- A copy of this license is available in the file LICENSE.OpenLDAP in the
- top-level directory of the distribution or, alternatively, at
- <http://www.OpenLDAP.org/license.html>.
+A copy of this license is available in the file LICENSE.OpenLDAP in the
+top-level directory of the distribution or, alternatively, at
+<http://www.OpenLDAP.org/license.html>.
 
- This code is derived from btree.c written by Martin Hedenfalk.
+This code is derived from btree.c written by Martin Hedenfalk.
 
- Copyright (c) 2009, 2010 Martin Hedenfalk <martin@bzero.se>
+Copyright (c) 2009, 2010 Martin Hedenfalk <martin@bzero.se>
 
- Permission to use, copy, modify, and distribute this software for any
- purpose with or without fee is hereby granted, provided that the above
- copyright notice and this permission notice appear in all copies.
+Permission to use, copy, modify, and distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
 
- THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
- WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
- MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
- ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
- WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
- ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
- OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
 #include "Malterlib_Database_Database.h"
@@ -108,7 +108,7 @@ namespace NMib::NDatabase
 	 *	<li>#MDB_DBS_FULL - too many databases have been opened. See #f_SetMaxDatabases().
 	 * </ul>
 	 */
-	CDatabaseSub CDatabaseTransactionCommon::fp_OpenDatabase(const char *_pName, EDatabaseSubFlag _Flags, CDatabaseSubProperties const &_Properties)
+	CDatabaseSub CDatabaseTransactionCommon::fp_OpenDatabase(char const *_pName, EDatabaseSubFlag _Flags, CDatabaseSubProperties const &_Properties)
 	{
 		using namespace NPrivate;
 		CDatabaseValue key, data;
@@ -148,12 +148,13 @@ namespace NMib::NDatabase
 
 		/* Is the DB already open? */
 		len = strlen(_pName);
-		for (i=CORE_DBS; i<txn->mt_numdbs; i++)
+		for (i = CORE_DBS; i < txn->mt_numdbs; i++)
 		{
 			if (!txn->mt_dbxs[i].m_DatabaseName.m_Size)
 			{
 				/* Remember this free slot */
-				if (!unused) unused = i;
+				if (!unused)
+					unused = i;
 				continue;
 			}
 			if (len == txn->mt_dbxs[i].m_DatabaseName.m_Size && !strncmp(_pName, (char const *)txn->mt_dbxs[i].m_DatabaseName.m_pData, len))
@@ -165,7 +166,7 @@ namespace NMib::NDatabase
 			DMibError("Out of database IDs");
 
 		/* Cannot mix named databases with some mainDB flags */
-		if (txn->mt_dbs[MAIN_DBI].md_flags & (EDatabaseSubFlag_SortedDuplicates|EDatabaseSubFlag_IntegerKeys))
+		if (txn->mt_dbs[MAIN_DBI].md_flags & (EDatabaseSubFlag_SortedDuplicates | EDatabaseSubFlag_IntegerKeys))
 		{
 			if (_Flags & EDatabaseSubFlag_Create)
 				DMibError(NStr::fg_Format("Database '{}' not found", _pName));
@@ -176,7 +177,7 @@ namespace NMib::NDatabase
 		}
 
 		/* Find the DB info */
-		dbflag = DB_NEW|DB_VALID|DB_USRVALID;
+		dbflag = DB_NEW | DB_VALID | DB_USRVALID;
 		exact = 0;
 		key.m_Size = len;
 		key.m_pData = (uint8 *)_pName;
@@ -186,10 +187,10 @@ namespace NMib::NDatabase
 		{
 			/* make sure this is actually a DB */
 			MDB_node *node = NODEPTR(mc.mc_pg[mc.mc_top], mc.mc_ki[mc.mc_top]);
-			if ((node->mn_flags & (F_DUPDATA|F_SUBDATA)) != F_SUBDATA)
+			if ((node->mn_flags & (F_DUPDATA | F_SUBDATA)) != F_SUBDATA)
 				DMibError("Named record is not a database");
 		}
-		else if (! (rc == MDB_NOTFOUND && (_Flags & EDatabaseSubFlag_Create)))
+		else if (!(rc == MDB_NOTFOUND && (_Flags & EDatabaseSubFlag_Create)))
 			DMibError(NStr::fg_Format("Error looking for database record: {}", NPrivate::mdb_strerror(rc)));
 
 		/* Done here so we cannot fail after creating a new DB */
@@ -205,7 +206,8 @@ namespace NMib::NDatabase
 			}
 		;
 
-		if (rc) {
+		if (rc)
+		{
 			/* MDB_NOTFOUND and EDatabaseSubFlag_Create: Create new DB */
 			data.m_Size = sizeof(MDB_db);
 			data.m_pData = (uint8 *)&dummy;
@@ -239,12 +241,7 @@ namespace NMib::NDatabase
 		}
 	}
 
-	CDatabaseSubReadTransaction CDatabaseReadTransaction::f_OpenDatabaseTransaction
-		(
-			const char *_pName
-			, EDatabaseSubFlag _Flags
-			, CDatabaseSubProperties const &_Properties
-		)
+	CDatabaseSubReadTransaction CDatabaseReadTransaction::f_OpenDatabaseTransaction(char const *_pName, EDatabaseSubFlag _Flags, CDatabaseSubProperties const &_Properties)
 	{
 		if (_pName && !f_HasDatabases())
 			DMibError("The database doesn't support sub-databases");
@@ -393,7 +390,8 @@ namespace NMib::NDatabase
 		char *pNamePointer = (char *)StaticDatabaseInfo.m_DatabaseName.m_pData;
 		umint NameSize = StaticDatabaseInfo.m_DatabaseName.m_Size;
 		/* If there was no name, this was already closed */
-		if (pNamePointer) {
+		if (pNamePointer)
+		{
 			StaticDatabaseInfo.m_DatabaseName.m_pData = nullptr;
 			StaticDatabaseInfo.m_DatabaseName.m_Size = 0;
 			Environment.me_dbflags[_DatabaseID] = 0;
@@ -437,7 +435,7 @@ namespace NMib::NDatabase
 			int rc = mdb_drop0(mc, mc->mc_db->md_flags & EDatabaseSubFlag_SortedDuplicates);
 			/* Invalidate the dropped DB's cursors */
 			for (m2 = mt_cursors[_DatabaseID]; m2; m2 = m2->mc_next)
-				m2->mc_flags &= ~(C_INITIALIZED|C_EOF);
+				m2->mc_flags &= ~(C_INITIALIZED | C_EOF);
 			if (rc)
 				DMibError(NStr::fg_Format("Error dropping database: {}", mdb_strerror(rc)));
 		}
