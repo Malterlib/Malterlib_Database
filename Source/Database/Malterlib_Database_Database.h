@@ -44,13 +44,13 @@
 
 namespace NMib::NDatabase
 {
-#	ifdef DMibDatabase_Always64BitSupport
-#		define DMibDatabase_IDBits 64
-		using CDatabaseOffset = uint64;
-#	else
-#		define DMibDatabase_IDBits DMibPPtrBits
-		using CDatabaseOffset = umint;
-#	endif
+#ifdef DMibDatabase_Always64BitSupport
+#	define DMibDatabase_IDBits 64
+	using CDatabaseOffset = uint64;
+#else
+#	define DMibDatabase_IDBits DMibPPtrBits
+	using CDatabaseOffset = umint;
+#endif
 
 	struct CDatabaseEnvironment;
 	struct CDatabaseEnvironment_Internal;
@@ -79,27 +79,24 @@ namespace NMib::NDatabase
 	/// Database Flags
 	enum EDatabaseEnvironmentFlag : uint32
 	{
-		EDatabaseEnvironmentFlag_None = 0
-		, EDatabaseEnvironmentFlag_FixedMap = 0x01						///< Memory map at a fixed address (experimental)
-		, EDatabaseEnvironmentFlag_NoSubdir = 0x4000					///< No environment directory
-		, EDatabaseEnvironmentFlag_NoSync = 0x10000						///< Don't fsync after commit
-		, EDatabaseEnvironmentFlag_ReadOnly = 0x20000					///< Read only
-		, EDatabaseEnvironmentFlag_NoMetaSync = 0x40000					///< Don't fsync metapage after commit
-		, EDatabaseEnvironmentFlag_WriteMap = 0x80000					///< Use writable mmap
-		, EDatabaseEnvironmentFlag_WriteMapAsync = 0x100000				///< Use asynchronous msync when #EDatabaseEnvironmentFlag_WriteMap is used
-		, EDatabaseEnvironmentFlag_NoTls = 0x200000						///< Tie reader locktable slots to #NMib::NDatabase::CDatabaseReadTransaction objects instead of to threads
-		, EDatabaseEnvironmentFlag_NoLock = 0x400000					///< Don't do any locking, caller must manage their own locks
-		, EDatabaseEnvironmentFlag_NoReadAhead = 0x800000				///< Don't do readahead (no effect on Windows)
-		, EDatabaseEnvironmentFlag_NoMemoryInit = 0x1000000				///< Don't initialize malloc'd memory before writing to datafile
-		, EDatabaseEnvironmentFlag_PreviousSnapshot = 0x2000000			///< Use the previous snapshot rather than the latest one
- 		, EDatabaseEnvironmentFlag_AllowOneProcessLocking = 0x4000000	///< Allow one process only locking if a named mutex cannot be created due to access rights on Windows
+		EDatabaseEnvironmentFlag_None                     = 0
+		, EDatabaseEnvironmentFlag_FixedMap               = 0x01      ///< Memory map at a fixed address (experimental)
+		, EDatabaseEnvironmentFlag_NoSubdir               = 0x4000    ///< No environment directory
+		, EDatabaseEnvironmentFlag_NoSync                 = 0x10000   ///< Don't fsync after commit
+		, EDatabaseEnvironmentFlag_ReadOnly               = 0x20000   ///< Read only
+		, EDatabaseEnvironmentFlag_NoMetaSync             = 0x40000   ///< Don't fsync metapage after commit
+		, EDatabaseEnvironmentFlag_WriteMap               = 0x80000   ///< Use writable mmap
+		, EDatabaseEnvironmentFlag_WriteMapAsync          = 0x100000  ///< Use asynchronous msync when #EDatabaseEnvironmentFlag_WriteMap is used
+		, EDatabaseEnvironmentFlag_NoTls                  = 0x200000  ///< Tie reader locktable slots to #NMib::NDatabase::CDatabaseReadTransaction objects instead of to threads
+		, EDatabaseEnvironmentFlag_NoLock                 = 0x400000  ///< Don't do any locking, caller must manage their own locks
+		, EDatabaseEnvironmentFlag_NoReadAhead            = 0x800000  ///< Don't do readahead (no effect on Windows)
+		, EDatabaseEnvironmentFlag_NoMemoryInit           = 0x1000000 ///< Don't initialize malloc'd memory before writing to datafile
+		, EDatabaseEnvironmentFlag_PreviousSnapshot       = 0x2000000 ///< Use the previous snapshot rather than the latest one
+		, EDatabaseEnvironmentFlag_AllowOneProcessLocking = 0x4000000 ///< Allow one process only locking if a named mutex cannot be created due to access rights on Windows
 
 		, EDatabaseEnvironmentFlag_Changable =
 		(
-			EDatabaseEnvironmentFlag_NoSync
-			| EDatabaseEnvironmentFlag_NoMetaSync
-			| EDatabaseEnvironmentFlag_WriteMapAsync
-			| EDatabaseEnvironmentFlag_NoMemoryInit
+			EDatabaseEnvironmentFlag_NoSync | EDatabaseEnvironmentFlag_NoMetaSync | EDatabaseEnvironmentFlag_WriteMapAsync | EDatabaseEnvironmentFlag_NoMemoryInit
 		)
 		, EDatabaseEnvironmentFlag_Changeless =
 		(
@@ -118,19 +115,19 @@ namespace NMib::NDatabase
 	///	Database Copy Flags
 	enum EDatabaseEnvironmentCopyFlag
 	{
-		EDatabaseEnvironmentCopyFlag_None = 0
+		EDatabaseEnvironmentCopyFlag_None      = 0
 		, EDatabaseEnvironmentCopyFlag_Compact = 0x01 ///< Compacting copy: Omit free space from copy, and renumber all pages sequentially.
 	};
 
 	/** @brief Information about the environment */
 	struct CDatabaseEnvironmentInfo
 	{
-		void *m_pMapAddress;						///< Address of map, if fixed
-		CDatabaseOffset m_MapSize;					///< Size of the data memory map
-		CDatabaseOffset m_LastPageID;					///< ID of the last used page
-		CDatabaseOffset m_LastCommittedTransactionID;	///< ID of the last committed transaction
-		uint32 m_MaxReaders;						///< max reader slots in the environment
-		uint32 m_nReaders;							///< max reader slots used in the environment
+		void *m_pMapAddress;                          ///< Address of map, if fixed
+		CDatabaseOffset m_MapSize;                    ///< Size of the data memory map
+		CDatabaseOffset m_LastPageID;                 ///< ID of the last used page
+		CDatabaseOffset m_LastCommittedTransactionID; ///< ID of the last committed transaction
+		uint32 m_MaxReaders;                          ///< max reader slots in the environment
+		uint32 m_nReaders;                            ///< max reader slots used in the environment
 	};
 
 	struct CDatabaseReaderInfo
@@ -152,7 +149,7 @@ namespace NMib::NDatabase
 		~CDatabaseEnvironment();
 
 		CDatabaseEnvironment(CDatabaseEnvironment &&_Other);
-		CDatabaseEnvironment &operator =(CDatabaseEnvironment &&_Other);
+		CDatabaseEnvironment &operator = (CDatabaseEnvironment &&_Other);
 
 		void f_Open(NStr::CStr const &_Path, EDatabaseEnvironmentFlag _Flags, NFile::EFileAttrib _FileAttributes, uint32 _PageSize = 0);
 		void f_Close();
@@ -200,5 +197,5 @@ namespace NMib::NDatabase
 #include "Malterlib_Database_Database_SubTransaction.hpp"
 
 #ifndef DMibPNoShortCuts
-	using namespace NMib::NDatabase;
+using namespace NMib::NDatabase;
 #endif

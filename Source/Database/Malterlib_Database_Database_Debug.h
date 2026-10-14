@@ -45,8 +45,8 @@ namespace NMib::NDatabase::NPrivate
 	char const *mdb_leafnode_type(MDB_node const *n);
 	void mdb_page_list(MDB_page const *mp);
 	void mdb_cursor_chk(MDB_cursor const *mc);
-#if (DMibDatabaseDebug) > 2
+#	if (DMibDatabaseDebug) > 2
 	void mdb_audit(MDB_txn *txn);
-#endif
+#	endif
 #endif
 }

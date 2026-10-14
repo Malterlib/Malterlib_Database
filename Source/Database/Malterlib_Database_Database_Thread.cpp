@@ -47,13 +47,13 @@ namespace NMib::NDatabase
 		MDB_reader *reader = (MDB_reader *)ptr;
 
 #ifndef DPlatformFamily_Windows
-		if (reader->m_OwningProcessID.f_Load(NAtomic::gc_MemoryOrder_Acquire) == getpid()) /* catch pthread_exit() in child process */
+		if (reader->m_OwningProcessID.f_Load(NAtomic::gc_MemoryOrder_Acquire) == getpid()) // catch pthread_exit() in child process
 #endif
 			/* We omit the mutex, so do this atomically (i.e. skip mr_txnid) */
 			reader->m_OwningProcessID.f_Store(0, NAtomic::gc_MemoryOrder_Release);
 	}
 
-	#ifdef DPlatformFamily_Windows
+#ifdef DPlatformFamily_Windows
 	/** Junk for arranging thread-specific callbacks on Windows. This is
 	 *	necessarily platform and compiler-specific. Windows supports up
 	 *	to 1088 keys. Let's assume nobody opens more than 64 environments
@@ -67,49 +67,50 @@ namespace NMib::NDatabase
 		void NTAPI mdb_tls_callback(PVOID module, DWORD reason, PVOID ptr)
 		{
 			int i;
-			switch(reason) {
+			switch (reason)
+			{
 			case DLL_PROCESS_ATTACH: break;
 			case DLL_THREAD_ATTACH: break;
 			case DLL_THREAD_DETACH:
-				for (i=0; i<NPrivate::mdb_tls_nkeys; i++) {
+				for (i = 0; i < NPrivate::mdb_tls_nkeys; i++)
+				{
 					NPrivate::MDB_reader *r = (NPrivate::MDB_reader *)pthread_getspecific(NPrivate::mdb_tls_keys[i]);
-					if (r) {
+					if (r)
 						mdb_env_reader_dest(r);
-					}
 				}
 				break;
 			case DLL_PROCESS_DETACH: break;
 			}
 		}
 	}
-	#endif
+#endif
 }
 
 #ifdef DPlatformFamily_Windows
-#ifdef __GNUC__
-#ifdef _WIN64
-extern "C" const PIMAGE_TLS_CALLBACK mdb_tls_cbp __attribute__((section (".CRT$XLB"))) = mdb_tls_callback;
-#else
-extern "C" PIMAGE_TLS_CALLBACK mdb_tls_cbp __attribute__((section (".CRT$XLB"))) = mdb_tls_callback;
-#endif
-#else
-#ifdef _WIN64
+#	ifdef __GNUC__
+#		ifdef _WIN64
+extern "C" const PIMAGE_TLS_CALLBACK mdb_tls_cbp __attribute__((section(".CRT$XLB"))) = mdb_tls_callback;
+#		else
+extern "C" PIMAGE_TLS_CALLBACK mdb_tls_cbp __attribute__((section(".CRT$XLB"))) = mdb_tls_callback;
+#		endif
+#	else
+#		ifdef _WIN64
 /* Force some symbol references.
 	*	_tls_used forces the linker to create the TLS directory if not already done
 	*	mdb_tls_cbp prevents whole-program-optimizer from dropping the symbol.
 	*/
-#pragma comment(linker, "/INCLUDE:_tls_used")
-#pragma comment(linker, "/INCLUDE:mdb_tls_cbp")
-#pragma const_seg(".CRT$XLB")
+#			pragma comment(linker, "/INCLUDE:_tls_used")
+#			pragma comment(linker, "/INCLUDE:mdb_tls_cbp")
+#			pragma const_seg(".CRT$XLB")
 extern "C" const PIMAGE_TLS_CALLBACK mdb_tls_cbp;
 extern "C" const PIMAGE_TLS_CALLBACK mdb_tls_cbp = NMib::NDatabase::mdb_tls_callback;
-#pragma const_seg()
-#else	/* DPlatformFamily_Windows */
-#pragma comment(linker, "/INCLUDE:__tls_used")
-#pragma comment(linker, "/INCLUDE:_mdb_tls_cbp")
-#pragma data_seg(".CRT$XLB")
+#			pragma const_seg()
+#		else	/* DPlatformFamily_Windows */
+#			pragma comment(linker, "/INCLUDE:__tls_used")
+#			pragma comment(linker, "/INCLUDE:_mdb_tls_cbp")
+#			pragma data_seg(".CRT$XLB")
 extern "C" PIMAGE_TLS_CALLBACK mdb_tls_cbp = NMib::NDatabase::mdb_tls_callback;
-#pragma data_seg()
-#endif	/* WIN 32/64 */
-#endif	/* !__GNUC__ */
+#			pragma data_seg()
+#		endif	/* WIN 32/64 */
+#	endif	/* !__GNUC__ */
 #endif

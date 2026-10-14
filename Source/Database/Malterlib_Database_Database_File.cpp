@@ -37,29 +37,29 @@
 #include "Malterlib_Database_Database_Internal.h"
 
 #ifdef DPlatformFamily_Linux
-#include <sys/utsname.h>
-#include <sys/vfs.h>
+#	include <sys/utsname.h>
+#	include <sys/vfs.h>
 #endif
 
 namespace NMib::NDatabase::NPrivate
 {
 	CDatabaseOffset DMibDatabaseInfrequentSection mdb_fsize(HANDLE fd)
 	{
-	#ifdef DPlatformFamily_Windows
+#ifdef DPlatformFamily_Windows
 		LARGE_INTEGER fsize;
 
 		if (!GetFileSizeEx(fd, &fsize))
 			DMibError(NStr::fg_Format("Error getting file size: {}", ErrCode()));
 
 		return fsize.QuadPart;
-	#else
+#else
 		struct stat st;
 
 		if (fstat(fd, &st))
 			DMibError(NStr::fg_Format("Error getting file size: {}", ErrCode()));
 
 		return st.st_size;
-	#endif
+#endif
 	}
 
 	bool DMibDatabaseInfrequentSection fg_BrokenFSync(MDB_env *_pEnvironment, HANDLE _FileDescriptor)
@@ -77,34 +77,46 @@ namespace NMib::NDatabase::NPrivate
 		{
 			struct statfs st;
 			fstatfs(_pEnvironment->me_fd, &st);
-			while (st.f_type == 0xEF53) {
+			while (st.f_type == 0xEF53)
+			{
 				struct utsname uts;
 				int i;
 				uname(&uts);
-				if (uts.release[0] < '3') {
-					if (!strncmp(uts.release, "2.6.32.", 7)) {
-						i = atoi(uts.release+7);
+				if (uts.release[0] < '3')
+				{
+					if (!strncmp(uts.release, "2.6.32.", 7))
+					{
+						i = atoi(uts.release + 7);
 						if (i >= 60)
-							break;	/* 2.6.32.60 and newer is OK */
-					} else if (!strncmp(uts.release, "2.6.34.", 7)) {
-						i = atoi(uts.release+7);
+							break; // 2.6.32.60 and newer is OK
+					}
+					else if (!strncmp(uts.release, "2.6.34.", 7))
+					{
+						i = atoi(uts.release + 7);
 						if (i >= 15)
-							break;	/* 2.6.34.15 and newer is OK */
+							break; // 2.6.34.15 and newer is OK
 					}
-				} else if (uts.release[0] == '3') {
-					i = atoi(uts.release+2);
+				}
+				else if (uts.release[0] == '3')
+				{
+					i = atoi(uts.release + 2);
 					if (i > 5)
-						break;	/* 3.6 and newer is OK */
-					if (i == 5) {
-						i = atoi(uts.release+4);
+						break; // 3.6 and newer is OK
+					if (i == 5)
+					{
+						i = atoi(uts.release + 4);
 						if (i >= 4)
-							break;	/* 3.5.4 and newer is OK */
-					} else if (i == 2) {
-						i = atoi(uts.release+4);
-						if (i >= 30)
-							break;	/* 3.2.30 and newer is OK */
+							break; // 3.5.4 and newer is OK
 					}
-				} else {	/* 4.x and newer is OK */
+					else if (i == 2)
+					{
+						i = atoi(uts.release + 4);
+						if (i >= 30)
+							break; // 3.2.30 and newer is OK
+					}
+				}
+				else
+				{ // 4.x and newer is OK
 					break;
 				}
 				bBroken = true;

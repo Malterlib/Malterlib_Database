@@ -50,21 +50,21 @@ namespace NMib::NDatabase::NPrivate
 	/* IDL sizes - likely should be even bigger
 	 *   limiting factors: sizeof(ID), thread stack size
 	 */
-	#define	MDB_IDL_LOGN	16	/* DB_SIZE is 2^16, UM_SIZE is 2^17 */
-	#define MDB_IDL_DB_SIZE		(1<<MDB_IDL_LOGN)
-	#define MDB_IDL_UM_SIZE		(1<<(MDB_IDL_LOGN+1))
+#define	MDB_IDL_LOGN	16	/* DB_SIZE is 2^16, UM_SIZE is 2^17 */
+#define MDB_IDL_DB_SIZE		(1<<MDB_IDL_LOGN)
+#define MDB_IDL_UM_SIZE		(1<<(MDB_IDL_LOGN+1))
 
-	#define MDB_IDL_DB_MAX		(MDB_IDL_DB_SIZE-1)
-	#define MDB_IDL_UM_MAX		(MDB_IDL_UM_SIZE-1)
+#define MDB_IDL_DB_MAX		(MDB_IDL_DB_SIZE-1)
+#define MDB_IDL_UM_MAX		(MDB_IDL_UM_SIZE-1)
 
-	#define MDB_IDL_SIZEOF(ids)		(((ids)[0]+1) * sizeof(MDB_ID))
-	#define MDB_IDL_IS_ZERO(ids) ( (ids)[0] == 0 )
-	#define MDB_IDL_CPY( dst, src ) (memcpy( dst, src, MDB_IDL_SIZEOF( src ) ))
-	#define MDB_IDL_FIRST( ids )	( (ids)[1] )
-	#define MDB_IDL_LAST( ids )		( (ids)[(ids)[0]] )
+#define MDB_IDL_SIZEOF(ids)		(((ids)[0]+1) * sizeof(MDB_ID))
+#define MDB_IDL_IS_ZERO(ids) ( (ids)[0] == 0 )
+#define MDB_IDL_CPY( dst, src ) (memcpy( dst, src, MDB_IDL_SIZEOF( src ) ))
+#define MDB_IDL_FIRST( ids )	( (ids)[1] )
+#define MDB_IDL_LAST( ids )		( (ids)[(ids)[0]] )
 
 		/** Current max length of an #mdb_midl_alloc()ed IDL */
-	#define MDB_IDL_ALLOCLEN( ids )	( (ids)[-1] )
+#define MDB_IDL_ALLOCLEN( ids )	( (ids)[-1] )
 
 		/** Append ID to IDL. The IDL must be big enough. */
 	inline_always void mdb_midl_xappend(MDB_IDL idl, MDB_ID id)
@@ -79,7 +79,7 @@ namespace NMib::NDatabase::NPrivate
 		 * @param[in] id	The ID to search for.
 		 * @return	The index of the first ID greater than or equal to \b id.
 		 */
-	unsigned mdb_midl_search( MDB_IDL ids, MDB_ID id );
+	unsigned mdb_midl_search(MDB_IDL ids, MDB_ID id);
 
 		/** Allocate an IDL.
 		 * Allocates memory for an IDL of the given size.
@@ -110,14 +110,14 @@ namespace NMib::NDatabase::NPrivate
 		 * @param[in] id	The ID to append.
 		 * @return	0 on success, ENOMEM if the IDL is too large.
 		 */
-	void mdb_midl_append( MDB_IDL *idp, MDB_ID id );
+	void mdb_midl_append(MDB_IDL *idp, MDB_ID id);
 
 		/** Append an IDL onto an IDL.
 		 * @param[in,out] idp	Address of the IDL to append to.
 		 * @param[in] app	The IDL to append.
 		 * @return	0 on success, ENOMEM if the IDL is too large.
 		 */
-	void mdb_midl_append_list( MDB_IDL *idp, MDB_IDL app );
+	void mdb_midl_append_list(MDB_IDL *idp, MDB_IDL app);
 
 		/** Append an ID range onto an IDL.
 		 * @param[in,out] idp	Address of the IDL to append to.
@@ -125,24 +125,25 @@ namespace NMib::NDatabase::NPrivate
 		 * @param[in] n		Number of IDs to append.
 		 * @return	0 on success, ENOMEM if the IDL is too large.
 		 */
-	void mdb_midl_append_range( MDB_IDL *idp, MDB_ID id, unsigned n );
+	void mdb_midl_append_range(MDB_IDL *idp, MDB_ID id, unsigned n);
 
 		/** Merge an IDL onto an IDL. The destination IDL must be big enough.
 		 * @param[in] idl	The IDL to merge into.
 		 * @param[in] merge	The IDL to merge.
 		 */
-	void mdb_midl_xmerge( MDB_IDL idl, MDB_IDL merge );
+	void mdb_midl_xmerge(MDB_IDL idl, MDB_IDL merge);
 
 		/** Sort an IDL.
 		 * @param[in,out] ids	The IDL to sort.
 		 */
-	void mdb_midl_sort( MDB_IDL ids );
+	void mdb_midl_sort(MDB_IDL ids);
 
 		/** An ID2 is an ID/pointer pair.
 		 */
-	struct MDB_ID2 {
-		MDB_ID mid;		/**< The ID */
-		void *mptr;		/**< The pointer */
+	struct MDB_ID2
+	{
+		MDB_ID mid; /**< The ID */
+		void *mptr; /**< The pointer */
 	};
 
 		/** An ID2L is an ID2 List, a sorted array of ID2s.
@@ -157,37 +158,37 @@ namespace NMib::NDatabase::NPrivate
 		 * @param[in] id	The ID to search for.
 		 * @return	The index of the first ID2 whose \b mid member is greater than or equal to \b id.
 		 */
-	unsigned mdb_mid2l_search( MDB_ID2L ids, MDB_ID id );
-
+	unsigned mdb_mid2l_search(MDB_ID2L ids, MDB_ID id);
 
 		/** Insert an ID2 into a ID2L.
 		 * @param[in,out] ids	The ID2L to insert into.
 		 * @param[in] id	The ID2 to insert.
 		 * @return	0 on success, -1 if the ID was already present in the ID2L.
 		 */
-	int mdb_mid2l_insert( MDB_ID2L ids, MDB_ID2 *id );
+	int mdb_mid2l_insert(MDB_ID2L ids, MDB_ID2 *id);
 
 		/** Append an ID2 into a ID2L.
 		 * @param[in,out] ids	The ID2L to append into.
 		 * @param[in] id	The ID2 to append.
 		 * @return	0 on success, -2 if the ID2L is too big.
 		 */
-	int mdb_mid2l_append( MDB_ID2L ids, MDB_ID2 *id );
+	int mdb_mid2l_append(MDB_ID2L ids, MDB_ID2 *id);
 
-	#ifdef DMibDatabase_Always64BitSupport
-	struct MDB_ID3 {
-		MDB_ID mid;		/**< The ID */
-		void *mptr;		/**< The pointer */
-		uint32 mcnt;		/**< Number of pages */
-		uint32 mref;		/**< Refcounter */
+#ifdef DMibDatabase_Always64BitSupport
+	struct MDB_ID3
+	{
+		MDB_ID mid; /**< The ID */
+		void *mptr; /**< The pointer */
+		uint32 mcnt; /**< Number of pages */
+		uint32 mref; /**< Refcounter */
 	};
 
 	typedef MDB_ID3 *MDB_ID3L;
 
-	unsigned mdb_mid3l_search( MDB_ID3L ids, MDB_ID id );
-	int mdb_mid3l_insert( MDB_ID3L ids, MDB_ID3 *id );
+	unsigned mdb_mid3l_search(MDB_ID3L ids, MDB_ID id);
+	int mdb_mid3l_insert(MDB_ID3L ids, MDB_ID3 *id);
 
-	#endif /* DMibDatabase_Always64BitSupport */
+#endif /* DMibDatabase_Always64BitSupport */
 	/** @} */
 	/** @} */
 }

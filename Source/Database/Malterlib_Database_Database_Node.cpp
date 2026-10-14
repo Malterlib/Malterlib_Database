@@ -48,12 +48,12 @@ namespace NMib::NDatabase
 	 */
 	NPrivate::MDB_node *NPrivate::mdb_node_search(MDB_cursor *mc, CDatabaseValue const *key, int *exactp)
 	{
-		uint32	 i = 0, nkeys;
-		int		 low, high;
-		int		 rc = 0;
+		uint32 i = 0, nkeys;
+		int low, high;
+		int rc = 0;
 		MDB_page *mp = mc->mc_pg[mc->mc_top];
-		MDB_node	*node = nullptr;
-		CDatabaseValue	 nodekey;
+		MDB_node *node = nullptr;
+		CDatabaseValue nodekey;
 		FDatabaseCompare *pCompare;
 		DKBUF;
 
@@ -68,17 +68,20 @@ namespace NMib::NDatabase
 		/* Branch pages have no data, so if using integer keys,
 		 * alignment is guaranteed. Use faster mdb_cmp_int.
 		 */
-		if (IS_BRANCH(mp) && *pCompare == g_mdb_cmp_cint) {
+		if (IS_BRANCH(mp) && *pCompare == g_mdb_cmp_cint)
+		{
 			if (NODEPTR(mp, 1)->mn_ksize == sizeof(CDatabaseOffset))
 				pCompare = &g_mdb_cmp_long;
 			else
 				pCompare = &g_mdb_cmp_int;
 		}
 
-		if (IS_LEAF2(mp)) {
+		if (IS_LEAF2(mp))
+		{
 			nodekey.m_Size = mc->mc_db->md_pad;
-			node = NODEPTR(mp, 0);	/* fake */
-			while (low <= high) {
+			node = NODEPTR(mp, 0); // fake
+			while (low <= high)
+			{
 				i = (low + high) >> 1;
 				nodekey.m_pData = LEAF2KEY(mp, i, nodekey.m_Size);
 				rc = (*pCompare)(*key, nodekey);
@@ -90,8 +93,11 @@ namespace NMib::NDatabase
 				else
 					high = i - 1;
 			}
-		} else {
-			while (low <= high) {
+		}
+		else
+		{
+			while (low <= high)
+			{
 				i = (low + high) >> 1;
 
 				node = NODEPTR(mp, i);
@@ -99,16 +105,12 @@ namespace NMib::NDatabase
 				nodekey.m_pData = NODEKEY(node);
 
 				rc = (*pCompare)(*key, nodekey);
-	#if DMibDatabaseDebug
+#if DMibDatabaseDebug
 				if (IS_LEAF(mp))
-				{
 					DMibDatabaseTrace("found leaf index {} [{}], rc = {}", i, DKEY(&nodekey), rc);
-				}
 				else
-				{
 					DMibDatabaseTrace("found branch index {} [{} -> {}], rc = {}", i, DKEY(&nodekey), NODEPGNO(node), rc);
-				}
-	#endif
+#endif
 				if (rc == 0)
 					break;
 				if (rc > 0)
@@ -118,8 +120,9 @@ namespace NMib::NDatabase
 			}
 		}
 
-		if (rc > 0) {	/* Found entry is less than the key. */
-			i++;	/* Skip to get the smallest entry larger than key. */
+		if (rc > 0)
+		{ // Found entry is less than the key.
+			i++; // Skip to get the smallest entry larger than key.
 			if (!IS_LEAF2(mp))
 				node = NODEPTR(mp, i);
 		}
@@ -135,7 +138,6 @@ namespace NMib::NDatabase
 		return node;
 	}
 
-
 	/** Return the data associated with a given node.
 	 * @param[in] mc The cursor for this operation.
 	 * @param[in] leaf The node being read.
@@ -144,15 +146,17 @@ namespace NMib::NDatabase
 	 */
 	int NPrivate::mdb_node_read(MDB_cursor *mc, MDB_node *leaf, CDatabaseValue *data)
 	{
-		MDB_page	*omp;		/* overflow page */
-		pgno_t		 pgno;
+		MDB_page *omp; // overflow page
+		pgno_t pgno;
 		int rc;
 
-		if (MC_OVPG(mc)) {
+		if (MC_OVPG(mc))
+		{
 			MDB_PAGE_UNREF(mc->mc_txn, MC_OVPG(mc));
 			MC_SET_OVPG(mc, NULL);
 		}
-		if (!F_ISSET(leaf->mn_flags, F_BIGDATA)) {
+		if (!F_ISSET(leaf->mn_flags, F_BIGDATA))
+		{
 			data->m_Size = NODEDSZ(leaf);
 			data->m_pData = NODEDATA(leaf);
 			return MDB_SUCCESS;
@@ -162,7 +166,8 @@ namespace NMib::NDatabase
 		 */
 		data->m_Size = NODEDSZ(leaf);
 		memcpy(&pgno, NODEDATA(leaf), sizeof(pgno));
-		if ((rc = mdb_page_get(mc, pgno, &omp, nullptr)) != 0) {
+		if ((rc = mdb_page_get(mc, pgno, &omp, nullptr)) != 0)
+		{
 			DMibDatabaseTrace("read overflow page {} failed", pgno);
 			return rc;
 		}
@@ -190,14 +195,14 @@ namespace NMib::NDatabase
 	 */
 	int NPrivate::mdb_node_add(MDB_cursor *mc, indx_t indx, CDatabaseValue *key, CDatabaseValue *data, pgno_t pgno, uint32 flags)
 	{
-		uint32	 i;
-		umint		 node_size = NODESIZE;
-		smint		 room;
-		indx_t		 ofs;
-		MDB_node	*node;
-		MDB_page	*mp = mc->mc_pg[mc->mc_top];
-		MDB_page	*ofp = nullptr;		/* overflow page */
-		void		*ndata;
+		uint32 i;
+		umint node_size = NODESIZE;
+		smint room;
+		indx_t ofs;
+		MDB_node *node;
+		MDB_page *mp = mc->mc_pg[mc->mc_top];
+		MDB_page *ofp = nullptr; // overflow page
+		void *ndata;
 		DKBUF;
 
 		DMibCheck(mp->mp_upper >= mp->mp_lower);
@@ -215,13 +220,14 @@ namespace NMib::NDatabase
 			)
 		;
 
-		if (IS_LEAF2(mp)) {
+		if (IS_LEAF2(mp))
+		{
 			/* Move higher keys up one slot. */
 			int ksize = mc->mc_db->md_pad, dif;
 			uint8 *ptr = LEAF2KEY(mp, indx, ksize);
 			dif = NUMKEYS(mp) - indx;
 			if (dif > 0)
-				memmove(ptr+ksize, ptr, dif*ksize);
+				memmove(ptr + ksize, ptr, dif*ksize);
 			/* insert new key */
 			memcpy(ptr, key->m_pData, ksize);
 
@@ -234,16 +240,20 @@ namespace NMib::NDatabase
 		room = (smint)SIZELEFT(mp) - (smint)sizeof(indx_t);
 		if (key != nullptr)
 			node_size += key->m_Size;
-		if (IS_LEAF(mp)) {
+		if (IS_LEAF(mp))
+		{
 			DMibCheck(key && data);
-			if (F_ISSET(flags, F_BIGDATA)) {
+			if (F_ISSET(flags, F_BIGDATA))
+			{
 				/* Data already on overflow page. */
 				node_size += sizeof(pgno_t);
-			} else if (node_size + data->m_Size > mc->mc_txn->mt_env->me_nodemax) {
+			}
+			else if (node_size + data->m_Size > mc->mc_txn->mt_env->me_nodemax)
+			{
 				int ovpages = OVPAGES(data->m_Size, mc->mc_txn->mt_env->me_psize);
 				int rc;
 				/* Put data on overflow page. */
-				DMibDatabaseTrace("data size is {}, node would be {}, put data on overflow page", data->m_Size, node_size+data->m_Size);
+				DMibDatabaseTrace("data size is {}, node would be {}, put data on overflow page", data->m_Size, node_size + data->m_Size);
 				node_size = EVEN(node_size + sizeof(pgno_t));
 				if ((smint)node_size > room)
 					goto full;
@@ -252,9 +262,9 @@ namespace NMib::NDatabase
 				DMibDatabaseTrace("allocated overflow page {}", ofp->mp_p.p_pgno);
 				flags |= F_BIGDATA;
 				goto update;
-			} else {
-				node_size += data->m_Size;
 			}
+			else
+				node_size += data->m_Size;
 		}
 		node_size = EVEN(node_size);
 		if ((smint)node_size > room)
@@ -277,23 +287,27 @@ namespace NMib::NDatabase
 		node->mn_ksize = (key == nullptr) ? 0 : key->m_Size;
 		node->mn_flags = flags;
 		if (IS_LEAF(mp))
-			SETDSZ(node,data->m_Size);
+			SETDSZ(node, data->m_Size);
 		else
-			SETPGNO(node,pgno);
+			SETPGNO(node, pgno);
 
 		if (key)
 			memcpy(NODEKEY(node), key->m_pData, key->m_Size);
 
-		if (IS_LEAF(mp)) {
+		if (IS_LEAF(mp))
+		{
 			ndata = (MDB_page *)NODEDATA(node);
-			if (ofp == nullptr) {
+			if (ofp == nullptr)
+			{
 				if (F_ISSET(flags, F_BIGDATA))
 					memcpy(ndata, data->m_pData, sizeof(pgno_t));
 				else if (F_ISSET(flags, EDatabaseWriteFlag_ReserveSpace))
 					data->m_pData = (uint8 *)ndata;
 				else if (data->m_Size)
 					memcpy(ndata, data->m_pData, data->m_Size);
-			} else {
+			}
+			else
+			{
 				memcpy(ndata, &ofp->mp_p.p_pgno, sizeof(pgno_t));
 				ndata = METADATA(ofp);
 				if (F_ISSET(flags, EDatabaseWriteFlag_ReserveSpace))
@@ -307,7 +321,7 @@ namespace NMib::NDatabase
 
 	full:
 		DMibDatabaseTrace("not enough room in page {}, got {} ptrs", mdb_dbg_pgno(mp), NUMKEYS(mp));
-		DMibDatabaseTrace("upper-lower = {} - {} = {}", mp->mp_upper,mp->mp_lower,room);
+		DMibDatabaseTrace("upper-lower = {} - {} = {}", mp->mp_upper, mp->mp_lower, room);
 		DMibDatabaseTrace("node size = {}", node_size);
 		mc->mc_txn->mt_flags |= MDB_TXN_ERROR;
 		return MDB_PAGE_FULL;
@@ -321,17 +335,18 @@ namespace NMib::NDatabase
 	void NPrivate::mdb_node_del(MDB_cursor *mc, int ksize)
 	{
 		MDB_page *mp = mc->mc_pg[mc->mc_top];
-		indx_t	indx = mc->mc_ki[mc->mc_top];
-		uint32	 sz;
-		indx_t		 i, j, numkeys, ptr;
-		MDB_node	*node;
-		uint8		*base;
+		indx_t indx = mc->mc_ki[mc->mc_top];
+		uint32 sz;
+		indx_t i, j, numkeys, ptr;
+		MDB_node *node;
+		uint8 *base;
 
 		DMibDatabaseTrace("delete node {} on {} page {}", indx, IS_LEAF(mp) ? "leaf" : "branch", mdb_dbg_pgno(mp));
 		numkeys = NUMKEYS(mp);
 		DMibCheck(indx < numkeys);
 
-		if (IS_LEAF2(mp)) {
+		if (IS_LEAF2(mp))
+		{
 			int x = numkeys - 1 - indx;
 			base = LEAF2KEY(mp, indx, ksize);
 			if (x)
@@ -343,7 +358,8 @@ namespace NMib::NDatabase
 
 		node = NODEPTR(mp, indx);
 		sz = NODESIZE + node->mn_ksize;
-		if (IS_LEAF(mp)) {
+		if (IS_LEAF(mp))
+		{
 			if (F_ISSET(node->mn_flags, F_BIGDATA))
 				sz += sizeof(pgno_t);
 			else
@@ -352,8 +368,10 @@ namespace NMib::NDatabase
 		sz = EVEN(sz);
 
 		ptr = mp->mp_ptrs[indx];
-		for (i = j = 0; i < numkeys; i++) {
-			if (i != indx) {
+		for (i = j = 0; i < numkeys; i++)
+		{
+			if (i != indx)
+			{
 				mp->mp_ptrs[j] = mp->mp_ptrs[i];
 				if (mp->mp_ptrs[i] < ptr)
 					mp->mp_ptrs[j] += sz;
@@ -386,13 +404,16 @@ namespace NMib::NDatabase
 		nsize = NODEDSZ(node) - delta;
 
 		/* Prepare to shift upward, set len = length(subpage part to shift) */
-		if (IS_LEAF2(sp)) {
+		if (IS_LEAF2(sp))
+		{
 			len = nsize;
 			if (nsize & 1)
-				return;		/* do not make the node uneven-sized */
-		} else {
-			xp = (MDB_page *)((char *)sp + delta); /* destination subpage */
-			for (i = NUMKEYS(sp); --i >= 0; )
+				return; // do not make the node uneven-sized
+		}
+		else
+		{
+			xp = (MDB_page *)((char *)sp + delta); // destination subpage
+			for (i = NUMKEYS(sp); --i >= 0;)
 				xp->mp_ptrs[i] = sp->mp_ptrs[i] - delta;
 			len = PAGEHDRSZ;
 		}
@@ -405,7 +426,8 @@ namespace NMib::NDatabase
 		memmove(base + delta, base, (char *)sp + len - base);
 
 		ptr = mp->mp_ptrs[indx];
-		for (i = NUMKEYS(mp); --i >= 0; ) {
+		for (i = NUMKEYS(mp); --i >= 0;)
+		{
 			if (mp->mp_ptrs[i] <= ptr)
 				mp->mp_ptrs[i] += delta;
 		}
@@ -416,50 +438,58 @@ namespace NMib::NDatabase
 	 */
 	int NPrivate::mdb_node_move(MDB_cursor *csrc, MDB_cursor *cdst, int fromleft)
 	{
-		MDB_node		*srcnode;
-		CDatabaseValue		 key, data;
-		pgno_t	srcpg;
+		MDB_node *srcnode;
+		CDatabaseValue key, data;
+		pgno_t srcpg;
 		MDB_cursor mn;
-		int			 rc;
+		int rc;
 		unsigned short flags;
 
 		DKBUF;
 
 		/* Mark src and dst as dirty. */
-		if ((rc = mdb_page_touch(csrc)) ||
-			(rc = mdb_page_touch(cdst)))
+		if ((rc = mdb_page_touch(csrc)) || (rc = mdb_page_touch(cdst)))
 			return rc;
 
-		if (IS_LEAF2(csrc->mc_pg[csrc->mc_top])) {
+		if (IS_LEAF2(csrc->mc_pg[csrc->mc_top]))
+		{
 			key.m_Size = csrc->mc_db->md_pad;
 			key.m_pData = LEAF2KEY(csrc->mc_pg[csrc->mc_top], csrc->mc_ki[csrc->mc_top], key.m_Size);
 			data.m_Size = 0;
 			data.m_pData = nullptr;
 			srcpg = 0;
 			flags = 0;
-		} else {
+		}
+		else
+		{
 			srcnode = NODEPTR(csrc->mc_pg[csrc->mc_top], csrc->mc_ki[csrc->mc_top]);
 			DMibCheck(!((umint)srcnode & 1));
 			srcpg = NODEPGNO(srcnode);
 			flags = srcnode->mn_flags;
-			if (csrc->mc_ki[csrc->mc_top] == 0 && IS_BRANCH(csrc->mc_pg[csrc->mc_top])) {
+			if (csrc->mc_ki[csrc->mc_top] == 0 && IS_BRANCH(csrc->mc_pg[csrc->mc_top]))
+			{
 				uint32 snum = csrc->mc_snum;
 				MDB_node *s2;
 				/* must find the lowest key below src */
 				rc = mdb_page_search_lowest(csrc);
 				if (rc)
 					return rc;
-				if (IS_LEAF2(csrc->mc_pg[csrc->mc_top])) {
+				if (IS_LEAF2(csrc->mc_pg[csrc->mc_top]))
+				{
 					key.m_Size = csrc->mc_db->md_pad;
 					key.m_pData = LEAF2KEY(csrc->mc_pg[csrc->mc_top], 0, key.m_Size);
-				} else {
+				}
+				else
+				{
 					s2 = NODEPTR(csrc->mc_pg[csrc->mc_top], 0);
 					key.m_Size = NODEKSZ(s2);
 					key.m_pData = NODEKEY(s2);
 				}
 				csrc->mc_snum = snum--;
 				csrc->mc_top = snum;
-			} else {
+			}
+			else
+			{
 				key.m_Size = NODEKSZ(srcnode);
 				key.m_pData = NODEKEY(srcnode);
 			}
@@ -467,7 +497,8 @@ namespace NMib::NDatabase
 			data.m_pData = NODEDATA(srcnode);
 		}
 		mn.mc_xcursor = nullptr;
-		if (IS_BRANCH(cdst->mc_pg[cdst->mc_top]) && cdst->mc_ki[cdst->mc_top] == 0) {
+		if (IS_BRANCH(cdst->mc_pg[cdst->mc_top]) && cdst->mc_ki[cdst->mc_top] == 0)
+		{
 			uint32 snum = cdst->mc_snum;
 			MDB_node *s2;
 			CDatabaseValue bkey;
@@ -476,10 +507,13 @@ namespace NMib::NDatabase
 			rc = mdb_page_search_lowest(&mn);
 			if (rc)
 				return rc;
-			if (IS_LEAF2(mn.mc_pg[mn.mc_top])) {
+			if (IS_LEAF2(mn.mc_pg[mn.mc_top]))
+			{
 				bkey.m_Size = mn.mc_db->md_pad;
 				bkey.m_pData = LEAF2KEY(mn.mc_pg[mn.mc_top], 0, bkey.m_Size);
-			} else {
+			}
+			else
+			{
 				s2 = NODEPTR(mn.mc_pg[mn.mc_top], 0);
 				bkey.m_Size = NODEKSZ(s2);
 				bkey.m_pData = NODEKEY(s2);
@@ -522,49 +556,52 @@ namespace NMib::NDatabase
 
 			mps = csrc->mc_pg[csrc->mc_top];
 			/* If we're adding on the left, bump others up */
-			if (fromleft) {
+			if (fromleft)
+			{
 				mpd = cdst->mc_pg[csrc->mc_top];
-				for (m2 = csrc->mc_txn->mt_cursors[dbi]; m2; m2=m2->mc_next) {
+				for (m2 = csrc->mc_txn->mt_cursors[dbi]; m2; m2 = m2->mc_next)
+				{
 					if (csrc->mc_flags & C_SUB)
 						m3 = &m2->mc_xcursor->mx_cursor;
 					else
 						m3 = m2;
 					if (!(m3->mc_flags & C_INITIALIZED) || m3->mc_top < csrc->mc_top)
 						continue;
-					if (m3 != cdst &&
-						m3->mc_pg[csrc->mc_top] == mpd &&
-						m3->mc_ki[csrc->mc_top] >= cdst->mc_ki[csrc->mc_top]) {
+					if (m3 != cdst && m3->mc_pg[csrc->mc_top] == mpd && m3->mc_ki[csrc->mc_top] >= cdst->mc_ki[csrc->mc_top])
 						m3->mc_ki[csrc->mc_top]++;
-					}
-					if (m3 !=csrc &&
-						m3->mc_pg[csrc->mc_top] == mps &&
-						m3->mc_ki[csrc->mc_top] == csrc->mc_ki[csrc->mc_top]) {
+					if (m3 != csrc && m3->mc_pg[csrc->mc_top] == mps && m3->mc_ki[csrc->mc_top] == csrc->mc_ki[csrc->mc_top])
+					{
 						m3->mc_pg[csrc->mc_top] = cdst->mc_pg[cdst->mc_top];
 						m3->mc_ki[csrc->mc_top] = cdst->mc_ki[cdst->mc_top];
-						m3->mc_ki[csrc->mc_top-1]++;
+						m3->mc_ki[csrc->mc_top - 1]++;
 					}
 					if (IS_LEAF(mps))
 						XCURSOR_REFRESH(m3, csrc->mc_top, m3->mc_pg[csrc->mc_top]);
 				}
-			} else
+			}
+			else
 			/* Adding on the right, bump others down */
 			{
-				for (m2 = csrc->mc_txn->mt_cursors[dbi]; m2; m2=m2->mc_next) {
+				for (m2 = csrc->mc_txn->mt_cursors[dbi]; m2; m2 = m2->mc_next)
+				{
 					if (csrc->mc_flags & C_SUB)
 						m3 = &m2->mc_xcursor->mx_cursor;
 					else
 						m3 = m2;
-					if (m3 == csrc) continue;
+					if (m3 == csrc)
+						continue;
 					if (!(m3->mc_flags & C_INITIALIZED) || m3->mc_top < csrc->mc_top)
 						continue;
-					if (m3->mc_pg[csrc->mc_top] == mps) {
-						if (!m3->mc_ki[csrc->mc_top]) {
+					if (m3->mc_pg[csrc->mc_top] == mps)
+					{
+						if (!m3->mc_ki[csrc->mc_top])
+						{
 							m3->mc_pg[csrc->mc_top] = cdst->mc_pg[cdst->mc_top];
 							m3->mc_ki[csrc->mc_top] = cdst->mc_ki[cdst->mc_top];
-							m3->mc_ki[csrc->mc_top-1]--;
-						} else {
-							m3->mc_ki[csrc->mc_top]--;
+							m3->mc_ki[csrc->mc_top - 1]--;
 						}
+						else
+							m3->mc_ki[csrc->mc_top]--;
 						if (IS_LEAF(mps))
 							XCURSOR_REFRESH(m3, csrc->mc_top, m3->mc_pg[csrc->mc_top]);
 					}
@@ -574,11 +611,14 @@ namespace NMib::NDatabase
 
 		/* Update the parent separators.
 		 */
-		if (csrc->mc_ki[csrc->mc_top] == 0) {
-			if (csrc->mc_ki[csrc->mc_top-1] != 0) {
-				if (IS_LEAF2(csrc->mc_pg[csrc->mc_top])) {
+		if (csrc->mc_ki[csrc->mc_top] == 0)
+		{
+			if (csrc->mc_ki[csrc->mc_top - 1] != 0)
+			{
+				if (IS_LEAF2(csrc->mc_pg[csrc->mc_top]))
 					key.m_pData = LEAF2KEY(csrc->mc_pg[csrc->mc_top], 0, key.m_Size);
-				} else {
+				else
+				{
 					srcnode = NODEPTR(csrc->mc_pg[csrc->mc_top], 0);
 					key.m_Size = NODEKSZ(srcnode);
 					key.m_pData = NODEKEY(srcnode);
@@ -588,14 +628,14 @@ namespace NMib::NDatabase
 				mn.mc_snum--;
 				mn.mc_top--;
 				/* We want mdb_rebalance to find mn when doing fixups */
-				WITH_CURSOR_TRACKING(mn,
-					rc = mdb_update_key(&mn, &key));
+				WITH_CURSOR_TRACKING(mn, rc = mdb_update_key(&mn, &key));
 				if (rc)
 					return rc;
 			}
-			if (IS_BRANCH(csrc->mc_pg[csrc->mc_top])) {
-				CDatabaseValue	 nullkey;
-				indx_t	ix = csrc->mc_ki[csrc->mc_top];
+			if (IS_BRANCH(csrc->mc_pg[csrc->mc_top]))
+			{
+				CDatabaseValue nullkey;
+				indx_t ix = csrc->mc_ki[csrc->mc_top];
 				nullkey.m_Size = 0;
 				csrc->mc_ki[csrc->mc_top] = 0;
 				rc = mdb_update_key(csrc, &nullkey);
@@ -604,11 +644,14 @@ namespace NMib::NDatabase
 			}
 		}
 
-		if (cdst->mc_ki[cdst->mc_top] == 0) {
-			if (cdst->mc_ki[cdst->mc_top-1] != 0) {
-				if (IS_LEAF2(csrc->mc_pg[csrc->mc_top])) {
+		if (cdst->mc_ki[cdst->mc_top] == 0)
+		{
+			if (cdst->mc_ki[cdst->mc_top - 1] != 0)
+			{
+				if (IS_LEAF2(csrc->mc_pg[csrc->mc_top]))
 					key.m_pData = LEAF2KEY(cdst->mc_pg[cdst->mc_top], 0, key.m_Size);
-				} else {
+				else
+				{
 					srcnode = NODEPTR(cdst->mc_pg[cdst->mc_top], 0);
 					key.m_Size = NODEKSZ(srcnode);
 					key.m_pData = NODEKEY(srcnode);
@@ -618,14 +661,14 @@ namespace NMib::NDatabase
 				mn.mc_snum--;
 				mn.mc_top--;
 				/* We want mdb_rebalance to find mn when doing fixups */
-				WITH_CURSOR_TRACKING(mn,
-					rc = mdb_update_key(&mn, &key));
+				WITH_CURSOR_TRACKING(mn, rc = mdb_update_key(&mn, &key));
 				if (rc)
 					return rc;
 			}
-			if (IS_BRANCH(cdst->mc_pg[cdst->mc_top])) {
-				CDatabaseValue	 nullkey;
-				indx_t	ix = cdst->mc_ki[cdst->mc_top];
+			if (IS_BRANCH(cdst->mc_pg[cdst->mc_top]))
+			{
+				CDatabaseValue nullkey;
+				indx_t ix = cdst->mc_ki[cdst->mc_top];
 				nullkey.m_Size = 0;
 				cdst->mc_ki[cdst->mc_top] = 0;
 				rc = mdb_update_key(cdst, &nullkey);
@@ -650,10 +693,11 @@ namespace NMib::NDatabase
 	 */
 	umint CDatabaseEnvironment_Internal::mdb_leaf_size(CDatabaseValue *key, CDatabaseValue *data)
 	{
-		umint		 sz;
+		umint sz;
 
 		sz = LEAFSIZE(key, data);
-		if (sz > me_nodemax) {
+		if (sz > me_nodemax)
+		{
 			/* put on overflow page */
 			sz -= data->m_Size - sizeof(pgno_t);
 		}
@@ -673,10 +717,11 @@ namespace NMib::NDatabase
 	 */
 	umint CDatabaseEnvironment_Internal::mdb_branch_size(CDatabaseValue *key)
 	{
-		umint		 sz;
+		umint sz;
 
 		sz = INDXSIZE(key);
-		if (sz > me_nodemax) {
+		if (sz > me_nodemax)
+		{
 			/* put on overflow page */
 			/* not implemented */
 			/* sz -= key->size - sizeof(pgno_t); */
@@ -693,36 +738,27 @@ namespace NMib::NDatabase
 	 */
 	int NPrivate::mdb_update_key(MDB_cursor *mc, CDatabaseValue *key)
 	{
-		MDB_page		*mp;
-		MDB_node		*node;
-		char			*base;
-		umint			 len;
-		int				 delta, ksize, oksize;
-		indx_t			 ptr, i, numkeys, indx;
+		MDB_page *mp;
+		MDB_node *node;
+		char *base;
+		umint len;
+		int delta, ksize, oksize;
+		indx_t ptr, i, numkeys, indx;
 		DKBUF;
 
 		indx = mc->mc_ki[mc->mc_top];
 		mp = mc->mc_pg[mc->mc_top];
 		node = NODEPTR(mp, indx);
 		ptr = mp->mp_ptrs[indx];
-	#if DMibDatabaseDebug
+#if DMibDatabaseDebug
 		{
-			CDatabaseValue	k2;
-			char kbuf2[DKBUF_MAXKEYSIZE*2+1];
+			CDatabaseValue k2;
+			char kbuf2[DKBUF_MAXKEYSIZE * 2 + 1];
 			k2.m_pData = NODEKEY(node);
 			k2.m_Size = node->mn_ksize;
-			DMibDatabaseTrace
-				(
-					"update key {} (ofs {}) [{}] to [{}] on page {}"
-					, indx
-					, ptr
-					, mdb_dkey(&k2, kbuf2)
-					, DKEY(key)
-					, mp->mp_p.p_pgno
-				)
-			;
+			DMibDatabaseTrace("update key {} (ofs {}) [{}] to [{}] on page {}", indx, ptr, mdb_dkey(&k2, kbuf2), DKEY(key), mp->mp_p.p_pgno);
 		}
-	#endif
+#endif
 
 		/* Sizes must be 2-byte aligned. */
 		ksize = EVEN(key->m_Size);
@@ -730,8 +766,10 @@ namespace NMib::NDatabase
 		delta = ksize - oksize;
 
 		/* Shift node contents if EVEN(key length) changed. */
-		if (delta) {
-			if (delta > 0 && SIZELEFT(mp) < delta) {
+		if (delta)
+		{
+			if (delta > 0 && SIZELEFT(mp) < delta)
+			{
 				pgno_t pgno;
 				/* not enough space left, do a delete and split */
 				DMibDatabaseTrace("Not enough room, delta = {}, splitting...", delta);
@@ -741,7 +779,8 @@ namespace NMib::NDatabase
 			}
 
 			numkeys = NUMKEYS(mp);
-			for (i = 0; i < numkeys; i++) {
+			for (i = 0; i < numkeys; i++)
+			{
 				if (mp->mp_ptrs[i] <= ptr)
 					mp->mp_ptrs[i] -= delta;
 			}
@@ -771,16 +810,19 @@ namespace NMib::NDatabase
 	 */
 	int NPrivate::mdb_rebalance(MDB_cursor *mc)
 	{
-		MDB_node	*node;
+		MDB_node *node;
 		int rc, fromleft;
 		uint32 ptop, minkeys, thresh;
-		MDB_cursor	mn;
+		MDB_cursor mn;
 		indx_t oldki;
 
-		if (IS_BRANCH(mc->mc_pg[mc->mc_top])) {
+		if (IS_BRANCH(mc->mc_pg[mc->mc_top]))
+		{
 			minkeys = 2;
 			thresh = 1;
-		} else {
+		}
+		else
+		{
 			minkeys = 1;
 			thresh = FILL_THRESHOLD;
 		}
@@ -794,19 +836,22 @@ namespace NMib::NDatabase
 			)
 		;
 
-		if (PAGEFILL(mc->mc_txn->mt_env, mc->mc_pg[mc->mc_top]) >= thresh &&
-			NUMKEYS(mc->mc_pg[mc->mc_top]) >= minkeys) {
+		if (PAGEFILL(mc->mc_txn->mt_env, mc->mc_pg[mc->mc_top]) >= thresh && NUMKEYS(mc->mc_pg[mc->mc_top]) >= minkeys)
+		{
 			DMibDatabaseTrace("no need to rebalance page {}, above fill threshold", mdb_dbg_pgno(mc->mc_pg[mc->mc_top]));
 			return MDB_SUCCESS;
 		}
 
-		if (mc->mc_snum < 2) {
+		if (mc->mc_snum < 2)
+		{
 			MDB_page *mp = mc->mc_pg[0];
-			if (IS_SUBP(mp)) {
+			if (IS_SUBP(mp))
+			{
 				DPUTS("Can't rebalance a subpage, ignoring");
 				return MDB_SUCCESS;
 			}
-			if (NUMKEYS(mp) == 0) {
+			if (NUMKEYS(mp) == 0)
+			{
 				DPUTS("tree is completely empty");
 				mc->mc_db->md_root = P_INVALID;
 				mc->mc_db->md_depth = 0;
@@ -820,21 +865,25 @@ namespace NMib::NDatabase
 					MDB_cursor *m2, *m3;
 					CDatabaseSubID dbi = mc->mc_dbi;
 
-					for (m2 = mc->mc_txn->mt_cursors[dbi]; m2; m2=m2->mc_next) {
+					for (m2 = mc->mc_txn->mt_cursors[dbi]; m2; m2 = m2->mc_next)
+					{
 						if (mc->mc_flags & C_SUB)
 							m3 = &m2->mc_xcursor->mx_cursor;
 						else
 							m3 = m2;
 						if (!(m3->mc_flags & C_INITIALIZED) || (m3->mc_snum < mc->mc_snum))
 							continue;
-						if (m3->mc_pg[0] == mp) {
+						if (m3->mc_pg[0] == mp)
+						{
 							m3->mc_snum = 0;
 							m3->mc_top = 0;
 							m3->mc_flags &= ~C_INITIALIZED;
 						}
 					}
 				}
-			} else if (IS_BRANCH(mp) && NUMKEYS(mp) == 1) {
+			}
+			else if (IS_BRANCH(mp) && NUMKEYS(mp) == 1)
+			{
 				int i;
 				DPUTS("collapsing root page!");
 				mdb_midl_append(&mc->mc_txn->mt_free_pgs, mp->mp_p.p_pgno);
@@ -845,34 +894,40 @@ namespace NMib::NDatabase
 				mc->mc_db->md_depth--;
 				mc->mc_db->md_branch_pages--;
 				mc->mc_ki[0] = mc->mc_ki[1];
-				for (i = 1; i<mc->mc_db->md_depth; i++) {
-					mc->mc_pg[i] = mc->mc_pg[i+1];
-					mc->mc_ki[i] = mc->mc_ki[i+1];
+				for (i = 1; i < mc->mc_db->md_depth; i++)
+				{
+					mc->mc_pg[i] = mc->mc_pg[i + 1];
+					mc->mc_ki[i] = mc->mc_ki[i + 1];
 				}
 				{
 					/* Adjust other cursors pointing to mp */
 					MDB_cursor *m2, *m3;
 					CDatabaseSubID dbi = mc->mc_dbi;
 
-					for (m2 = mc->mc_txn->mt_cursors[dbi]; m2; m2=m2->mc_next) {
+					for (m2 = mc->mc_txn->mt_cursors[dbi]; m2; m2 = m2->mc_next)
+					{
 						if (mc->mc_flags & C_SUB)
 							m3 = &m2->mc_xcursor->mx_cursor;
 						else
 							m3 = m2;
-						if (m3 == mc) continue;
+						if (m3 == mc)
+							continue;
 						if (!(m3->mc_flags & C_INITIALIZED))
 							continue;
-						if (m3->mc_pg[0] == mp) {
-							for (i=0; i<mc->mc_db->md_depth; i++) {
-								m3->mc_pg[i] = m3->mc_pg[i+1];
-								m3->mc_ki[i] = m3->mc_ki[i+1];
+						if (m3->mc_pg[0] == mp)
+						{
+							for (i = 0; i < mc->mc_db->md_depth; i++)
+							{
+								m3->mc_pg[i] = m3->mc_pg[i + 1];
+								m3->mc_ki[i] = m3->mc_ki[i + 1];
 							}
 							m3->mc_snum--;
 							m3->mc_top--;
 						}
 					}
 				}
-			} else
+			}
+			else
 				DPUTS("root page doesn't need rebalancing");
 			return MDB_SUCCESS;
 		}
@@ -880,7 +935,7 @@ namespace NMib::NDatabase
 		/* The parent (branch page) must have at least 2 pointers,
 		 * otherwise the tree is invalid.
 		 */
-		ptop = mc->mc_top-1;
+		ptop = mc->mc_top - 1;
 		DMibCheck(NUMKEYS(mc->mc_pg[ptop]) > 1);
 
 		/* Leaf page fill factor is below the threshold.
@@ -894,7 +949,8 @@ namespace NMib::NDatabase
 		mn.mc_xcursor = nullptr;
 
 		oldki = mc->mc_ki[mc->mc_top];
-		if (mc->mc_ki[ptop] == 0) {
+		if (mc->mc_ki[ptop] == 0)
+		{
 			/* We're the leftmost leaf in our parent.
 			 */
 			DPUTS("reading right neighbor");
@@ -906,7 +962,9 @@ namespace NMib::NDatabase
 			mn.mc_ki[mn.mc_top] = 0;
 			mc->mc_ki[mc->mc_top] = NUMKEYS(mc->mc_pg[mc->mc_top]);
 			fromleft = 0;
-		} else {
+		}
+		else
+		{
 			/* There is at least one neighbor to the left.
 			 */
 			DPUTS("reading left neighbor");
@@ -933,21 +991,25 @@ namespace NMib::NDatabase
 		 * move one key from it. Otherwise we should try to merge them.
 		 * (A branch page must never have less than 2 keys.)
 		 */
-		if (PAGEFILL(mc->mc_txn->mt_env, mn.mc_pg[mn.mc_top]) >= thresh && NUMKEYS(mn.mc_pg[mn.mc_top]) > minkeys) {
+		if (PAGEFILL(mc->mc_txn->mt_env, mn.mc_pg[mn.mc_top]) >= thresh && NUMKEYS(mn.mc_pg[mn.mc_top]) > minkeys)
+		{
 			rc = mdb_node_move(&mn, mc, fromleft);
-			if (fromleft) {
+			if (fromleft)
+			{
 				/* if we inserted on left, bump position up */
 				oldki++;
 			}
-		} else {
-			if (!fromleft) {
+		}
+		else
+		{
+			if (!fromleft)
 				rc = mdb_page_merge(&mn, mc);
-			} else {
+			else
+			{
 				oldki += NUMKEYS(mn.mc_pg[mn.mc_top]);
 				mn.mc_ki[mn.mc_top] += mc->mc_ki[mn.mc_top] + 1;
 				/* We want mdb_rebalance to find mn when doing fixups */
-				WITH_CURSOR_TRACKING(mn,
-					rc = mdb_page_merge(mc, &mn));
+				WITH_CURSOR_TRACKING(mn, rc = mdb_page_merge(mc, &mn));
 				mdb_cursor_copy(&mn, mc);
 			}
 			mc->mc_flags &= ~C_EOF;
@@ -966,7 +1028,8 @@ namespace NMib::NDatabase
 		int rc;
 
 		rc = mdb_page_search(mc, nullptr, MDB_PS_FIRST);
-		if (rc == MDB_SUCCESS) {
+		if (rc == MDB_SUCCESS)
+		{
 			MDB_txn *txn = mc->mc_txn;
 			MDB_node *ni;
 			MDB_cursor mx;
@@ -977,23 +1040,26 @@ namespace NMib::NDatabase
 			 * Also if the DB doesn't have sub-DBs and has no overflow
 			 * pages, omit scanning leaves.
 			 */
-			if ((mc->mc_flags & C_SUB) ||
-				(!subs && !mc->mc_db->md_overflow_pages))
+			if ((mc->mc_flags & C_SUB) || (!subs && !mc->mc_db->md_overflow_pages))
 				mdb_cursor_pop(mc);
 
 			mdb_cursor_copy(mc, &mx);
-	#ifdef DMibDatabase_Always64BitSupport
+#ifdef DMibDatabase_Always64BitSupport
 			/* bump refcount for mx's pages */
-			for (i=0; i<mc->mc_snum; i++)
+			for (i = 0; i < mc->mc_snum; i++)
 				mdb_page_get(&mx, mc->mc_pg[i]->mp_p.p_pgno, &mx.mc_pg[i], nullptr);
-	#endif
-			while (mc->mc_snum > 0) {
+#endif
+			while (mc->mc_snum > 0)
+			{
 				MDB_page *mp = mc->mc_pg[mc->mc_top];
 				unsigned n = NUMKEYS(mp);
-				if (IS_LEAF(mp)) {
-					for (i=0; i<n; i++) {
+				if (IS_LEAF(mp))
+				{
+					for (i = 0; i < n; i++)
+					{
 						ni = NODEPTR(mp, i);
-						if (ni->mn_flags & F_BIGDATA) {
+						if (ni->mn_flags & F_BIGDATA)
+						{
 							MDB_page *omp;
 							pgno_t pg;
 							memcpy(&pg, NODEDATA(ni), sizeof(pg));
@@ -1005,7 +1071,9 @@ namespace NMib::NDatabase
 							mc->mc_db->md_overflow_pages -= omp->mp_pages;
 							if (!mc->mc_db->md_overflow_pages && !subs)
 								break;
-						} else if (subs && (ni->mn_flags & F_SUBDATA)) {
+						}
+						else if (subs && (ni->mn_flags & F_SUBDATA))
+						{
 							mdb_xcursor_init1(mc, ni);
 							rc = mdb_drop0(&mc->mc_xcursor->mx_cursor, 0);
 							if (rc)
@@ -1014,9 +1082,11 @@ namespace NMib::NDatabase
 					}
 					if (!subs && !mc->mc_db->md_overflow_pages)
 						goto pop;
-				} else {
+				}
+				else
+				{
 					mdb_midl_need(&txn->mt_free_pgs, n);
-					for (i=0; i<n; i++)
+					for (i = 0; i < n; i++)
 					{
 						pgno_t pg;
 						ni = NODEPTR(mp, i);
@@ -1029,16 +1099,18 @@ namespace NMib::NDatabase
 					break;
 				mc->mc_ki[mc->mc_top] = i;
 				rc = mdb_cursor_sibling(mc, 1);
-				if (rc) {
+				if (rc)
+				{
 					if (rc != MDB_NOTFOUND)
 						goto done;
 					/* no more siblings, go back to beginning
 					 * of previous level.
 					 */
-	pop:
+				pop:
 					mdb_cursor_pop(mc);
 					mc->mc_ki[0] = 0;
-					for (i=1; i<mc->mc_snum; i++) {
+					for (i = 1; i < mc->mc_snum; i++)
+					{
 						mc->mc_ki[i] = 0;
 						mc->mc_pg[i] = mx.mc_pg[i];
 					}
@@ -1046,16 +1118,16 @@ namespace NMib::NDatabase
 			}
 			/* free it */
 			mdb_midl_append(&txn->mt_free_pgs, mc->mc_db->md_root);
-	done:
+		done:
 			if (rc)
 				txn->mt_flags |= MDB_TXN_ERROR;
-	#ifdef DMibDatabase_Always64BitSupport
+#ifdef DMibDatabase_Always64BitSupport
 			/* drop refcount for mx's pages */
 			mdb_cursor_unref(&mx);
-	#endif
-		} else if (rc == MDB_NOTFOUND) {
-			rc = MDB_SUCCESS;
+#endif
 		}
+		else if (rc == MDB_NOTFOUND)
+			rc = MDB_SUCCESS;
 		mc->mc_flags &= ~C_INITIALIZED;
 		return rc;
 	}

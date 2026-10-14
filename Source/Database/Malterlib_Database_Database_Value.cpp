@@ -70,8 +70,8 @@ namespace NMib::NDatabase
 		DMibRequire(data);
 
 		using namespace NPrivate;
-		MDB_cursor	mc;
-		MDB_xcursor	mx;
+		MDB_cursor mc;
+		MDB_xcursor mx;
 		int exact = 0;
 		DKBUF;
 
@@ -158,8 +158,22 @@ namespace NMib::NDatabase
 		if (!TXN_DBI_EXIST(this, dbi, DB_USRVALID))
 			DMibError("Database does not exists");
 
-		if (_WriteFlags & ~(EDatabaseWriteFlag_NoOverwrite|EDatabaseWriteFlag_NoDuplicateData|EDatabaseWriteFlag_ReserveSpace|EDatabaseWriteFlag_Append|EDatabaseWriteFlag_AppendDuplicateData|EDatabaseWriteFlag_OverwriteAtCurrentCursorPos))
+		if
+		(
+			_WriteFlags
+			& ~
+			(
+				EDatabaseWriteFlag_NoOverwrite
+				| EDatabaseWriteFlag_NoDuplicateData
+				| EDatabaseWriteFlag_ReserveSpace
+				| EDatabaseWriteFlag_Append
+				| EDatabaseWriteFlag_AppendDuplicateData
+				| EDatabaseWriteFlag_OverwriteAtCurrentCursorPos
+			)
+		)
+		{
 			DMibError("Invalid flags");
+		}
 
 		f_CheckBlocked();
 
@@ -213,7 +227,8 @@ namespace NMib::NDatabase
 		if (mt_flags & (MDB_TXN_RDONLY))
 			DMibError("Trying to write to read only transaction");
 
-		if (!F_ISSET(mt_dbs[dbi].md_flags, EDatabaseSubFlag_SortedDuplicates)) {
+		if (!F_ISSET(mt_dbs[dbi].md_flags, EDatabaseSubFlag_SortedDuplicates))
+		{
 			/* must ignore any data */
 			data = nullptr;
 		}
@@ -233,7 +248,7 @@ namespace NMib::NDatabase
 	 * @param[in] b The second item to compare
 	 * @return < 0 if a < b, 0 if a == b, > 0 if a > b
 	 */
-	int CDatabaseTransactionCommon::CInternal::f_KeyCompare(CDatabaseSubID dbi, const CDatabaseValue *a, const CDatabaseValue *b)
+	int CDatabaseTransactionCommon::CInternal::f_KeyCompare(CDatabaseSubID dbi, CDatabaseValue const *a, CDatabaseValue const *b)
 	{
 		return mt_dbxs[dbi].m_fKeyCompare(*a, *b);
 	}
@@ -248,13 +263,13 @@ namespace NMib::NDatabase
 	 * @param[in] b The second item to compare
 	 * @return < 0 if a < b, 0 if a == b, > 0 if a > b
 	 */
-	int CDatabaseTransactionCommon::CInternal::f_DataCompare(CDatabaseSubID dbi, const CDatabaseValue *a, const CDatabaseValue *b)
+	int CDatabaseTransactionCommon::CInternal::f_DataCompare(CDatabaseSubID dbi, CDatabaseValue const *a, CDatabaseValue const *b)
 	{
 		FDatabaseCompare const &DataCompare = mt_dbxs[dbi].m_fDataCompare;
-	#if DMibPPtrBits > 32 || defined(DMibDatabase_Always64BitSupport)
+#if DMibPPtrBits > 32 || defined(DMibDatabase_Always64BitSupport)
 		if (a->m_Size == sizeof(CDatabaseOffset) && DataCompare == NPrivate::g_mdb_cmp_int)
 			return NPrivate::g_mdb_cmp_clong(*a, *b);
-	#endif
+#endif
 		return DataCompare(*a, *b);
 	}
 
@@ -268,25 +283,29 @@ namespace NMib::NDatabase
 		MDB_xcursor mx;
 		EDatabaseCursorGet op;
 		CDatabaseValue rdata, *xdata;
-		int		 rc, exact = 0;
+		int rc, exact = 0;
 		DKBUF;
 
 		DMibDatabaseTrace("====> delete db {} key [{}]", dbi, DKEY(key));
 
 		mdb_cursor_init(&mc, txn, dbi, &mx);
 
-		if (data) {
+		if (data)
+		{
 			op = MDB_GET_BOTH;
 			rdata = *data;
 			xdata = &rdata;
-		} else {
+		}
+		else
+		{
 			op = MDB_SET;
 			xdata = nullptr;
 			_Flags |= EDatabaseWriteFlag_NoDuplicateData;
 		}
 		auto Key = *key;
 		rc = mdb_cursor_set(&mc, &Key, xdata, op, &exact);
-		if (rc == 0) {
+		if (rc == 0)
+		{
 			/* let mdb_page_split know about this cursor if needed:
 			 * delete will trigger a rebalance; if it needs to move
 			 * a node from one page to another, it will have to

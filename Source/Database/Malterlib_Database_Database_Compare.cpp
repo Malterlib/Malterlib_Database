@@ -94,8 +94,7 @@ namespace NMib::NDatabase::NPrivate
 	/** Compare two items pointing at aligned #CDatabaseOffset's */
 	int mdb_cmp_long(CDatabaseValue const &_Left, CDatabaseValue const &_Right)
 	{
-		return (*(CDatabaseOffset *)_Left.m_pData < *(CDatabaseOffset *)_Right.m_pData) ? -1 :
-			*(CDatabaseOffset *)_Left.m_pData > *(CDatabaseOffset *)_Right.m_pData;
+		return (*(CDatabaseOffset *)_Left.m_pData < *(CDatabaseOffset *)_Right.m_pData) ? -1 : *(CDatabaseOffset *)_Left.m_pData > *(CDatabaseOffset *)_Right.m_pData;
 	}
 
 	/** Compare two items pointing at aligned unsigned int's.
@@ -105,8 +104,7 @@ namespace NMib::NDatabase::NPrivate
 	 */
 	int mdb_cmp_int(CDatabaseValue const &_Left, CDatabaseValue const &_Right)
 	{
-		return (*(uint32 *)_Left.m_pData < *(uint32 *)_Right.m_pData) ? -1 :
-			*(uint32 *)_Left.m_pData > *(uint32 *)_Right.m_pData;
+		return (*(uint32 *)_Left.m_pData < *(uint32 *)_Right.m_pData) ? -1 : *(uint32 *)_Left.m_pData > *(uint32 *)_Right.m_pData;
 	}
 
 	/** Compare two items pointing at unsigned ints of unknown alignment.
@@ -114,28 +112,32 @@ namespace NMib::NDatabase::NPrivate
 	 */
 	int mdb_cmp_cint(CDatabaseValue const &_Left, CDatabaseValue const &_Right)
 	{
-	#if BYTE_ORDER == LITTLE_ENDIAN
+#if BYTE_ORDER == LITTLE_ENDIAN
 		unsigned short *u, *c;
 		int x;
 
-		u = (unsigned short *) ((char *) _Left.m_pData + _Left.m_Size);
-		c = (unsigned short *) ((char *) _Right.m_pData + _Left.m_Size);
-		do {
+		u = (unsigned short *)((char *)_Left.m_pData + _Left.m_Size);
+		c = (unsigned short *)((char *)_Right.m_pData + _Left.m_Size);
+		do
+		{
 			x = *--u - *--c;
-		} while(!x && u > (unsigned short *)_Left.m_pData);
+		}
+		while (!x && u > (unsigned short *)_Left.m_pData);
 		return x;
-	#else
+#else
 		unsigned short *u, *c, *end;
 		int x;
 
-		end = (unsigned short *) ((char *) _Left.m_pData + _Left.m_Size);
+		end = (unsigned short *)((char *)_Left.m_pData + _Left.m_Size);
 		u = (unsigned short *)_Left.m_pData;
 		c = (unsigned short *)_Right.m_pData;
-		do {
+		do
+		{
 			x = *u++ - *c++;
-		} while(!x && u < end);
+		}
+		while (!x && u < end);
 		return x;
-	#endif
+#endif
 	}
 
 	/** Compare two items lexically */
@@ -146,39 +148,42 @@ namespace NMib::NDatabase::NPrivate
 		uint32 len;
 
 		len = _Left.m_Size;
-		len_diff = (smint) _Left.m_Size - (smint) _Right.m_Size;
-		if (len_diff > 0) {
+		len_diff = (smint)_Left.m_Size - (smint)_Right.m_Size;
+		if (len_diff > 0)
+		{
 			len = _Right.m_Size;
 			len_diff = 1;
 		}
 
 		diff = memcmp(_Left.m_pData, _Right.m_pData, len);
-		return diff ? diff : len_diff<0 ? -1 : len_diff;
+		return diff ? diff : len_diff < 0 ? -1 : len_diff;
 	}
 
 	/** Compare two items in reverse byte order */
 	int mdb_cmp_memnr(CDatabaseValue const &_Left, CDatabaseValue const &_Right)
 	{
-		const unsigned char	*p1, *p2, *p1_lim;
+		unsigned char const *p1, *p2, *p1_lim;
 		smint len_diff;
 		int diff;
 
-		p1_lim = (const unsigned char *)_Left.m_pData;
-		p1 = (const unsigned char *)_Left.m_pData + _Left.m_Size;
-		p2 = (const unsigned char *)_Right.m_pData + _Right.m_Size;
+		p1_lim = (unsigned char const *)_Left.m_pData;
+		p1 = (unsigned char const *)_Left.m_pData + _Left.m_Size;
+		p2 = (unsigned char const *)_Right.m_pData + _Right.m_Size;
 
-		len_diff = (smint) _Left.m_Size - (smint) _Right.m_Size;
-		if (len_diff > 0) {
+		len_diff = (smint)_Left.m_Size - (smint)_Right.m_Size;
+		if (len_diff > 0)
+		{
 			p1_lim += len_diff;
 			len_diff = 1;
 		}
 
-		while (p1 > p1_lim) {
+		while (p1 > p1_lim)
+		{
 			diff = *--p1 - *--p2;
 			if (diff)
 				return diff;
 		}
-		return len_diff<0 ? -1 : len_diff;
+		return len_diff < 0 ? -1 : len_diff;
 	}
 
 	FDatabaseCompare g_mdb_cmp_memn = mdb_cmp_memn;

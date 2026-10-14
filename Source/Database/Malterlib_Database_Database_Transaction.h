@@ -42,8 +42,8 @@ namespace NMib::NDatabase
 	enum EDatabaseWriteTrasactionFlag
 	{
 		EDatabaseWriteTrasactionFlag_None
-		, EDatabaseWriteTrasactionFlag_NoMetaSync = 0x40000	///< Flush system buffers but omit metadata flush when committing this transaction.
-		, EDatabaseWriteTrasactionFlag_NoSync = 0x10000		///< Don't flush system buffers to disk when committing this transaction.
+		, EDatabaseWriteTrasactionFlag_NoMetaSync = 0x40000 ///< Flush system buffers but omit metadata flush when committing this transaction.
+		, EDatabaseWriteTrasactionFlag_NoSync     = 0x10000 ///< Don't flush system buffers to disk when committing this transaction.
 	};
 
 	struct CDatabaseTransactionCommon
@@ -53,7 +53,7 @@ namespace NMib::NDatabase
 		CDatabaseTransactionCommon();
 		~CDatabaseTransactionCommon();
 		CDatabaseTransactionCommon(CDatabaseTransactionCommon &&_Other);
-		CDatabaseTransactionCommon &operator =(CDatabaseTransactionCommon &&_Other);
+		CDatabaseTransactionCommon &operator = (CDatabaseTransactionCommon &&_Other);
 
 		CDatabaseOffset f_TransactionID();
 		bool f_HasDatabases() const;
@@ -89,18 +89,14 @@ namespace NMib::NDatabase
 	{
 		CDatabaseReadTransaction();
 		CDatabaseReadTransaction(CDatabaseReadTransaction &&_Other);
-		CDatabaseReadTransaction &operator =(CDatabaseReadTransaction &&_Other);
+		CDatabaseReadTransaction &operator = (CDatabaseReadTransaction &&_Other);
 
 		using CDatabaseTransactionCommon::f_HasDatabases;
 		using CDatabaseTransactionCommon::f_TransactionID;
 
 		CDatabaseResetReadTransaction f_Reset();
-		CDatabaseSubReadTransaction f_OpenDatabaseTransaction
-			(
-				ch8 const *_pName = nullptr
-				, EDatabaseSubFlag _Flags = EDatabaseSubFlag_None
-				, CDatabaseSubProperties const &_Properties = CDatabaseSubProperties()
-			)
+		auto f_OpenDatabaseTransaction(ch8 const *_pName = nullptr, EDatabaseSubFlag _Flags = EDatabaseSubFlag_None, CDatabaseSubProperties const &_Properties = CDatabaseSubProperties())
+			-> CDatabaseSubReadTransaction
 		;
 
 		NContainer::TCSet<NStr::CStr> f_EnumDatabases();
@@ -118,23 +114,18 @@ namespace NMib::NDatabase
 	{
 		CDatabaseWriteTransaction();
 		CDatabaseWriteTransaction(CDatabaseWriteTransaction &&_Other);
-		CDatabaseWriteTransaction &operator =(CDatabaseWriteTransaction &&_Other);
+		CDatabaseWriteTransaction &operator = (CDatabaseWriteTransaction &&_Other);
 
 		using CDatabaseTransactionCommon::f_HasDatabases;
 		using CDatabaseTransactionCommon::f_TransactionID;
 
 		void f_Commit();
-		CDatabaseSub f_OpenDatabase
-			(
-				ch8 const *_pName = nullptr
-				, EDatabaseSubFlag _Flags = EDatabaseSubFlag_Create
-				, CDatabaseSubProperties const &_Properties = CDatabaseSubProperties()
-			)
-		;
+		CDatabaseSub f_OpenDatabase(ch8 const *_pName = nullptr, EDatabaseSubFlag _Flags = EDatabaseSubFlag_Create, CDatabaseSubProperties const &_Properties = CDatabaseSubProperties());
 
 		NContainer::TCSet<NStr::CStr> f_EnumDatabases();
 
 		CDatabaseWriteTransaction f_BeginChildTransaction();
+
 	private:
 		friend struct CDatabaseEnvironment;
 		friend struct CDatabaseSub;

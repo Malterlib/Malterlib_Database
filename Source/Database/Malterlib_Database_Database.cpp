@@ -33,7 +33,6 @@
  OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-
 #include "Malterlib_Database_Database.h"
 #include "Malterlib_Database_Database_IDList.h"
 #include "Malterlib_Database_Database_Internal.h"

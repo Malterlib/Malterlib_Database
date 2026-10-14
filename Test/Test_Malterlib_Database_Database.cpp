@@ -18,7 +18,7 @@ using namespace NMib::NFile;
 namespace NMib::NDatabase
 {
 	CTestEnvironment::CTestEnvironment(CTestEnvironment &&_Other) = default;
-	CTestEnvironment &CTestEnvironment::operator =(CTestEnvironment &&_Other) = default;
+	CTestEnvironment &CTestEnvironment::operator = (CTestEnvironment &&_Other) = default;
 
 	CTestEnvironment::CTestEnvironment()
 	{
@@ -86,8 +86,7 @@ namespace
 	class CDatabase_Tests : public NMib::NTest::CTest
 	{
 	public:
-
-		void fp_PopulateEnvironment(CDatabaseEnvironment &_Environment, umint _nDatabases = 16, umint _nValuesPerDatabase = 4*1024)
+		void fp_PopulateEnvironment(CDatabaseEnvironment &_Environment, umint _nDatabases = 16, umint _nValuesPerDatabase = 4 * 1024)
 		{
 			_Environment.f_SetMapSize(_nDatabases * _nValuesPerDatabase * 256 * fg_Max(NSys::fg_Mem_PageSize() / 4096u, 1u));
 			auto Transaction = _Environment.f_BeginWriteTransaction();
@@ -108,7 +107,7 @@ namespace
 			Transaction.f_Commit();
 		}
 
-		void fp_PopulateEnvironmentSingleDB(CDatabaseEnvironment &_Environment, umint _nValuesPerDatabase = 4*1024)
+		void fp_PopulateEnvironmentSingleDB(CDatabaseEnvironment &_Environment, umint _nValuesPerDatabase = 4 * 1024)
 		{
 			_Environment.f_SetMapSize(_nValuesPerDatabase * 256 * fg_Max(NSys::fg_Mem_PageSize() / 4096u, 1u));
 			auto Transaction = _Environment.f_BeginWriteTransaction();
@@ -116,12 +115,7 @@ namespace
 			for (uint32 iValue = 0; iValue < _nValuesPerDatabase; ++iValue)
 			{
 				auto DatabaseTransaction = Database.f_Transaction(Transaction);
-				DatabaseTransaction.f_Insert
-					(
-						NStorage::fg_TupleReferences("TestKey", iValue)
-						, NStorage::fg_TupleReferences("TestValue", iValue, iValue, iValue, iValue)
-					)
-				;
+				DatabaseTransaction.f_Insert(NStorage::fg_TupleReferences("TestKey", iValue), NStorage::fg_TupleReferences("TestValue", iValue, iValue, iValue, iValue));
 			}
 			Transaction.f_Commit();
 		}
@@ -273,7 +267,7 @@ namespace
 			};
 			DMibTestSuite("Child Write Transaction")
 			{
-				auto Environment = fg_GetTestEnvironment("TestDatabase14", true, EDatabaseEnvironmentFlag_None, 128*1024*1024);
+				auto Environment = fg_GetTestEnvironment("TestDatabase14", true, EDatabaseEnvironmentFlag_None, 128 * 1024 * 1024);
 
 				{
 					{
@@ -393,12 +387,7 @@ namespace
 					auto ReadOnly = fg_GetTestEnvironment("TestDatabase8", false, EDatabaseEnvironmentFlag_ReadOnly);
 					DMibExpectTrue(fp_EnvironmentsSame(Writable.m_Environment, ReadOnly.m_Environment));
 
-					DMibExpectException
-						(
-							ReadOnly.m_Environment.f_BeginWriteTransaction()
-							, DMibErrorInstance("Cannot open write transaction in read only environment")
-						)
-					;
+					DMibExpectException(ReadOnly.m_Environment.f_BeginWriteTransaction(), DMibErrorInstance("Cannot open write transaction in read only environment"));
 				};
 				DMibTestSuite("Flags-WriteMap")
 				{
@@ -615,7 +604,7 @@ namespace
 						}
 					}
 
-					DMibExpect(nEndEntries, == , nStartEntries - 1);
+					DMibExpect(nEndEntries, ==, nStartEntries - 1);
 				}
 
 				co_await fg_Move(DatabaseActor).f_Destroy();

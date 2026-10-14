@@ -13,6 +13,7 @@ namespace NMib::NDatabase
 		{
 			_Stream.f_FeedBytes(_Value.f_GetStr(), _Value.f_GetLen() + 1);
 		}
+
 		template <typename tf_CStream>
 		static void fs_Decode(tf_CStream &_Stream, NStr::TCStr<t_CTCStrTraits> &o_Value)
 		{

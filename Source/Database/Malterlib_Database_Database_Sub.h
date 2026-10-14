@@ -41,16 +41,16 @@ namespace NMib::NDatabase
 	///	Sub Database Flags
 	enum EDatabaseSubFlag : uint32
 	{
-		EDatabaseSubFlag_None = 0
-		, EDatabaseSubFlag_ReverseKeys = 0x02					///< Use reverse string keys
-		, EDatabaseSubFlag_SortedDuplicates = 0x04				///< Use sorted duplicates
-		, EDatabaseSubFlag_IntegerKeys = 0x08					///< Numeric keys in native byte order: either uint32 or CDatabaseOffset
-																///  (expects 32-bit int <= size_t <= 32/64-bit CDatabaseOffset.)
-																///  The keys must all be of the same size.
-		, EDatabaseSubFlag_SortedDuplicatesFixedSize = 0x10		///< With #EDatabaseSubFlag_SortedDuplicates, sorted dup items have fixed size
-		, EDatabaseSubFlag_SortedDuplicatesIntegerKeys = 0x20	///< With #EDatabaseSubFlag_SortedDuplicates, dups are #EDatabaseSubFlag_IntegerKeys-style integers
-		, EDatabaseSubFlag_SortedDuplicatesReverseKeys = 0x40	///< With #EDatabaseSubFlag_SortedDuplicates, use reverse string dups
-		, EDatabaseSubFlag_Create = 0x40000						///< Create DB if not already existing
+		EDatabaseSubFlag_None                          = 0
+		, EDatabaseSubFlag_ReverseKeys                 = 0x02    ///< Use reverse string keys
+		, EDatabaseSubFlag_SortedDuplicates            = 0x04    ///< Use sorted duplicates
+		, EDatabaseSubFlag_IntegerKeys                 = 0x08    ///< Numeric keys in native byte order: either uint32 or CDatabaseOffset
+		                                                         ///   (expects 32-bit int <= size_t <= 32/64-bit CDatabaseOffset.)
+		                                                         ///   The keys must all be of the same size.
+		, EDatabaseSubFlag_SortedDuplicatesFixedSize   = 0x10    ///< With #EDatabaseSubFlag_SortedDuplicates, sorted dup items have fixed size
+		, EDatabaseSubFlag_SortedDuplicatesIntegerKeys = 0x20    ///< With #EDatabaseSubFlag_SortedDuplicates, dups are #EDatabaseSubFlag_IntegerKeys-style integers
+		, EDatabaseSubFlag_SortedDuplicatesReverseKeys = 0x40    ///< With #EDatabaseSubFlag_SortedDuplicates, use reverse string dups
+		, EDatabaseSubFlag_Create                      = 0x40000 ///< Create DB if not already existing
 	};
 
 	using FDatabaseCompare = NFunction::TCFunction<int (CDatabaseValue const &_Left, CDatabaseValue const &_Right), NFunction::CFunctionSupportEqualityCompareTag>;

@@ -38,7 +38,7 @@
 
 namespace NMib::NDatabase::NPrivate
 {
-	#ifdef MDB_USE_HASH
+#ifdef MDB_USE_HASH
 	/*
 	 * hash_64 - 64 bit Fowler/Noll/Vo-0 FNV-1a hash code
 	 *
@@ -72,16 +72,15 @@ namespace NMib::NDatabase::NPrivate
 	 * @param[in] len	length of value
 	 * @return 64 bit hash
 	 */
-	mdb_hash_t mdb_hash(const void *val, size_t len)
+	mdb_hash_t mdb_hash(void const *val, size_t len)
 	{
-		const unsigned char *s = (const unsigned char *) val, *end = s + len;
+		unsigned char const *s = (unsigned char const *)val, *end = s + len;
 		mdb_hash_t hval = 0xcbf29ce484222325ULL;
 		/*
 		 * FNV-1a hash each octet of the buffer
 		 */
-		while (s < end) {
+		while (s < end)
 			hval = (hval ^ *s++) * 0x100000001b3ULL;
-		}
 		/* return our new hash value */
 		return hval;
 	}
@@ -96,7 +95,7 @@ namespace NMib::NDatabase::NPrivate
 	 */
 	namespace
 	{
-		const char mdb_a85[]= "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&()*+-;<=>?@^_`{|}~";
+		char const mdb_a85[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&()*+-;<=>?@^_`{|}~";
 	}
 
 	void DMibDatabaseInfrequentSection
@@ -104,7 +103,8 @@ namespace NMib::NDatabase::NPrivate
 	{
 		int i;
 
-		for (i=0; i<10 && l; i++) {
+		for (i = 0; i < 10 && l; i++)
+		{
 			*out++ = mdb_a85[l % 85];
 			l /= 85;
 		}
@@ -123,5 +123,5 @@ namespace NMib::NDatabase::NPrivate
 	}
 
 	/** Return env->me_mutexname after filling in ch ('r'/'w') for convenience */
-	#endif
+#endif
 }

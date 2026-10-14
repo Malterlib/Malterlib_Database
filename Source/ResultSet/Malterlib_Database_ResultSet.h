@@ -74,7 +74,6 @@ The following elements can have associated metadata:
 
 namespace NMib::NDatabase
 {
-
 	//
 	// Result Set
 	//
@@ -84,29 +83,26 @@ namespace NMib::NDatabase
 	class CResultSet
 	{
 	private:
-
 	protected:
-
 		//
 		// Structure:
 		//
 
-		NContainer::TCVector<NResultSet::CMetadataEntry> mp_Metadata;	// Lookup by uint32 m_ID
-		NContainer::TCVector<NResultSet::CElementInfo> mp_KeyPartInfos;	// Index by iKeyPart
-		NContainer::TCVector<NResultSet::CElementInfo> mp_ColumnInfos;	// Index by iColumn
+		NContainer::TCVector<NResultSet::CMetadataEntry> mp_Metadata;   // Lookup by uint32 m_ID
+		NContainer::TCVector<NResultSet::CElementInfo> mp_KeyPartInfos; // Index by iKeyPart
+		NContainer::TCVector<NResultSet::CElementInfo> mp_ColumnInfos;  // Index by iColumn
 
 		//
 		// Data:
 		//
 
-		NContainer::TCVector< NResultSet::CValueVector > mp_KeyPartValues;		// Index by iKeyPart, then by iKeyPartValue
+		NContainer::TCVector<NResultSet::CValueVector> mp_KeyPartValues; // Index by iKeyPart, then by iKeyPartValue
 
-		umint mp_nRows;											// Cached for easy access, == mp_KeyParse[X].f_GetLen()
-		NContainer::TCVector< NContainer::TCVector<uint32> > mp_KeyPartRowValueIndices;		// Index by iKeyPart and then by iRow to get value index.
-		NContainer::TCVector< NResultSet::CSparseValueVector > mp_Columns;	// Index by iColumn, then by iterator (as values are sparse)
+		umint mp_nRows;                                                               // Cached for easy access, == mp_KeyParse[X].f_GetLen()
+		NContainer::TCVector<NContainer::TCVector<uint32>> mp_KeyPartRowValueIndices; // Index by iKeyPart and then by iRow to get value index.
+		NContainer::TCVector<NResultSet::CSparseValueVector> mp_Columns;              // Index by iColumn, then by iterator (as values are sparse)
 
 	public:
-
 		//
 		// Iterators
 		//
@@ -118,7 +114,7 @@ namespace NMib::NDatabase
 			~CKeyPartIterator();
 
 			template <typename tf_CType>
-			inline tf_CType const& f_Get() const;
+			inline tf_CType const &f_Get() const;
 
 			inline uint32 f_GetValueIndex() const;
 
@@ -127,20 +123,20 @@ namespace NMib::NDatabase
 
 			inline umint f_GetIndex() const;
 
-			CKeyPartIterator & operator ++ ();
+			CKeyPartIterator &operator ++ ();
 
 			explicit operator bool () const;
 
 		private:
-			CKeyPartIterator(CResultSet const& _ResultSet, umint _iRow, umint _iKeyPart = 0);
+			CKeyPartIterator(CResultSet const &_ResultSet, umint _iRow, umint _iKeyPart = 0);
 
 		private:
 			friend class CResultSet;
 
-			CResultSet const* mp_pResultSet;
+			CResultSet const *mp_pResultSet;
 			umint mp_iRow;
 
-			umint mp_nKeyParts;	// Cached from mp_pResultSet
+			umint mp_nKeyParts; // Cached from mp_pResultSet
 
 			umint mp_iKeyPart;
 		};
@@ -152,24 +148,24 @@ namespace NMib::NDatabase
 			~CColumnValueIterator();
 
 			template <typename tf_CType>
-			tf_CType const* f_Get() const;
+			tf_CType const *f_Get() const;
 
 			EResultDataType f_GetType() const;
 			NResultSet::CSubType f_GetSubType() const;
 
 			umint f_GetIndex() const;
 
-			CColumnValueIterator & operator ++ ();
+			CColumnValueIterator &operator ++ ();
 
 			explicit operator bool () const;
 
 		private:
-			CColumnValueIterator(CResultSet const& _ResultSet, umint _iRow, NContainer::TCVector<umint> const& _ColumnValueIterators, umint _iCol = 0);
+			CColumnValueIterator(CResultSet const &_ResultSet, umint _iRow, NContainer::TCVector<umint> const &_ColumnValueIterators, umint _iCol = 0);
 
 		private:
 			friend class CResultSet;
 
-			CResultSet const* mp_pResultSet;
+			CResultSet const *mp_pResultSet;
 			NContainer::TCVector<umint> mp_ColumnValueIterators;
 			umint mp_iRow;
 
@@ -182,7 +178,7 @@ namespace NMib::NDatabase
 			CRowIterator();
 
 			// Move to the next row
-			CRowIterator & operator ++ ();
+			CRowIterator &operator ++ ();
 
 			// Returns:
 			//	true: If the iterator points to a row within the result set.
@@ -191,14 +187,14 @@ namespace NMib::NDatabase
 
 			// Allows type-safe access to a specific key part of the current row.
 			template <typename tf_CType>
-			tf_CType const& f_GetKeyPart(umint _iKeyPart) const;
+			tf_CType const &f_GetKeyPart(umint _iKeyPart) const;
 
 			inline uint32 f_GetKeyPartValueIndex(umint _iKeyPart) const;
 
 			// Allows type-safe access to a specific column value of the current row.
 			// This may return nullptr if the row does not have a value for the specified column.
 			template <typename tf_CType>
-			tf_CType const* f_GetColumnValue(umint _iColumn) const;
+			tf_CType const *f_GetColumnValue(umint _iColumn) const;
 
 			// Returns an iterator allowing for iteration over each key part.
 			CKeyPartIterator f_GetKeyPartIterator() const;
@@ -218,15 +214,14 @@ namespace NMib::NDatabase
 		private:
 			friend class CResultSet;
 
-			CRowIterator(CResultSet const& _ResultSet, umint _iRow = 0);
+			CRowIterator(CResultSet const &_ResultSet, umint _iRow = 0);
 
-			CResultSet const* mp_pResultSet;
-			umint const mp_nRows;		// Cached from mp_pResultSet
+			CResultSet const *mp_pResultSet;
+			umint const mp_nRows; // Cached from mp_pResultSet
 
-			umint mp_iCurRow;	// The index of the current row , The iterator is only valid if within bounds [0, mp_pResultSet->f_GetNumRows).
+			umint mp_iCurRow;                                    // The index of the current row , The iterator is only valid if within bounds [0, mp_pResultSet->f_GetNumRows).
 			NContainer::TCVector<umint> mp_ColumnValueIterators; // The position in each of the column sparse data vectors we are currently at.
 		};
-
 
 	private:
 		friend struct CColumnValueIterator;
@@ -235,7 +230,7 @@ namespace NMib::NDatabase
 
 	public:
 		CResultSet();
-		CResultSet(CResultSet&& _ToMove);
+		CResultSet(CResultSet &&_ToMove);
 		~CResultSet();
 
 		void f_Clear();
@@ -248,17 +243,17 @@ namespace NMib::NDatabase
 		EResultDataType f_GetKeyPartType(umint _iKeyPart) const;
 		NResultSet::CSubType f_GetKeyPartSubType(umint _iKeyPart) const;
 
-		template<typename t_CType>
-		NContainer::TCVector<t_CType> const& f_GetKeyPartValues(umint _iKeyPart) const;
+		template <typename t_CType>
+		NContainer::TCVector<t_CType> const &f_GetKeyPartValues(umint _iKeyPart) const;
 
 		EResultDataType f_GetColumnType(umint _iColumn) const;
 		NResultSet::CSubType f_GetColumnSubType(umint _iColumn) const;
 
 		umint f_GetNumRows() const;
 
-		CResultMetadata const*f_GetMetadata(uint32 _ID) const;
-		CResultMetadata const& f_GetKeyPartMetadata(umint _iKeyPart) const;
-		CResultMetadata const& f_GetColumnMetadata(umint _iKeyPart) const;
+		CResultMetadata const *f_GetMetadata(uint32 _ID) const;
+		CResultMetadata const &f_GetKeyPartMetadata(umint _iKeyPart) const;
+		CResultMetadata const &f_GetColumnMetadata(umint _iKeyPart) const;
 
 		CRowIterator f_GetRowIterator() const;
 		// Returns an iterator starting at the specified row allowing for iteration over each row.
@@ -272,9 +267,8 @@ namespace NMib::NDatabase
 	};
 }
 
-
 #include "Malterlib_Database_ResultSet.hpp"
 
 #ifndef DMibPNoShortCuts
-	using namespace NMib::NDatabase;
+using namespace NMib::NDatabase;
 #endif

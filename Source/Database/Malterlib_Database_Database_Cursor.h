@@ -43,11 +43,11 @@ namespace NMib::NDatabase
 		CDatabaseCursorCommon();
 		~CDatabaseCursorCommon();
 		CDatabaseCursorCommon(CDatabaseCursorCommon &&_Other);
-		CDatabaseCursorCommon &operator =(CDatabaseCursorCommon &&_Other);
+		CDatabaseCursorCommon &operator = (CDatabaseCursorCommon &&_Other);
 
 		struct CInternal;
 
-		operator bool() const;
+		operator bool () const;
 
 		CDatabaseValue const &f_Key() const;
 
@@ -71,8 +71,8 @@ namespace NMib::NDatabase
 		template <typename ...tfp_CKeys>
 		bool f_FindLowerBound(tfp_CKeys const & ...p_Keys);
 
-		void operator ++();
-		void operator --();
+		void operator ++ ();
+		void operator -- ();
 
 	protected:
 		CDatabaseCursorCommon(NStorage::TCUniquePointer<CInternal> &&_pInternal);

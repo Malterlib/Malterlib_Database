@@ -14,19 +14,12 @@ namespace NMib::NDatabase
 		CDatabaseEnvironment m_Environment;
 
 		CTestEnvironment(CTestEnvironment &&_Other);
-		CTestEnvironment &operator =(CTestEnvironment &&_Other);
+		CTestEnvironment &operator = (CTestEnvironment &&_Other);
 		CTestEnvironment();
 
 		~CTestEnvironment();
 	};
 
-	CTestEnvironment fg_GetTestEnvironment
-		(
-			NStr::CStr const &_FileName
-			, bool _bReset = true
-			, EDatabaseEnvironmentFlag _OpenFlags = EDatabaseEnvironmentFlag_None
-			, uint64 _MapSize = 0
-		)
-	;
+	CTestEnvironment fg_GetTestEnvironment(NStr::CStr const &_FileName, bool _bReset = true, EDatabaseEnvironmentFlag _OpenFlags = EDatabaseEnvironmentFlag_None, uint64 _MapSize = 0);
 }
 

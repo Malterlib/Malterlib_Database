@@ -108,7 +108,7 @@ namespace NMib::NDatabase
 	 *	<li>#MDB_DBS_FULL - too many databases have been opened. See #f_SetMaxDatabases().
 	 * </ul>
 	 */
-	CDatabaseSub CDatabaseTransactionCommon::fp_OpenDatabase(const char *_pName, EDatabaseSubFlag _Flags, CDatabaseSubProperties const &_Properties)
+	CDatabaseSub CDatabaseTransactionCommon::fp_OpenDatabase(char const *_pName, EDatabaseSubFlag _Flags, CDatabaseSubProperties const &_Properties)
 	{
 		using namespace NPrivate;
 		CDatabaseValue key, data;
@@ -148,12 +148,13 @@ namespace NMib::NDatabase
 
 		/* Is the DB already open? */
 		len = strlen(_pName);
-		for (i=CORE_DBS; i<txn->mt_numdbs; i++)
+		for (i = CORE_DBS; i < txn->mt_numdbs; i++)
 		{
 			if (!txn->mt_dbxs[i].m_DatabaseName.m_Size)
 			{
 				/* Remember this free slot */
-				if (!unused) unused = i;
+				if (!unused)
+					unused = i;
 				continue;
 			}
 			if (len == txn->mt_dbxs[i].m_DatabaseName.m_Size && !strncmp(_pName, (char const *)txn->mt_dbxs[i].m_DatabaseName.m_pData, len))
@@ -165,7 +166,7 @@ namespace NMib::NDatabase
 			DMibError("Out of database IDs");
 
 		/* Cannot mix named databases with some mainDB flags */
-		if (txn->mt_dbs[MAIN_DBI].md_flags & (EDatabaseSubFlag_SortedDuplicates|EDatabaseSubFlag_IntegerKeys))
+		if (txn->mt_dbs[MAIN_DBI].md_flags & (EDatabaseSubFlag_SortedDuplicates | EDatabaseSubFlag_IntegerKeys))
 		{
 			if (_Flags & EDatabaseSubFlag_Create)
 				DMibError(NStr::fg_Format("Database '{}' not found", _pName));
@@ -176,7 +177,7 @@ namespace NMib::NDatabase
 		}
 
 		/* Find the DB info */
-		dbflag = DB_NEW|DB_VALID|DB_USRVALID;
+		dbflag = DB_NEW | DB_VALID | DB_USRVALID;
 		exact = 0;
 		key.m_Size = len;
 		key.m_pData = (uint8 *)_pName;
@@ -186,10 +187,10 @@ namespace NMib::NDatabase
 		{
 			/* make sure this is actually a DB */
 			MDB_node *node = NODEPTR(mc.mc_pg[mc.mc_top], mc.mc_ki[mc.mc_top]);
-			if ((node->mn_flags & (F_DUPDATA|F_SUBDATA)) != F_SUBDATA)
+			if ((node->mn_flags & (F_DUPDATA | F_SUBDATA)) != F_SUBDATA)
 				DMibError("Named record is not a database");
 		}
-		else if (! (rc == MDB_NOTFOUND && (_Flags & EDatabaseSubFlag_Create)))
+		else if (!(rc == MDB_NOTFOUND && (_Flags & EDatabaseSubFlag_Create)))
 			DMibError(NStr::fg_Format("Error looking for database record: {}", NPrivate::mdb_strerror(rc)));
 
 		/* Done here so we cannot fail after creating a new DB */
@@ -205,7 +206,8 @@ namespace NMib::NDatabase
 			}
 		;
 
-		if (rc) {
+		if (rc)
+		{
 			/* MDB_NOTFOUND and EDatabaseSubFlag_Create: Create new DB */
 			data.m_Size = sizeof(MDB_db);
 			data.m_pData = (uint8 *)&dummy;
@@ -239,12 +241,7 @@ namespace NMib::NDatabase
 		}
 	}
 
-	CDatabaseSubReadTransaction CDatabaseReadTransaction::f_OpenDatabaseTransaction
-		(
-			const char *_pName
-			, EDatabaseSubFlag _Flags
-			, CDatabaseSubProperties const &_Properties
-		)
+	CDatabaseSubReadTransaction CDatabaseReadTransaction::f_OpenDatabaseTransaction(char const *_pName, EDatabaseSubFlag _Flags, CDatabaseSubProperties const &_Properties)
 	{
 		if (_pName && !f_HasDatabases())
 			DMibError("The database doesn't support sub-databases");
@@ -393,7 +390,8 @@ namespace NMib::NDatabase
 		char *pNamePointer = (char *)StaticDatabaseInfo.m_DatabaseName.m_pData;
 		umint NameSize = StaticDatabaseInfo.m_DatabaseName.m_Size;
 		/* If there was no name, this was already closed */
-		if (pNamePointer) {
+		if (pNamePointer)
+		{
 			StaticDatabaseInfo.m_DatabaseName.m_pData = nullptr;
 			StaticDatabaseInfo.m_DatabaseName.m_Size = 0;
 			Environment.me_dbflags[_DatabaseID] = 0;
@@ -437,7 +435,7 @@ namespace NMib::NDatabase
 			int rc = mdb_drop0(mc, mc->mc_db->md_flags & EDatabaseSubFlag_SortedDuplicates);
 			/* Invalidate the dropped DB's cursors */
 			for (m2 = mt_cursors[_DatabaseID]; m2; m2 = m2->mc_next)
-				m2->mc_flags &= ~(C_INITIALIZED|C_EOF);
+				m2->mc_flags &= ~(C_INITIALIZED | C_EOF);
 			if (rc)
 				DMibError(NStr::fg_Format("Error dropping database: {}", mdb_strerror(rc)));
 		}
