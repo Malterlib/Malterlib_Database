@@ -215,7 +215,7 @@ namespace NMib::NDatabase
 		, EDatabaseWriteFlag_NoOverwrite                 = 0x10    ///< For put: Don't write if the key already exists.
 		, EDatabaseWriteFlag_OverwriteAtCurrentCursorPos = 0x40    /// For mdb_cursor_put: overwrite the current key/data pair
 		, EDatabaseWriteFlag_ReserveSpace                = 0x10000 ///< For put: Just reserve space for data, don't copy it. Return a
-		                                                           ///< pointer to the reserved space.
+		                                                           ///<  pointer to the reserved space.
 		, EDatabaseWriteFlag_Append                      = 0x20000 ///< Data is being appended, don't split full pages.
 
 		// Dup data options
@@ -1818,15 +1818,15 @@ namespace NMib::NDatabase
 			, MDB_GET_BOTH_RANGE ///< position at key, nearest data. Only for #EDatabaseSubFlag_SortedDuplicates
 			, MDB_GET_CURRENT    ///< Return key/data at current cursor position
 			, MDB_GET_MULTIPLE   ///< Return up to a page of duplicate data items
-			                     ///	from current cursor position. Move cursor to prepare
-			                     ///	for #MDB_NEXT_MULTIPLE. Only for #EDatabaseSubFlag_SortedDuplicatesFixedSize
+			                     ///   from current cursor position. Move cursor to prepare
+			                     ///   for #MDB_NEXT_MULTIPLE. Only for #EDatabaseSubFlag_SortedDuplicatesFixedSize
 			, MDB_LAST           ///< Position at last key/data item
 			, MDB_LAST_DUP       ///< Position at last data item of current key. Only for #EDatabaseSubFlag_SortedDuplicates
 			, MDB_NEXT           ///< Position at next data item
 			, MDB_NEXT_DUP       ///< Position at next data item of current key. Only for #EDatabaseSubFlag_SortedDuplicates
 			, MDB_NEXT_MULTIPLE  ///< Return up to a page of duplicate data items
-			                     ///	from next cursor position. Move cursor to prepare
-			                     ///	for #MDB_NEXT_MULTIPLE. Only for #EDatabaseSubFlag_SortedDuplicatesFixedSize
+			                     ///   from next cursor position. Move cursor to prepare
+			                     ///   for #MDB_NEXT_MULTIPLE. Only for #EDatabaseSubFlag_SortedDuplicatesFixedSize
 			, MDB_NEXT_NODUP     ///< Position at first data item of next key
 			, MDB_PREV           ///< Position at previous data item
 			, MDB_PREV_DUP       ///< Position at previous data item of current key. Only for #EDatabaseSubFlag_SortedDuplicates

@@ -213,18 +213,18 @@ namespace NMib::NDatabase
 					mp_iCurRow = ArrayVariant.f_Get<EResultDataType_Binary>().f_GetLast().m_iRow;
 				break;
 				/* Deprecated:
-								case EResultDataType_int32:
-									if (!ArrayVariant.f_Get<EResultDataType_int32>().f_IsEmpty())
-										mp_iCurRow = ArrayVariant.f_Get<EResultDataType_int32>().f_GetLast().m_iRow;
-									break;
-								case EResultDataType_int64:
-									if (!ArrayVariant.f_Get<EResultDataType_int64>().f_IsEmpty())
-										mp_iCurRow = ArrayVariant.f_Get<EResultDataType_int64>().f_GetLast().m_iRow;
-									break;
-								case EResultDataType_fp32:
-									if (!ArrayVariant.f_Get<EResultDataType_fp32>().f_IsEmpty())
-										mp_iCurRow = ArrayVariant.f_Get<EResultDataType_fp32>().f_GetLast().m_iRow;
-									break;
+				case EResultDataType_int32:
+					if (!ArrayVariant.f_Get<EResultDataType_int32>().f_IsEmpty())
+						mp_iCurRow = ArrayVariant.f_Get<EResultDataType_int32>().f_GetLast().m_iRow;
+					break;
+				case EResultDataType_int64:
+					if (!ArrayVariant.f_Get<EResultDataType_int64>().f_IsEmpty())
+						mp_iCurRow = ArrayVariant.f_Get<EResultDataType_int64>().f_GetLast().m_iRow;
+					break;
+				case EResultDataType_fp32:
+					if (!ArrayVariant.f_Get<EResultDataType_fp32>().f_IsEmpty())
+						mp_iCurRow = ArrayVariant.f_Get<EResultDataType_fp32>().f_GetLast().m_iRow;
+					break;
 				*/
 			}
 		}

@@ -17,9 +17,9 @@ namespace NMib::NDatabase
 		, EResultDataType_uint64
 		, EResultDataType_Binary
 		/* Deprecated:
-				, EResultDataType_int32
-				, EResultDataType_int64
-				, EResultDataType_fp32
+		, EResultDataType_int32
+		, EResultDataType_int64
+		, EResultDataType_fp32
 		*/
 	};
 
@@ -97,9 +97,9 @@ namespace NMib::NDatabase
 				, NStorage::TCMember<NContainer::TCVector<uint64>, EResultDataType_uint64>
 				, NStorage::TCMember<NContainer::TCVector<CBlob>, EResultDataType_Binary>
 				/* Deprecated:
-					, NStorage::TCMember<NContainer::TCVector<int32>, EResultDataType_int32>
-					, NStorage::TCMember<NContainer::TCVector<int64>, EResultDataType_int64>
-					, NStorage::TCMember<NContainer::TCVector<fp32>, EResultDataType_fp32>
+				, NStorage::TCMember<NContainer::TCVector<int32>, EResultDataType_int32>
+				, NStorage::TCMember<NContainer::TCVector<int64>, EResultDataType_int64>
+				, NStorage::TCMember<NContainer::TCVector<fp32>, EResultDataType_fp32>
 				*/
 			>
 		;
@@ -146,9 +146,9 @@ namespace NMib::NDatabase
 				, NStorage::TCMember<NContainer::TCVector<TCSparseDataEntry<CBlob>>, EResultDataType_Binary>
 				/*
 				Deprecated
-					, NStorage::TCMember<NContainer::TCVector<TCSparseDataEntry<int32>>, EResultDataType_int32>
-					, NStorage::TCMember<NContainer::TCVector<TCSparseDataEntry<int64>>, EResultDataType_int64>
-					, NStorage::TCMember<NContainer::TCVector<TCSparseDataEntry<fp32>>, EResultDataType_fp32>
+				, NStorage::TCMember<NContainer::TCVector<TCSparseDataEntry<int32>>, EResultDataType_int32>
+				, NStorage::TCMember<NContainer::TCVector<TCSparseDataEntry<int64>>, EResultDataType_int64>
+				, NStorage::TCMember<NContainer::TCVector<TCSparseDataEntry<fp32>>, EResultDataType_fp32>
 				*/
 			>
 		;

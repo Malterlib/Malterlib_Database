@@ -151,15 +151,15 @@ namespace NMib::NDatabase
 				(*iKeyPartValues).f_Set<EResultDataType_Binary>();
 				break;
 				/* Deprecated:
-								case EResultDataType_int32:
-									(*iKeyPart).f_Set<EResultDataType_int32>();
-									break;
-								case EResultDataType_int64:
-									(*iKeyPart).f_Set<EResultDataType_int64>();
-									break;
-								case EResultDataType_fp32:
-									(*iKeyPart).f_Set<EResultDataType_fp32>();
-									break;
+				case EResultDataType_int32:
+					(*iKeyPart).f_Set<EResultDataType_int32>();
+					break;
+				case EResultDataType_int64:
+					(*iKeyPart).f_Set<EResultDataType_int64>();
+					break;
+				case EResultDataType_fp32:
+					(*iKeyPart).f_Set<EResultDataType_fp32>();
+					break;
 				*/
 			}
 
