@@ -7,7 +7,7 @@
 
 namespace NMib::NDatabase
 {
-	template <typename... tp_CTypes>
+	template <typename ...tp_CTypes>
 	struct TCDatabaseStreamLexicographic<NStorage::TCTuple<tp_CTypes...>, false>
 	{
 		template <typename tf_CStream>

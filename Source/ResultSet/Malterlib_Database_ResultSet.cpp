@@ -20,7 +20,7 @@ namespace NMib::NDatabase
 	{
 	}
 
-	CResultSet::CKeyPartIterator & CResultSet::CKeyPartIterator::operator ++ ()
+	CResultSet::CKeyPartIterator &CResultSet::CKeyPartIterator::operator ++ ()
 	{
 		++mp_iKeyPart;
 		return *this;
@@ -35,7 +35,7 @@ namespace NMib::NDatabase
 	// CResultSet::CKeyPartIterator Private Implementation
 	//
 
-	CResultSet::CKeyPartIterator::CKeyPartIterator(CResultSet const& _ResultSet, umint _iRow, umint _iKeyPart)
+	CResultSet::CKeyPartIterator::CKeyPartIterator(CResultSet const &_ResultSet, umint _iRow, umint _iKeyPart)
 		: mp_pResultSet(&_ResultSet)
 		, mp_iRow(_iRow)
 		, mp_nKeyParts(_ResultSet.mp_KeyPartInfos.f_GetLen())
@@ -58,7 +58,7 @@ namespace NMib::NDatabase
 	{
 	}
 
-	CResultSet::CColumnValueIterator & CResultSet::CColumnValueIterator::operator ++ ()
+	CResultSet::CColumnValueIterator &CResultSet::CColumnValueIterator::operator ++ ()
 	{
 		++mp_iColumn;
 		return *this;
@@ -73,15 +73,15 @@ namespace NMib::NDatabase
 	// CResultSet::CColumnValueIterator Private Implementation
 	//
 
-	CResultSet::CColumnValueIterator::CColumnValueIterator(CResultSet const& _ResultSet, umint _iRow, NContainer::TCVector<umint> const& _ColumnValueIterators, umint _iColumn)
+	CResultSet::CColumnValueIterator::CColumnValueIterator(CResultSet const &_ResultSet, umint _iRow, NContainer::TCVector<umint> const &_ColumnValueIterators, umint _iColumn)
 		: mp_pResultSet(&_ResultSet)
 		, mp_ColumnValueIterators(_ColumnValueIterators)
 		, mp_iRow(_iRow)
 		, mp_iColumn(0)
 	{
-		while(_iColumn)
+		while (_iColumn)
 		{
-			operator++();
+			operator ++ ();
 			--_iColumn;
 		}
 	}
@@ -97,7 +97,7 @@ namespace NMib::NDatabase
 	{
 	}
 
-	CResultSet::CRowIterator::CRowIterator(CResultSet const& _ResultSet, umint _iRow)
+	CResultSet::CRowIterator::CRowIterator(CResultSet const &_ResultSet, umint _iRow)
 		: mp_pResultSet(&_ResultSet)
 		, mp_nRows(_ResultSet.mp_nRows)
 		, mp_iCurRow(0)
@@ -105,12 +105,10 @@ namespace NMib::NDatabase
 		// Start all column value iterators off at the start.
 		mp_ColumnValueIterators.f_SetLen(mp_pResultSet->mp_Columns.f_GetLen());
 		for (auto &Index : mp_ColumnValueIterators)
-		{
 			Index = 0;
-		}
 		while (_iRow)
 		{
-			operator++();
+			operator ++ ();
 			--_iRow;
 		}
 	}
@@ -121,7 +119,7 @@ namespace NMib::NDatabase
 		// to visit each column and advance the corresponding value iterator
 		struct CRowIteratorAdvanceVisitor
 		{
-			umint & m_ColumnValueIterator;
+			umint &m_ColumnValueIterator;
 			umint m_iRow;
 
 			CRowIteratorAdvanceVisitor(umint &_ColumnValueIterator, umint _iRow)
@@ -131,7 +129,7 @@ namespace NMib::NDatabase
 			}
 
 			template <typename tf_CVector>
-			void operator ()(tf_CVector const& _Vector)
+			void operator () (tf_CVector const &_Vector)
 			{
 				umint VectorLen = _Vector.f_GetLen();
 				umint Iter = m_ColumnValueIterator;
@@ -143,7 +141,7 @@ namespace NMib::NDatabase
 		};
 	}
 
-	CResultSet::CRowIterator & CResultSet::CRowIterator::operator ++ ()
+	CResultSet::CRowIterator &CResultSet::CRowIterator::operator ++ ()
 	{
 		if (mp_iCurRow >= mp_nRows)
 			DMibErrorListBoundCheck("Row iterator out of bounds");
@@ -151,9 +149,7 @@ namespace NMib::NDatabase
 		umint iCurRow = ++mp_iCurRow;
 
 		auto iColumn = mp_pResultSet->mp_Columns.f_GetIterator();
-		for (auto iColumnValueIterator = mp_ColumnValueIterators.f_GetIterator()
-			;iColumnValueIterator
-			;++iColumn, ++iColumnValueIterator)
+		for (auto iColumnValueIterator = mp_ColumnValueIterators.f_GetIterator(); iColumnValueIterator; ++iColumn, ++iColumnValueIterator)
 		{
 			DMibCheck(iColumn);
 			CRowIteratorAdvanceVisitor Visitor(*iColumnValueIterator, iCurRow);
@@ -201,7 +197,7 @@ namespace NMib::NDatabase
 	{
 	}
 
-	CResultSet::CResultSet(CResultSet&& _ToMove)
+	CResultSet::CResultSet(CResultSet &&_ToMove)
 		: mp_Metadata(fg_Move(_ToMove.mp_Metadata))
 		, mp_KeyPartInfos(fg_Move(_ToMove.mp_KeyPartInfos))
 		, mp_ColumnInfos(fg_Move(_ToMove.mp_ColumnInfos))
@@ -210,7 +206,6 @@ namespace NMib::NDatabase
 		, mp_KeyPartRowValueIndices(fg_Move(_ToMove.mp_KeyPartRowValueIndices))
 		, mp_Columns(fg_Move(_ToMove.mp_Columns))
 	{
-
 	}
 
 	CResultSet::~CResultSet()
@@ -243,7 +238,6 @@ namespace NMib::NDatabase
 		return mp_ColumnInfos.f_GetLen();
 	}
 
-
 	EResultDataType CResultSet::f_GetKeyPartType(umint _iKeyPart) const
 	{
 		return mp_KeyPartInfos[_iKeyPart].m_Type;
@@ -252,7 +246,6 @@ namespace NMib::NDatabase
 	NResultSet::CSubType CResultSet::f_GetKeyPartSubType(umint _iKeyPart) const
 	{
 		return mp_KeyPartInfos[_iKeyPart].m_SubType;
-
 	}
 
 	EResultDataType CResultSet::f_GetColumnType(umint _iColumn) const
@@ -272,23 +265,23 @@ namespace NMib::NDatabase
 
 	struct CMetadataCompare
 	{
-		COrdering_Strong operator()(NResultSet::CMetadataEntry const &_A, NResultSet::CMetadataEntry const &_B) const
+		COrdering_Strong operator () (NResultSet::CMetadataEntry const &_A, NResultSet::CMetadataEntry const &_B) const
 		{
 			return _A.m_ID <=> _B.m_ID;
 		}
 
-		COrdering_Strong operator()(NResultSet::CMetadataEntry const& _A, uint32 _B) const
+		COrdering_Strong operator () (NResultSet::CMetadataEntry const &_A, uint32 _B) const
 		{
 			return _A.m_ID <=> _B;
 		}
 
-		COrdering_Strong operator()(uint32 _A, NResultSet::CMetadataEntry const& _B) const
+		COrdering_Strong operator () (uint32 _A, NResultSet::CMetadataEntry const &_B) const
 		{
 			return _A <=> _B.m_ID;
 		}
 	};
 
-	CResultMetadata const* CResultSet::f_GetMetadata(uint32 _ID) const
+	CResultMetadata const *CResultSet::f_GetMetadata(uint32 _ID) const
 	{
 		CMetadataCompare Compare;
 		aint iMetadata = mp_Metadata.f_BinarySearch(Compare, _ID);
@@ -298,16 +291,15 @@ namespace NMib::NDatabase
 			return &mp_Metadata[iMetadata].m_Data;
 	}
 
-	CResultMetadata const& CResultSet::f_GetKeyPartMetadata(umint _iKeyPart) const
+	CResultMetadata const &CResultSet::f_GetKeyPartMetadata(umint _iKeyPart) const
 	{
 		return mp_KeyPartInfos[_iKeyPart].m_Metadata;
 	}
 
-	CResultMetadata const& CResultSet::f_GetColumnMetadata(umint _iKeyPart) const
+	CResultMetadata const &CResultSet::f_GetColumnMetadata(umint _iKeyPart) const
 	{
 		return mp_ColumnInfos[_iKeyPart].m_Metadata;
 	}
-
 
 	CResultSet::CRowIterator CResultSet::f_GetRowIterator() const
 	{

@@ -60,7 +60,6 @@ Repository
 	}
 }
 
-
 Property
 {
 	MalterlibLibrary_Database: bool = MalterlibLibrary_All

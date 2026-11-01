@@ -70,7 +70,8 @@ namespace NMib::NDatabase
 
 		co_await
 			(
-				g_Dispatch(_WriteTransaction.mp_Checkout.f_Actor()) / [this, pCanDestroy = mp_pCanDestroyTracker, WriteTransaction = fg_Move(_WriteTransaction), _MaxSize]() mutable -> TCFuture<void>
+				g_Dispatch(_WriteTransaction.mp_Checkout.f_Actor()) / [this, pCanDestroy = mp_pCanDestroyTracker, WriteTransaction = fg_Move(_WriteTransaction), _MaxSize]
+				() mutable -> TCFuture<void>
 				{
 					CStr OriginalPath = mp_DatabaseEnvironment.f_GetPath();
 					CStr CompactTempPath = OriginalPath + ".compact";
@@ -96,7 +97,6 @@ namespace NMib::NDatabase
 						NewDatabaseEnvironment.f_Open(CompactTempPath, gc_EnvironmentFlags, Attribs);
 						OutTransaction = NewDatabaseEnvironment.f_BeginWriteTransaction();
 						OutDatabase = OutTransaction.f_OpenDatabase();
-
 					}
 
 					{
@@ -229,12 +229,7 @@ namespace NMib::NDatabase
 
 	CDatabaseActor::CTransactionRead::~CTransactionRead() = default;
 
-	CDatabaseSubReadTransaction CDatabaseActor::CTransactionRead::f_OpenDatabaseTransaction
-		(
-			ch8 const *_pName
-			, EDatabaseSubFlag _Flags
-			, CDatabaseSubProperties const &_Properties
-		)
+	CDatabaseSubReadTransaction CDatabaseActor::CTransactionRead::f_OpenDatabaseTransaction(ch8 const *_pName, EDatabaseSubFlag _Flags, CDatabaseSubProperties const &_Properties)
 	{
 		return mp_pMainTransaction->f_OpenDatabaseTransaction(_pName, _Flags, _Properties);
 	}
@@ -307,12 +302,7 @@ namespace NMib::NDatabase
 
 	CDatabaseActor::CTransactionWrite::~CTransactionWrite() = default;
 
-	CDatabaseSub CDatabaseActor::CTransactionWrite::f_OpenDatabase
-		(
-			ch8 const *_pName
-			, EDatabaseSubFlag _Flags
-			, CDatabaseSubProperties const &_Properties
-		)
+	CDatabaseSub CDatabaseActor::CTransactionWrite::f_OpenDatabase(ch8 const *_pName, EDatabaseSubFlag _Flags, CDatabaseSubProperties const &_Properties)
 	{
 		return mp_pMainTransaction->f_OpenDatabase(_pName, _Flags, _Properties);
 	}
@@ -406,7 +396,7 @@ namespace NMib::NDatabase
 					auto *pReferences = mp_DatabaseEnvironment.f_GetReferencesPointer();
 					++(*pReferences);
 
-			#ifndef DMibClangAnalyzerWorkaround
+#ifndef DMibClangAnalyzerWorkaround
 					co_return CTransactionRead
 						{
 							g_BlockingActorSubscription / [this, ThisActor, pReferences, pState, pCanDestroy = fg_Move(pCanDestroy)]() mutable
@@ -443,10 +433,10 @@ namespace NMib::NDatabase
 							, fg_Move(Transaction)
 						}
 					;
-			#else
+#else
 					(void)Transaction;
 					co_return DMibErrorInstance("Workaround analyzer bug");
-			#endif
+#endif
 				}
 			)
 		;
@@ -497,7 +487,8 @@ namespace NMib::NDatabase
 #ifndef DMibClangAnalyzerWorkaround
 					co_return CTransactionWrite
 						{
-							g_ActorSubscription(BlockingActor) / [this, ThisActor, pReferences, pState, SequenceSubscription = fg_Move(SequenceSubscription), pCanDestroy = fg_Move(pCanDestroy)]() mutable
+							g_ActorSubscription(BlockingActor)
+							/ [this, ThisActor, pReferences, pState, SequenceSubscription = fg_Move(SequenceSubscription), pCanDestroy = fg_Move(pCanDestroy)]() mutable
 							{
 								pState.f_Clear();
 								--(*pReferences);

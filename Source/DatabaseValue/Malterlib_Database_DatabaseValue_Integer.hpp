@@ -15,6 +15,7 @@ namespace NMib::NDatabase
 			Value = _Value ^ (t_CType(1) << (sizeof(t_CType) * 8 - 1));
 			_Stream << Value;
 		}
+
 		template <typename tf_CStream>
 		static void fs_Decode(tf_CStream &_Stream, t_CType &o_Value)
 		{
@@ -32,6 +33,7 @@ namespace NMib::NDatabase
 		{
 			_Stream << _Value;
 		}
+
 		template <typename tf_CStream>
 		static void fs_Decode(tf_CStream &_Stream, t_CType &o_Value)
 		{
