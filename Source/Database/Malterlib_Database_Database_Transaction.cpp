@@ -123,12 +123,12 @@ namespace NMib::NDatabase
 	 * @return A non-zero error value on failure and 0 on success. Some possible
 	 * errors are:
 	 * <ul>
-	 *	<li>#MDB_PANIC - a fatal error occurred earlier and the environment
+	 *	<li>#DMdbPanic - a fatal error occurred earlier and the environment
 	 *		must be shut down.
-	 *	<li>#MDB_MAP_RESIZED - another process wrote data beyond this MDB_env's
+	 *	<li>#DMdbMapResized - another process wrote data beyond this MDB_env's
 	 *		mapsize and this environment's map must be resized as well.
 	 *		See #f_SetMapSize().
-	 *	<li>#MDB_READERS_FULL - a read-only transaction was requested and
+	 *	<li>#DMdbReadersFull - a read-only transaction was requested and
 	 *		the reader lock table is full. See #f_SetMaxReaders().
 	 *	<li>ENOMEM - out of memory.
 	 * </ul>
@@ -164,11 +164,11 @@ namespace NMib::NDatabase
 
 	void CDatabaseTransactionCommon::CInternal::fs_CheckBlocked(uint32 _Flags)
 	{
-		if (_Flags & MDB_TXN_FINISHED)
+		if (_Flags & DMdbTxnFinished)
 			DMibError("Transaction already finished");
-		if (_Flags & MDB_TXN_ERROR)
+		if (_Flags & DMdbTxnError)
 			DMibError("Transaction in error state");
-		if (_Flags & MDB_TXN_HAS_CHILD)
+		if (_Flags & DMdbTxnHasChild)
 			DMibError("Transtion has a child");
 	}
 
@@ -180,7 +180,7 @@ namespace NMib::NDatabase
 	void CDatabaseEnvironment_Internal::mdb_dbi_close(CDatabaseSubID dbi)
 	{
 		void *ptr;
-		if (dbi < CORE_DBS || dbi >= me_maxdbs)
+		if (dbi < DCoreDbs || dbi >= me_maxdbs)
 			return;
 
 		auto pStaticDasabaseInfo = m_StaticDasabaseInfo.f_GetArray();
@@ -227,7 +227,7 @@ namespace NMib::NDatabase
 		MDB_txn *txn = nullptr;
 		int size, tsize;
 
-		flags &= MDB_TXN_BEGIN_FLAGS;
+		flags &= DMdbTxnBeginFlags;
 		flags |= me_flags & EDatabaseEnvironmentFlag_WriteMap;
 
 		if (me_flags & EDatabaseEnvironmentFlag_ReadOnly & ~flags) // write txn in RDONLY env
@@ -237,9 +237,9 @@ namespace NMib::NDatabase
 		{
 			/* Nested transactions: Max 1 child, write txns only, no writemap */
 			flags |= parent->mt_flags;
-			if (parent->mt_flags & MDB_TXN_RDONLY)
+			if (parent->mt_flags & DMdbTxnReadOnly)
 				DMibError("Cannot create child transaction for read only transaction");
-			if (flags & MDB_TXN_RDONLY)
+			if (flags & DMdbTxnReadOnly)
 				DMibError("Child transactions cannot be read only");
 			if (flags & EDatabaseEnvironmentFlag_WriteMap)
 				DMibError("Child transactions are not supported for write map");
@@ -276,9 +276,9 @@ namespace NMib::NDatabase
 #ifdef DMibDatabase_Always64BitSupport
 			if (!parent)
 			{
-				txn->mt_rpages = (NPrivate::MDB_ID3L)NMemory::fg_Alloc(MDB_TRPAGE_SIZE * sizeof(MDB_ID3));
+				txn->mt_rpages = (NPrivate::MDB_ID3L)NMemory::fg_Alloc(DMdbTrpageSize * sizeof(MDB_ID3));
 				txn->mt_rpages[0].mid = 0;
-				txn->mt_rpcheck = MDB_TRPAGE_SIZE / 2;
+				txn->mt_rpcheck = DMdbTrpageSize / 2;
 			}
 #endif
 			txn->mt_dbxs = m_StaticDasabaseInfo.f_GetArray(); // static
@@ -292,7 +292,7 @@ namespace NMib::NDatabase
 		auto Cleanup2 = g_OnScopeExit / [&]
 			{
 				if (txn->mt_rpages)
-					NMemory::fg_Free(txn->mt_rpages, MDB_TRPAGE_SIZE * sizeof(MDB_ID3));
+					NMemory::fg_Free(txn->mt_rpages, DMdbTrpageSize * sizeof(MDB_ID3));
 			}
 		;
 #endif
@@ -301,13 +301,13 @@ namespace NMib::NDatabase
 			uint32 i;
 			txn->mt_cursors = (MDB_cursor **)(txn->mt_dbs + me_maxdbs);
 			txn->mt_dbiseqs = parent->mt_dbiseqs;
-			txn->mt_u.dirty_list = (MDB_ID2L)NMemory::fg_Alloc(sizeof(MDB_ID2) * MDB_IDL_UM_SIZE);
+			txn->mt_u.dirty_list = (MDB_ID2L)NMemory::fg_Alloc(sizeof(MDB_ID2) * DMdbIdlUmSize);
 			auto Cleanup3 = g_OnScopeExit / [&]
 				{
-					NMemory::fg_Free(txn->mt_u.dirty_list, sizeof(MDB_ID2) * MDB_IDL_UM_SIZE);
+					NMemory::fg_Free(txn->mt_u.dirty_list, sizeof(MDB_ID2) * DMdbIdlUmSize);
 				}
 			;
-			txn->mt_free_pgs = mdb_midl_alloc(MDB_IDL_UM_MAX);
+			txn->mt_free_pgs = mdb_midl_alloc(DMdbIdlUmMax);
 			auto Cleanup4 = g_OnScopeExit / [&]
 				{
 					mdb_txn_end(txn, MDB_END_FAIL_BEGINCHILD);
@@ -319,7 +319,7 @@ namespace NMib::NDatabase
 			txn->mt_u.dirty_list[0].mid = 0;
 			txn->mt_spill_pgs = nullptr;
 			txn->mt_next_pgno = parent->mt_next_pgno;
-			parent->mt_flags |= MDB_TXN_HAS_CHILD;
+			parent->mt_flags |= DMdbTxnHasChild;
 			parent->mt_child = txn;
 			txn->mt_parent = parent;
 			txn->mt_numdbs = parent->mt_numdbs;
@@ -327,14 +327,14 @@ namespace NMib::NDatabase
 			txn->mt_rpages = parent->mt_rpages;
 #endif
 			memcpy(txn->mt_dbs, parent->mt_dbs, txn->mt_numdbs * sizeof(MDB_db));
-			/* Copy parent's mt_dbflags, but clear DB_NEW */
+			/* Copy parent's mt_dbflags, but clear DDbNew */
 			for (i = 0; i < txn->mt_numdbs; i++)
-				txn->mt_dbflags[i] = parent->mt_dbflags[i] & ~DB_NEW;
+				txn->mt_dbflags[i] = parent->mt_dbflags[i] & ~DDbNew;
 			NPrivate::MDB_ntxn *ntxn = (MDB_ntxn *)txn;
 			ntxn->mnt_pgstate = me_pgstate; // save parent me_pgstate.mf_pghead & co
 			if (me_pgstate.mf_pghead)
 			{
-				umint size = MDB_IDL_SIZEOF(me_pgstate.mf_pghead);
+				umint size = DMdbIdlSizeof(me_pgstate.mf_pghead);
 				me_pgstate.mf_pghead = mdb_midl_alloc(me_pgstate.mf_pghead[0]);
 				memcpy(me_pgstate.mf_pghead, ntxn->mnt_pgstate.mf_pghead, size);
 			}
@@ -361,7 +361,7 @@ namespace NMib::NDatabase
 				, (flags & EDatabaseEnvironmentFlag_ReadOnly) ? "r" : "w"
 				, (void *)txn
 				, (void *)this
-				, txn->mt_dbs[MAIN_DBI].md_root
+				, txn->mt_dbs[DMainDbi].md_root
 			)
 		;
 
@@ -387,7 +387,7 @@ namespace NMib::NDatabase
 	bool CDatabaseTransactionCommon::f_HasDatabases() const
 	{
 		auto &Environment = *this->mp_pTransaction->mt_env;
-		return Environment.me_maxdbs > CORE_DBS;
+		return Environment.me_maxdbs > DCoreDbs;
 	}
 
 	CDatabaseTransactionCommon::CInternal *CDatabaseTransactionCommon::fp_GetInternal()
@@ -419,7 +419,7 @@ namespace NMib::NDatabase
 		MDB_env *env;
 
 		/* mdb_txn_end() mode for a commit which writes nothing */
-		end_mode = NPrivate::MDB_END_EMPTY_COMMIT | MDB_END_UPDATE | MDB_END_SLOT | MDB_END_FREE;
+		end_mode = NPrivate::MDB_END_EMPTY_COMMIT | DMdbEndUpdate | DMdbEndSlot | DMdbEndFree;
 
 		if (txn->mt_child)
 			DMibError("Transaction still has a child transaction");
@@ -432,16 +432,16 @@ namespace NMib::NDatabase
 
 		env = txn->mt_env;
 
-		if (F_ISSET(txn->mt_flags, MDB_TXN_RDONLY))
+		if (DFIsSet(txn->mt_flags, DMdbTxnReadOnly))
 			goto done;
 
-		if (txn->mt_flags & (MDB_TXN_FINISHED | MDB_TXN_ERROR))
+		if (txn->mt_flags & (DMdbTxnFinished | DMdbTxnError))
 		{
 			if (txn->mt_parent)
-				txn->mt_parent->mt_flags |= MDB_TXN_ERROR;
-			if (txn->mt_flags & MDB_TXN_FINISHED)
+				txn->mt_parent->mt_flags |= DMdbTxnError;
+			if (txn->mt_flags & DMdbTxnFinished)
 				DMibError("Transaction has already finished");
-			if (txn->mt_flags & MDB_TXN_ERROR)
+			if (txn->mt_flags & DMdbTxnError)
 				DMibError("Transaction has already failed");
 		}
 
@@ -457,7 +457,7 @@ namespace NMib::NDatabase
 			mdb_midl_append_list(&parent->mt_free_pgs, txn->mt_free_pgs);
 			mdb_midl_free(txn->mt_free_pgs);
 			/* Failures after this must either undo the changes
-			 * to the parent or set MDB_TXN_ERROR in the parent.
+			 * to the parent or set DMdbTxnError in the parent.
 			 */
 
 			parent->mt_next_pgno = txn->mt_next_pgno;
@@ -469,12 +469,12 @@ namespace NMib::NDatabase
 			/* Update parent's DB table. */
 			memcpy(parent->mt_dbs, txn->mt_dbs, txn->mt_numdbs * sizeof(MDB_db));
 			parent->mt_numdbs = txn->mt_numdbs;
-			parent->mt_dbflags[FREE_DBI] = txn->mt_dbflags[FREE_DBI];
-			parent->mt_dbflags[MAIN_DBI] = txn->mt_dbflags[MAIN_DBI];
-			for (i = CORE_DBS; i < txn->mt_numdbs; i++)
+			parent->mt_dbflags[DFreeDbi] = txn->mt_dbflags[DFreeDbi];
+			parent->mt_dbflags[DMainDbi] = txn->mt_dbflags[DMainDbi];
+			for (i = DCoreDbs; i < txn->mt_numdbs; i++)
 			{
-				/* preserve parent's DB_NEW status */
-				x = parent->mt_dbflags[i] & DB_NEW;
+				/* preserve parent's DDbNew status */
+				x = parent->mt_dbflags[i] & DDbNew;
 				parent->mt_dbflags[i] = txn->mt_dbflags[i] | x;
 			}
 
@@ -550,7 +550,7 @@ namespace NMib::NDatabase
 			}
 			else
 			{ // Simplify the above for single-ancestor case
-				len = MDB_IDL_UM_MAX - txn->mt_dirty_room;
+				len = DMdbIdlUmMax - txn->mt_dirty_room;
 			}
 
 			/* Merge our dirty list with parent's */
@@ -565,7 +565,7 @@ namespace NMib::NDatabase
 			}
 			DMibCheck(i == x);
 			dst[0].mid = len;
-			NMemory::fg_Free(txn->mt_u.dirty_list, sizeof(MDB_ID2) * MDB_IDL_UM_SIZE);
+			NMemory::fg_Free(txn->mt_u.dirty_list, sizeof(MDB_ID2) * DMdbIdlUmSize);
 			parent->mt_dirty_room = txn->mt_dirty_room;
 			if (txn->mt_spill_pgs)
 			{
@@ -575,7 +575,7 @@ namespace NMib::NDatabase
 					{
 						auto Cleanup = g_OnScopeExit / [&]()
 							{
-								parent->mt_flags |= MDB_TXN_ERROR;
+								parent->mt_flags |= DMdbTxnError;
 							}
 						;
 						mdb_midl_append_list(&parent->mt_spill_pgs, txn->mt_spill_pgs);
@@ -589,7 +589,7 @@ namespace NMib::NDatabase
 			}
 
 			/* Append our loose page list to parent's */
-			for (lp = &parent->mt_loose_pgs; *lp; lp = &NEXT_LOOSE_PAGE(*lp))
+			for (lp = &parent->mt_loose_pgs; *lp; lp = &DNextLoosePage(*lp))
 				;
 			*lp = txn->mt_loose_pgs;
 			parent->mt_loose_count += txn->mt_loose_count;
@@ -606,28 +606,28 @@ namespace NMib::NDatabase
 
 		mdb_cursors_close(txn, 0);
 
-		if (!txn->mt_u.dirty_list[0].mid && !(txn->mt_flags & (MDB_TXN_DIRTY | MDB_TXN_SPILLS)))
+		if (!txn->mt_u.dirty_list[0].mid && !(txn->mt_flags & (DMdbTxnDirty | DMdbTxnSpills)))
 			goto done;
 
-		DMibDatabaseTrace("committing txn {} {} on mdbenv {}, root page {}", txn->mt_txnid, (void *)txn, (void *)env, txn->mt_dbs[MAIN_DBI].md_root);
+		DMibDatabaseTrace("committing txn {} {} on mdbenv {}, root page {}", txn->mt_txnid, (void *)txn, (void *)env, txn->mt_dbs[DMainDbi].md_root);
 
 		/* Update DB root pointers */
-		if (txn->mt_numdbs > CORE_DBS)
+		if (txn->mt_numdbs > DCoreDbs)
 		{
 			MDB_cursor mc;
 			CDatabaseSubID i;
 			CDatabaseValue data;
 			data.m_Size = sizeof(MDB_db);
 
-			NPrivate::mdb_cursor_init(&mc, txn, MAIN_DBI, nullptr);
-			for (i = CORE_DBS; i < txn->mt_numdbs; i++)
+			NPrivate::mdb_cursor_init(&mc, txn, DMainDbi, nullptr);
+			for (i = DCoreDbs; i < txn->mt_numdbs; i++)
 			{
-				if (txn->mt_dbflags[i] & DB_DIRTY)
+				if (txn->mt_dbflags[i] & DDbDirty)
 				{
-					if (TXN_DBI_CHANGED(txn, i))
+					if (DTxnDbiChanged(txn, i))
 						DMibError("Stale write transaction");
 					data.m_pData = (uint8 *)&txn->mt_dbs[i];
-					int rc = mdb_cursor_put(&mc, &txn->mt_dbxs[i].m_DatabaseName, &data, (EDatabaseWriteFlag)F_SUBDATA);
+					int rc = mdb_cursor_put(&mc, &txn->mt_dbxs[i].m_DatabaseName, &data, (EDatabaseWriteFlag)DFSubData);
 					if (rc)
 						DMibError(NStr::fg_Format("Error updating root pointers: {}", mdb_strerror(rc)));
 				}
@@ -650,11 +650,11 @@ namespace NMib::NDatabase
 
 		if (int rc = mdb_page_flush(txn, 0))
 			DMibError(NStr::fg_Format("Error flushing pages: {}", mdb_strerror(rc)));
-		if (!F_ISSET(txn->mt_flags, MDB_TXN_NOSYNC))
+		if (!DFIsSet(txn->mt_flags, DMdbTxnNoSync))
 			env->mdb_env_sync0(0, txn->mt_next_pgno);
 		if (int rc = NPrivate::mdb_env_write_meta(txn))
 			DMibError(NStr::fg_Format("Error writing metadata: {}", mdb_strerror(rc)));
-		end_mode = MDB_END_COMMITTED | MDB_END_UPDATE;
+		end_mode = MDB_END_COMMITTED | DMdbEndUpdate;
 		if (env->me_flags & EDatabaseEnvironmentFlag_PreviousSnapshot)
 		{
 			if (!(env->me_flags & EDatabaseEnvironmentFlag_NoLock))
@@ -687,7 +687,7 @@ namespace NMib::NDatabase
 		if (txn->mt_child)
 			mdb_txn_abort(txn->mt_child);
 
-		mdb_txn_end(txn, unsigned(NPrivate::MDB_END_ABORT) | MDB_END_SLOT | MDB_END_FREE);
+		mdb_txn_end(txn, unsigned(NPrivate::MDB_END_ABORT) | DMdbEndSlot | DMdbEndFree);
 	}
 
 	/** @brief Reset a read-only transaction.
@@ -711,7 +711,7 @@ namespace NMib::NDatabase
 	{
 		auto pTransaction = mp_pTransaction.f_Get();
 		/* This call is only valid for read-only txns */
-		if (!(pTransaction->mt_flags & MDB_TXN_RDONLY))
+		if (!(pTransaction->mt_flags & DMdbTxnReadOnly))
 			DMibError("You cannot reset a write rtransaction");
 
 		NPrivate::mdb_txn_end(pTransaction, NPrivate::MDB_END_RESET);
@@ -728,7 +728,7 @@ namespace NMib::NDatabase
 	 * @return A non-zero error value on failure and 0 on success. Some possible
 	 * errors are:
 	 * <ul>
-	 *	<li>#MDB_PANIC - a fatal error occurred earlier and the environment
+	 *	<li>#DMdbPanic - a fatal error occurred earlier and the environment
 	 *		must be shut down.
 	 *	<li>EINVAL - an invalid parameter was specified.
 	 * </ul>
@@ -737,9 +737,9 @@ namespace NMib::NDatabase
 	{
 		auto pTransaction = mp_pTransaction.f_Get();
 
-		if (!(pTransaction->mt_flags & MDB_TXN_RDONLY))
+		if (!(pTransaction->mt_flags & DMdbTxnReadOnly))
 			DMibError("Only read only transactions can be reused");
-		if (!(pTransaction->mt_flags & MDB_TXN_FINISHED))
+		if (!(pTransaction->mt_flags & DMdbTxnFinished))
 			DMibError("Only finished transactions can be reused");
 
 		NPrivate::mdb_txn_renew0(pTransaction);
@@ -747,10 +747,10 @@ namespace NMib::NDatabase
 			(
 				"renew txn {}{} {} on mdbenv {}, root page {}"
 				, pTransaction->mt_txnid
-				, (pTransaction->mt_flags & MDB_TXN_RDONLY) ? "r" : "w"
+				, (pTransaction->mt_flags & DMdbTxnReadOnly) ? "r" : "w"
 				, (void *)pTransaction
 				, (void *)pTransaction->mt_env
-				, pTransaction->mt_dbs[MAIN_DBI].md_root
+				, pTransaction->mt_dbs[DMainDbi].md_root
 			)
 		;
 		return fg_Move(mp_pTransaction);
@@ -773,7 +773,7 @@ namespace NMib::NDatabase
 		uint16 x;
 		int new_notls = 0;
 
-		if ((flags &= MDB_TXN_RDONLY) != 0)
+		if ((flags &= DMdbTxnReadOnly) != 0)
 		{
 			if (!pLocksMemoryMap)
 			{
@@ -811,12 +811,12 @@ namespace NMib::NDatabase
 
 					{
 						int rc;
-						if (LOCK_MUTEX(rc, env, rmutex))
+						if (DLockMutex(rc, env, rmutex))
 							DMibError(NStr::fg_Format("Read mutex lock failed: {}", mdb_strerror(rc)));
 					}
 					auto Unlock = g_OnScopeExit / [&]()
 						{
-							UNLOCK_MUTEX(rmutex);
+							DUnlockMutex(rmutex);
 						}
 					;
 					nr = pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Load(NAtomic::gc_MemoryOrder_Relaxed);
@@ -867,7 +867,7 @@ namespace NMib::NDatabase
 			{
 				{
 					int rc;
-					if (LOCK_MUTEX(rc, env, env->me_wmutex))
+					if (DLockMutex(rc, env, env->me_wmutex))
 						DMibError(NStr::fg_Format("Write mutex lock failed: {}", mdb_strerror(rc)));
 					env->m_LockedThreadID = NSys::fg_Thread_GetCurrentUID();
 				}
@@ -887,7 +887,7 @@ namespace NMib::NDatabase
 			txn->mt_child = nullptr;
 			txn->mt_loose_pgs = nullptr;
 			txn->mt_loose_count = 0;
-			txn->mt_dirty_room = MDB_IDL_UM_MAX;
+			txn->mt_dirty_room = DMdbIdlUmMax;
 			txn->mt_u.dirty_list = env->me_dirty_list;
 			txn->mt_u.dirty_list[0].mid = 0;
 			txn->mt_free_pgs = env->me_free_pgs;
@@ -898,7 +898,7 @@ namespace NMib::NDatabase
 		}
 
 		/* Copy the DB info and flags */
-		memcpy(txn->mt_dbs, meta->mm_dbs, CORE_DBS * sizeof(MDB_db));
+		memcpy(txn->mt_dbs, meta->mm_dbs, DCoreDbs * sizeof(MDB_db));
 
 		/* Moved to here to avoid a data race in read TXNs */
 		txn->mt_next_pgno = meta->mm_last_pg + 1;
@@ -910,22 +910,22 @@ namespace NMib::NDatabase
 
 		/* Setup db info */
 		txn->mt_numdbs = env->me_numdbs;
-		for (i = CORE_DBS; i < txn->mt_numdbs; i++)
+		for (i = DCoreDbs; i < txn->mt_numdbs; i++)
 		{
 			x = env->me_dbflags[i];
-			txn->mt_dbs[i].md_flags = x & PERSISTENT_FLAGS;
-			txn->mt_dbflags[i] = (x & MDB_VALID) ? DB_VALID | DB_USRVALID | DB_STALE : 0;
+			txn->mt_dbs[i].md_flags = x & DPersistentFlags;
+			txn->mt_dbflags[i] = (x & DMdbValid) ? DDbValid | DDbUserValid | DDbStale : 0;
 		}
-		txn->mt_dbflags[MAIN_DBI] = DB_VALID | DB_USRVALID;
-		txn->mt_dbflags[FREE_DBI] = DB_VALID;
+		txn->mt_dbflags[DMainDbi] = DDbValid | DDbUserValid;
+		txn->mt_dbflags[DFreeDbi] = DDbValid;
 
 		auto Cleanup = g_OnScopeExit / [&]
 			{
-				NPrivate::mdb_txn_end(txn, new_notls /*0 or MDB_END_SLOT*/ | NPrivate::MDB_END_FAIL_BEGIN);
+				NPrivate::mdb_txn_end(txn, new_notls /*0 or DMdbEndSlot*/ | NPrivate::MDB_END_FAIL_BEGIN);
 			}
 		;
 
-		if (env->me_flags & MDB_FATAL_ERROR)
+		if (env->me_flags & DMdbFatalError)
 			DMibError("Database environment had fatal error, must shutdown!");
 		else if (env->me_maxpg < txn->mt_next_pgno)
 			DMibError("Database size changed");
@@ -942,12 +942,12 @@ namespace NMib::NDatabase
 		unsigned char *tdbflags = txn->mt_dbflags;
 
 		auto pStaticDatabasesInfos = env->m_StaticDasabaseInfo.f_GetArray();
-		for (i = n; --i >= CORE_DBS;)
+		for (i = n; --i >= DCoreDbs;)
 		{
-			if (tdbflags[i] & DB_NEW)
+			if (tdbflags[i] & DDbNew)
 			{
 				if (keep)
-					env->me_dbflags[i] = txn->mt_dbs[i].md_flags | MDB_VALID;
+					env->me_dbflags[i] = txn->mt_dbs[i].md_flags | DMdbValid;
 				else
 				{
 					auto &StaticDatabaseInfo = pStaticDatabasesInfos[i];
@@ -977,51 +977,51 @@ namespace NMib::NDatabase
 	{
 		MDB_env *env = txn->mt_env;
 #if DMibDatabaseDebug
-		static char const * const names[] = MDB_END_NAMES;
+		static char const * const names[] = DMdbEndNames;
 #endif
 
 		/* Export or close DBI handles opened in this txn */
-		mdb_dbis_update(txn, mode & MDB_END_UPDATE);
+		mdb_dbis_update(txn, mode & DMdbEndUpdate);
 
 		DMibDatabaseTrace
 			(
 				"{} txn {}{} {} on mdbenv {}, root page {}"
-				, names[mode & MDB_END_OPMASK]
+				, names[mode & DMdbEndOpmask]
 				, txn->mt_txnid
-				, (txn->mt_flags & MDB_TXN_RDONLY) ? "r" : "w"
+				, (txn->mt_flags & DMdbTxnReadOnly) ? "r" : "w"
 				, (void *)txn
 				, (void *)env
-				, txn->mt_dbs[MAIN_DBI].md_root
+				, txn->mt_dbs[DMainDbi].md_root
 			)
 		;
 
-		if (F_ISSET(txn->mt_flags, MDB_TXN_RDONLY))
+		if (DFIsSet(txn->mt_flags, DMdbTxnReadOnly))
 		{
 			if (txn->mt_u.reader)
 			{
 				txn->mt_u.reader->m_BeginReadTransactionID.f_Store((CTransactionID)-1, NAtomic::gc_MemoryOrder_Release);
 				if (!(env->me_flags & EDatabaseEnvironmentFlag_NoTls))
 					txn->mt_u.reader = nullptr; // txn does not own reader
-				else if (mode & MDB_END_SLOT)
+				else if (mode & DMdbEndSlot)
 				{
 					txn->mt_u.reader->m_OwningProcessID.f_Store(0, NAtomic::gc_MemoryOrder_Release);
 					txn->mt_u.reader = nullptr;
-				} // else txn owns the slot until it does MDB_END_SLOT
+				} // else txn owns the slot until it does DMdbEndSlot
 			}
 			txn->mt_numdbs = 0; // prevent further DBI activity
-			txn->mt_flags |= MDB_TXN_FINISHED;
+			txn->mt_flags |= DMdbTxnFinished;
 		}
-		else if (!F_ISSET(txn->mt_flags, MDB_TXN_FINISHED))
+		else if (!DFIsSet(txn->mt_flags, DMdbTxnFinished))
 		{
 			pgno_t *pghead = env->me_pgstate.mf_pghead;
 
-			if (!(mode & MDB_END_UPDATE)) // !(already closed cursors)
+			if (!(mode & DMdbEndUpdate)) // !(already closed cursors)
 				mdb_cursors_close(txn, 0);
 			if (!(env->me_flags & EDatabaseEnvironmentFlag_WriteMap))
 				mdb_dlist_free(txn);
 
 			txn->mt_numdbs = 0;
-			txn->mt_flags = MDB_TXN_FINISHED;
+			txn->mt_flags = DMdbTxnFinished;
 
 			if (!txn->mt_parent)
 			{
@@ -1038,17 +1038,17 @@ namespace NMib::NDatabase
 				if (env->m_pLocksMemoryMap)
 				{
 					DMibCheck(env->m_LockedThreadID == NSys::fg_Thread_GetCurrentUID())(env->m_LockedThreadID)(NSys::fg_Thread_GetCurrentUID());
-					UNLOCK_MUTEX(env->me_wmutex);
+					DUnlockMutex(env->me_wmutex);
 				}
 			}
 			else
 			{
 				txn->mt_parent->mt_child = nullptr;
-				txn->mt_parent->mt_flags &= ~MDB_TXN_HAS_CHILD;
+				txn->mt_parent->mt_flags &= ~DMdbTxnHasChild;
 				env->me_pgstate = ((MDB_ntxn *)txn)->mnt_pgstate;
 				mdb_midl_free(txn->mt_free_pgs);
 				mdb_midl_free(txn->mt_spill_pgs);
-				NMemory::fg_Free(txn->mt_u.dirty_list, sizeof(MDB_ID2) * MDB_IDL_UM_SIZE);
+				NMemory::fg_Free(txn->mt_u.dirty_list, sizeof(MDB_ID2) * DMdbIdlUmSize);
 			}
 
 			mdb_midl_free(pghead);
@@ -1062,7 +1062,7 @@ namespace NMib::NDatabase
 			pthread_mutex_lock(&env->me_rpmutex);
 			for (i = 1; i <= n; i++)
 			{
-				if (tl[i].mid & (MDB_RPAGE_CHUNK - 1))
+				if (tl[i].mid & (DMdbRpageChunk - 1))
 				{
 					/* tmp overflow pages that we didn't share in env */
 					munmap(tl[i].mptr, tl[i].mcnt * env->me_psize);
@@ -1081,18 +1081,18 @@ namespace NMib::NDatabase
 			}
 			pthread_mutex_unlock(&env->me_rpmutex);
 			tl[0].mid = 0;
-			if (mode & MDB_END_FREE)
-				NMemory::fg_Free(tl, MDB_TRPAGE_SIZE * sizeof(MDB_ID3));
+			if (mode & DMdbEndFree)
+				NMemory::fg_Free(tl, DMdbTrpageSize * sizeof(MDB_ID3));
 		}
 #endif
-		if (mode & MDB_END_FREE)
+		if (mode & DMdbEndFree)
 			env->mdb_txn_free(txn);
 	}
 
 	/** Save the freelist as of this transaction to the freeDB.
 	 * This changes the freelist. Keep trying until it stabilizes.
 	 *
-	 * When (MDB_DEVEL) & 2, the changes do not affect #mdb_page_alloc(),
+	 * When (DMdbDevel) & 2, the changes do not affect #mdb_page_alloc(),
 	 * it then uses the transaction's original snapshot of the freeDB.
 	 */
 	int NPrivate::mdb_freelist_save(MDB_txn *txn)
@@ -1109,13 +1109,13 @@ namespace NMib::NDatabase
 		pgno_t freecnt = 0, *free_pgs, *mop;
 		smint head_room = 0, total_room = 0, mop_len, clean_limit;
 
-		NPrivate::mdb_cursor_init(&mc, txn, FREE_DBI, nullptr);
+		NPrivate::mdb_cursor_init(&mc, txn, DFreeDbi, nullptr);
 
 		if (env->me_pgstate.mf_pghead)
 		{
 			/* Make sure first page of freeDB is touched and on freelist */
-			rc = NPrivate::mdb_page_search(&mc, nullptr, MDB_PS_FIRST | MDB_PS_MODIFY);
-			if (rc && rc != MDB_NOTFOUND)
+			rc = NPrivate::mdb_page_search(&mc, nullptr, DMdbPsFirst | DMdbPsModify);
+			if (rc && rc != DMdbNotFound)
 				return rc;
 		}
 
@@ -1129,11 +1129,11 @@ namespace NMib::NDatabase
 			unsigned x;
 			mdb_midl_need(&txn->mt_free_pgs, txn->mt_loose_count);
 
-			for (; mp; mp = NEXT_LOOSE_PAGE(mp))
+			for (; mp; mp = DNextLoosePage(mp))
 			{
 				mdb_midl_xappend(txn->mt_free_pgs, mp->mp_p.p_pgno);
 				/* must also remove from dirty list */
-				if (txn->mt_flags & MDB_TXN_WRITEMAP)
+				if (txn->mt_flags & DMdbTxnWriteMap)
 				{
 					for (x = 1; x <= dl[0].mid; x++)
 					{
@@ -1208,8 +1208,8 @@ namespace NMib::NDatabase
 				if (!freecnt)
 				{
 					/* Make sure last page of freeDB is touched and on freelist */
-					rc = NPrivate::mdb_page_search(&mc, nullptr, MDB_PS_LAST | MDB_PS_MODIFY);
-					if (rc && rc != MDB_NOTFOUND)
+					rc = NPrivate::mdb_page_search(&mc, nullptr, DMdbPsLast | DMdbPsModify);
+					if (rc && rc != DMdbNotFound)
 						return rc;
 				}
 				free_pgs = txn->mt_free_pgs;
@@ -1219,7 +1219,7 @@ namespace NMib::NDatabase
 				do
 				{
 					freecnt = free_pgs[0];
-					data.m_Size = MDB_IDL_SIZEOF(free_pgs);
+					data.m_Size = DMdbIdlSizeof(free_pgs);
 					rc = mdb_cursor_put(&mc, &key, &data, EDatabaseWriteFlag_ReserveSpace);
 					if (rc)
 						return rc;
@@ -1232,7 +1232,7 @@ namespace NMib::NDatabase
 #	if (DMibDatabaseDebug) > 1
 				{
 					uint32 i = free_pgs[0];
-					DMibDatabaseTrace("IDL write txn {} root {} num {}", txn->mt_txnid, txn->mt_dbs[FREE_DBI].md_root, i);
+					DMibDatabaseTrace("IDL write txn {} root {} num {}", txn->mt_txnid, txn->mt_dbs[DFreeDbi].md_root, i);
 					for (; i; i--)
 						DMibDatabaseTrace("IDL {}", free_pgs[i]);
 				}
@@ -1300,8 +1300,8 @@ namespace NMib::NDatabase
 			/* Room for loose pages + temp IDL with same */
 			mdb_midl_need(&env->me_pgstate.mf_pghead, 2 * count + 1);
 			mop = env->me_pgstate.mf_pghead;
-			loose = mop + MDB_IDL_ALLOCLEN(mop) - count;
-			for (count = 0; mp; mp = NEXT_LOOSE_PAGE(mp))
+			loose = mop + DMdbIdlAlloclen(mop) - count;
+			for (count = 0; mp; mp = DNextLoosePage(mp))
 				loose[++count] = mp->mp_p.p_pgno;
 			loose[0] = count;
 			mdb_midl_sort(loose);
@@ -1312,7 +1312,7 @@ namespace NMib::NDatabase
 		}
 
 		/* Fill in the reserved me_pgstate.mf_pghead records */
-		rc = MDB_SUCCESS;
+		rc = DMdbSuccess;
 		if (mop_len)
 		{
 			CDatabaseValue key, data;

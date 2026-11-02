@@ -49,14 +49,14 @@ namespace NMib::NDatabase::NPrivate
 		LARGE_INTEGER fsize;
 
 		if (!GetFileSizeEx(fd, &fsize))
-			DMibError(NStr::fg_Format("Error getting file size: {}", ErrCode()));
+			DMibError(NStr::fg_Format("Error getting file size: {}", DErrCode()));
 
 		return fsize.QuadPart;
 #else
 		struct stat st;
 
 		if (fstat(fd, &st))
-			DMibError(NStr::fg_Format("Error getting file size: {}", ErrCode()));
+			DMibError(NStr::fg_Format("Error getting file size: {}", DErrCode()));
 
 		return st.st_size;
 #endif

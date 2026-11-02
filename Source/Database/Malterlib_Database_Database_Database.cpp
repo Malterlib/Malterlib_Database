@@ -103,9 +103,9 @@ namespace NMib::NDatabase
 	 * @return A non-zero error value on failure and 0 on success. Some possible
 	 * errors are:
 	 * <ul>
-	 *	<li>#MDB_NOTFOUND - the specified database doesn't exist in the environment
+	 *	<li>#DMdbNotFound - the specified database doesn't exist in the environment
 	 *		and #EDatabaseSubFlag_Create was not specified.
-	 *	<li>#MDB_DBS_FULL - too many databases have been opened. See #f_SetMaxDatabases().
+	 *	<li>#DMdbDbsFull - too many databases have been opened. See #f_SetMaxDatabases().
 	 * </ul>
 	 */
 	CDatabaseSub CDatabaseTransactionCommon::fp_OpenDatabase(char const *_pName, EDatabaseSubFlag _Flags, CDatabaseSubProperties const &_Properties)
@@ -119,7 +119,7 @@ namespace NMib::NDatabase
 		uint32 unused = 0, seq;
 		umint len;
 
-		if (_Flags & ~VALID_FLAGS)
+		if (_Flags & ~DValidFlags)
 			DMibError("Invalid flags specified");
 
 		auto txn = mp_pTransaction.f_Get();
@@ -129,26 +129,26 @@ namespace NMib::NDatabase
 		/* main DB? */
 		if (!_pName)
 		{
-			if (_Flags & PERSISTENT_FLAGS)
+			if (_Flags & DPersistentFlags)
 			{
-				uint16 f2 = _Flags & PERSISTENT_FLAGS;
+				uint16 f2 = _Flags & DPersistentFlags;
 				/* make sure flag changes get committed */
-				if ((txn->mt_dbs[MAIN_DBI].md_flags | f2) != txn->mt_dbs[MAIN_DBI].md_flags)
+				if ((txn->mt_dbs[DMainDbi].md_flags | f2) != txn->mt_dbs[DMainDbi].md_flags)
 				{
-					txn->mt_dbs[MAIN_DBI].md_flags |= f2;
-					txn->mt_flags |= MDB_TXN_DIRTY;
+					txn->mt_dbs[DMainDbi].md_flags |= f2;
+					txn->mt_flags |= DMdbTxnDirty;
 				}
 			}
-			mdb_default_cmp(txn, MAIN_DBI);
-			return MAIN_DBI;
+			mdb_default_cmp(txn, DMainDbi);
+			return DMainDbi;
 		}
 
-		if (txn->mt_dbxs[MAIN_DBI].m_fKeyCompare.f_IsEmpty())
-			mdb_default_cmp(txn, MAIN_DBI);
+		if (txn->mt_dbxs[DMainDbi].m_fKeyCompare.f_IsEmpty())
+			mdb_default_cmp(txn, DMainDbi);
 
 		/* Is the DB already open? */
 		len = strlen(_pName);
-		for (i = CORE_DBS; i < txn->mt_numdbs; i++)
+		for (i = DCoreDbs; i < txn->mt_numdbs; i++)
 		{
 			if (!txn->mt_dbxs[i].m_DatabaseName.m_Size)
 			{
@@ -166,31 +166,31 @@ namespace NMib::NDatabase
 			DMibError("Out of database IDs");
 
 		/* Cannot mix named databases with some mainDB flags */
-		if (txn->mt_dbs[MAIN_DBI].md_flags & (EDatabaseSubFlag_SortedDuplicates | EDatabaseSubFlag_IntegerKeys))
+		if (txn->mt_dbs[DMainDbi].md_flags & (EDatabaseSubFlag_SortedDuplicates | EDatabaseSubFlag_IntegerKeys))
 		{
 			if (_Flags & EDatabaseSubFlag_Create)
 				DMibError(NStr::fg_Format("Database '{}' not found", _pName));
-			else if (txn->mt_dbs[MAIN_DBI].md_flags & (EDatabaseSubFlag_SortedDuplicates))
+			else if (txn->mt_dbs[DMainDbi].md_flags & (EDatabaseSubFlag_SortedDuplicates))
 				DMibError("Named databases not supported when main database is dupsort");
-			else if (txn->mt_dbs[MAIN_DBI].md_flags & (EDatabaseSubFlag_IntegerKeys))
+			else if (txn->mt_dbs[DMainDbi].md_flags & (EDatabaseSubFlag_IntegerKeys))
 				DMibError("Named databases not supported when main database is integer key");
 		}
 
 		/* Find the DB info */
-		dbflag = DB_NEW | DB_VALID | DB_USRVALID;
+		dbflag = DDbNew | DDbValid | DDbUserValid;
 		exact = 0;
 		key.m_Size = len;
 		key.m_pData = (uint8 *)_pName;
-		mdb_cursor_init(&mc, txn, MAIN_DBI, nullptr);
+		mdb_cursor_init(&mc, txn, DMainDbi, nullptr);
 		int rc = mdb_cursor_set(&mc, &key, &data, MDB_SET, &exact);
-		if (rc == MDB_SUCCESS)
+		if (rc == DMdbSuccess)
 		{
 			/* make sure this is actually a DB */
-			MDB_node *node = NODEPTR(mc.mc_pg[mc.mc_top], mc.mc_ki[mc.mc_top]);
-			if ((node->mn_flags & (F_DUPDATA | F_SUBDATA)) != F_SUBDATA)
+			MDB_node *node = DNodePtr(mc.mc_pg[mc.mc_top], mc.mc_ki[mc.mc_top]);
+			if ((node->mn_flags & (DFDupData | DFSubData)) != DFSubData)
 				DMibError("Named record is not a database");
 		}
-		else if (!(rc == MDB_NOTFOUND && (_Flags & EDatabaseSubFlag_Create)))
+		else if (!(rc == DMdbNotFound && (_Flags & EDatabaseSubFlag_Create)))
 			DMibError(NStr::fg_Format("Error looking for database record: {}", NPrivate::mdb_strerror(rc)));
 
 		/* Done here so we cannot fail after creating a new DB */
@@ -208,16 +208,16 @@ namespace NMib::NDatabase
 
 		if (rc)
 		{
-			/* MDB_NOTFOUND and EDatabaseSubFlag_Create: Create new DB */
+			/* DMdbNotFound and EDatabaseSubFlag_Create: Create new DB */
 			data.m_Size = sizeof(MDB_db);
 			data.m_pData = (uint8 *)&dummy;
 			memset(&dummy, 0, sizeof(dummy));
-			dummy.md_root = P_INVALID;
-			dummy.md_flags = _Flags & PERSISTENT_FLAGS;
-			rc = mdb_cursor_put(&mc, &key, &data, (EDatabaseWriteFlag)F_SUBDATA);
+			dummy.md_root = DPInvalid;
+			dummy.md_flags = _Flags & DPersistentFlags;
+			rc = mdb_cursor_put(&mc, &key, &data, (EDatabaseWriteFlag)DFSubData);
 			if (rc)
 				DMibError(NStr::fg_Format("Error creating database record: {}", NPrivate::mdb_strerror(rc)));
-			dbflag |= DB_DIRTY;
+			dbflag |= DDbDirty;
 		}
 
 		{
@@ -305,12 +305,12 @@ namespace NMib::NDatabase
 	void DMibDatabaseInfrequentSection CDatabaseTransactionCommon::CInternal::f_PrepareStatisticsQuery(CDatabaseSubID _DatabaseID)
 	{
 		using namespace NPrivate;
-		if (!TXN_DBI_EXIST(this, _DatabaseID, DB_VALID))
+		if (!DTxnDbiExist(this, _DatabaseID, DDbValid))
 			DMibError("Database does not exist");
 
 		f_CheckBlocked();
 
-		if (mt_dbflags[_DatabaseID] & DB_STALE)
+		if (mt_dbflags[_DatabaseID] & DDbStale)
 		{
 			MDB_cursor mc;
 			MDB_xcursor mx;
@@ -359,10 +359,10 @@ namespace NMib::NDatabase
 	 */
 	uint32 CDatabaseTransactionCommon::CInternal::f_DatabaseFlags(CDatabaseSubID _DatabaseID)
 	{
-		/* We could return the flags for the FREE_DBI too but what's the point? */
-		if (!TXN_DBI_EXIST(this, _DatabaseID, DB_USRVALID))
+		/* We could return the flags for the DFreeDbi too but what's the point? */
+		if (!DTxnDbiExist(this, _DatabaseID, DDbUserValid))
 			DMibError("Database does not exists");
-		return mt_dbs[_DatabaseID].md_flags & PERSISTENT_FLAGS;
+		return mt_dbs[_DatabaseID].md_flags & DPersistentFlags;
 	}
 
 	/** @brief Close a database handle. Normally unnecessary. Use with care:
@@ -372,7 +372,7 @@ namespace NMib::NDatabase
 	 * the database handle or one of its cursors any further. Do not close
 	 * a handle if an existing transaction has modified its database.
 	 * Doing so can cause misbehavior from database corruption to errors
-	 * like MDB_BAD_VALSIZE (since the DB name is gone).
+	 * like DMdbBadValsize (since the DB name is gone).
 	 *
 	 * Closing a database handle is not necessary, but lets #f_OpenDatabase()
 	 * reuse the handle value.  Usually it's better to set a bigger
@@ -384,7 +384,7 @@ namespace NMib::NDatabase
 	void CDatabaseEnvironment::fp_CloseDatabase(CDatabaseSubID _DatabaseID)
 	{
 		auto &Environment = *mp_pEnvironment;
-		if (_DatabaseID < CORE_DBS || _DatabaseID >= Environment.me_maxdbs)
+		if (_DatabaseID < DCoreDbs || _DatabaseID >= Environment.me_maxdbs)
 			return;
 		auto &StaticDatabaseInfo = Environment.m_StaticDasabaseInfo[_DatabaseID];
 		char *pNamePointer = (char *)StaticDatabaseInfo.m_DatabaseName.m_pData;
@@ -414,13 +414,13 @@ namespace NMib::NDatabase
 		using namespace NPrivate;
 		MDB_cursor *mc, *m2;
 
-		if (!TXN_DBI_EXIST(this, _DatabaseID, DB_USRVALID))
+		if (!DTxnDbiExist(this, _DatabaseID, DDbUserValid))
 			DMibError("Database does not exists");
 
-		if (F_ISSET(mt_flags, MDB_TXN_RDONLY))
+		if (DFIsSet(mt_flags, DMdbTxnReadOnly))
 			DMibError("Cannot drop database with read only transaction");
 
-		if (TXN_DBI_CHANGED(this, _DatabaseID))
+		if (DTxnDbiChanged(this, _DatabaseID))
 			DMibError("Stale write transaction");
 
 		mc = f_Cursor(_DatabaseID);
@@ -435,38 +435,38 @@ namespace NMib::NDatabase
 			int rc = mdb_drop0(mc, mc->mc_db->md_flags & EDatabaseSubFlag_SortedDuplicates);
 			/* Invalidate the dropped DB's cursors */
 			for (m2 = mt_cursors[_DatabaseID]; m2; m2 = m2->mc_next)
-				m2->mc_flags &= ~(C_INITIALIZED | C_EOF);
+				m2->mc_flags &= ~(DCInitialized | DCEof);
 			if (rc)
 				DMibError(NStr::fg_Format("Error dropping database: {}", mdb_strerror(rc)));
 		}
 
 		/* Can't delete the main DB */
-		if (_bDelete && _DatabaseID >= CORE_DBS)
+		if (_bDelete && _DatabaseID >= DCoreDbs)
 		{
-			int rc = mdb_del0(this, MAIN_DBI, &mc->mc_dbx->m_DatabaseName, nullptr, (EDatabaseWriteFlag)F_SUBDATA);
+			int rc = mdb_del0(this, DMainDbi, &mc->mc_dbx->m_DatabaseName, nullptr, (EDatabaseWriteFlag)DFSubData);
 			if (!rc)
 			{
-				mt_dbflags[_DatabaseID] = DB_STALE;
+				mt_dbflags[_DatabaseID] = DDbStale;
 				mt_env->mdb_dbi_close(_DatabaseID);
 			}
 			else
 			{
-				mt_flags |= MDB_TXN_ERROR;
+				mt_flags |= DMdbTxnError;
 				DMibError(NStr::fg_Format("Error deleting database: {}", mdb_strerror(rc)));
 			}
 		}
 		else
 		{
 			/* reset the DB record, mark it dirty */
-			mt_dbflags[_DatabaseID] |= DB_DIRTY;
+			mt_dbflags[_DatabaseID] |= DDbDirty;
 			mt_dbs[_DatabaseID].md_depth = 0;
 			mt_dbs[_DatabaseID].md_branch_pages = 0;
 			mt_dbs[_DatabaseID].md_leaf_pages = 0;
 			mt_dbs[_DatabaseID].md_overflow_pages = 0;
 			mt_dbs[_DatabaseID].md_entries = 0;
-			mt_dbs[_DatabaseID].md_root = P_INVALID;
+			mt_dbs[_DatabaseID].md_root = DPInvalid;
 
-			mt_flags |= MDB_TXN_DIRTY;
+			mt_flags |= DMdbTxnDirty;
 		}
 	}
 
@@ -491,7 +491,7 @@ namespace NMib::NDatabase
 	 */
 	void CDatabaseTransactionCommon::CInternal::f_SetDatabaseKeyCompare(CDatabaseSubID _DatabaseID, FDatabaseCompare &&_fCompare)
 	{
-		if (!TXN_DBI_EXIST(this, _DatabaseID, DB_USRVALID))
+		if (!DTxnDbiExist(this, _DatabaseID, DDbUserValid))
 			DMibError("Database does not exists");
 
 		mt_dbxs[_DatabaseID].m_fKeyCompare = fg_Move(_fCompare);
@@ -520,7 +520,7 @@ namespace NMib::NDatabase
 	 */
 	void CDatabaseTransactionCommon::CInternal::f_SetDatabaseDataCompare(CDatabaseSubID _DatabaseID, FDatabaseCompare &&_fCompare)
 	{
-		if (!TXN_DBI_EXIST(this, _DatabaseID, DB_USRVALID))
+		if (!DTxnDbiExist(this, _DatabaseID, DDbUserValid))
 			DMibError("Database does not exists");
 
 		mt_dbxs[_DatabaseID].m_fDataCompare = fg_Move(_fCompare);

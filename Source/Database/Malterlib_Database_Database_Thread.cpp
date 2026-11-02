@@ -59,7 +59,7 @@ namespace NMib::NDatabase
 	 *	to 1088 keys. Let's assume nobody opens more than 64 environments
 	 *	in a single process, for now. They can override this if needed.
 	 */
-	pthread_key_t NPrivate::mdb_tls_keys[MAX_TLS_KEYS];
+	pthread_key_t NPrivate::mdb_tls_keys[DMaxTlsKeys];
 	int NPrivate::mdb_tls_nkeys = 0;
 
 	namespace

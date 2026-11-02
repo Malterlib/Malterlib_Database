@@ -38,7 +38,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 namespace NMib::NDatabase::NPrivate
 {
-#ifdef MDB_USE_HASH
+#ifdef DMdbUseHash
 	/*
 	 * hash_64 - 64 bit Fowler/Noll/Vo-0 FNV-1a hash code
 	 *
@@ -110,14 +110,14 @@ namespace NMib::NDatabase::NPrivate
 		*out = '\0';
 	}
 
-	/** Init #MDB_env.me_mutexname[] except the char which #MUTEXNAME() will set.
-	 *	Changes to this code must be reflected in #MDB_LOCK_FORMAT.
+	/** Init #MDB_env.me_mutexname[] except the char which #DMutexName() will set.
+	 *	Changes to this code must be reflected in #DMdbLockFormat.
 	 */
 	void DMibDatabaseInfrequentSection mdb_env_mname_init(MDB_env *env)
 	{
 		char *nm = env->me_mutexname;
-		strcpy(nm, MUTEXNAME_PREFIX);
-		mdb_pack85(env->m_pLocksMemoryMap->m_TransactionBody.mtb_mutexid, nm + sizeof(MUTEXNAME_PREFIX));
+		strcpy(nm, DMutexNamePrefix);
+		mdb_pack85(env->m_pLocksMemoryMap->m_TransactionBody.mtb_mutexid, nm + sizeof(DMutexNamePrefix));
 	}
 
 	/** Return env->me_mutexname after filling in ch ('r'/'w') for convenience */

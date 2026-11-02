@@ -60,7 +60,7 @@ namespace NMib::NDatabase
 	 * @return A non-zero error value on failure and 0 on success. Some possible
 	 * errors are:
 	 * <ul>
-	 *	<li>#MDB_NOTFOUND - the key was not in the database.
+	 *	<li>#DMdbNotFound - the key was not in the database.
 	 *	<li>EINVAL - an invalid parameter was specified.
 	 * </ul>
 	 */
@@ -73,11 +73,11 @@ namespace NMib::NDatabase
 		MDB_cursor mc;
 		MDB_xcursor mx;
 		int exact = 0;
-		DKBUF;
+		DKBuf;
 
-		DMibDatabaseTrace("===> get db {} key [{}]", dbi, DKEY(key));
+		DMibDatabaseTrace("===> get db {} key [{}]", dbi, DKey(key));
 
-		if (!TXN_DBI_EXIST(this, dbi, DB_USRVALID))
+		if (!DTxnDbiExist(this, dbi, DDbUserValid))
 			DMibError("Database does not exists");
 
 		f_CheckBlocked();
@@ -87,7 +87,7 @@ namespace NMib::NDatabase
 			int rc = mdb_cursor_set(&mc, key, data, MDB_SET, &exact);
 			if (rc)
 			{
-				if (rc == MDB_NOTFOUND)
+				if (rc == DMdbNotFound)
 					return false;
 				DMibError(NStr::fg_Format("Error setting data: {}", mdb_strerror(rc)));
 			}
@@ -95,7 +95,7 @@ namespace NMib::NDatabase
 		/* unref all the pages when DMibDatabase_Always64BitSupport - caller must copy the data
 		 * before doing anything else
 		 */
-		MDB_CURSOR_UNREF(&mc, 1);
+		DMdbCursorUnref(&mc, 1);
 		return true;
 	}
 
@@ -116,11 +116,11 @@ namespace NMib::NDatabase
 	 *	<li>#EDatabaseWriteFlag_NoDuplicateData - enter the new key/data pair only if it does not
 	 *		already appear in the database. This flag may only be specified
 	 *		if the database was opened with #EDatabaseSubFlag_SortedDuplicates. The function will
-	 *		return #MDB_KEYEXIST if the key/data pair already appears in the
+	 *		return #DMdbKeyExist if the key/data pair already appears in the
 	 *		database.
 	 *	<li>#EDatabaseWriteFlag_NoOverwrite - enter the new key/data pair only if the key
 	 *		does not already appear in the database. The function will return
-	 *		#MDB_KEYEXIST if the key already appears in the database, even if
+	 *		#DMdbKeyExist if the key already appears in the database, even if
 	 *		the database supports duplicates (#EDatabaseSubFlag_SortedDuplicates). The \b data
 	 *		parameter will be set to point to the existing item.
 	 *	<li>#EDatabaseWriteFlag_ReserveSpace - reserve space for data of the given size, but
@@ -134,14 +134,14 @@ namespace NMib::NDatabase
 	 *	<li>#EDatabaseWriteFlag_Append - append the given key/data pair to the end of the
 	 *		database. This option allows fast bulk loading when keys are
 	 *		already known to be in the correct order. Loading unsorted keys
-	 *		with this flag will cause a #MDB_KEYEXIST error.
+	 *		with this flag will cause a #DMdbKeyExist error.
 	 *	<li>#EDatabaseWriteFlag_AppendDuplicateData - as above, but for sorted dup data.
 	 * </ul>
 	 * @return A non-zero error value on failure and 0 on success. Some possible
 	 * errors are:
 	 * <ul>
-	 *	<li>#MDB_MAP_FULL - the database is full, see #f_SetMapSize().
-	 *	<li>#MDB_TXN_FULL - the transaction has too many dirty pages.
+	 *	<li>#DMdbMapFull - the database is full, see #f_SetMapSize().
+	 *	<li>#DMdbTxnFull - the transaction has too many dirty pages.
 	 *	<li>EACCES - an attempt was made to write in a read-only transaction.
 	 *	<li>EINVAL - an invalid parameter was specified.
 	 * </ul>
@@ -155,7 +155,7 @@ namespace NMib::NDatabase
 		;
 		using namespace NPrivate;
 
-		if (!TXN_DBI_EXIST(this, dbi, DB_USRVALID))
+		if (!DTxnDbiExist(this, dbi, DDbUserValid))
 			DMibError("Database does not exists");
 
 		if
@@ -177,7 +177,7 @@ namespace NMib::NDatabase
 
 		f_CheckBlocked();
 
-		if (mt_flags & (MDB_TXN_RDONLY))
+		if (mt_flags & (DMdbTxnReadOnly))
 			DMibError("Trying to write to read only transaction");
 
 		MDB_cursor mc;
@@ -201,7 +201,7 @@ namespace NMib::NDatabase
 	 * is NULL, all of the duplicate data items for the key will be
 	 * deleted. Otherwise, if the data parameter is non-NULL
 	 * only the matching data item will be deleted.
-	 * This function will return #MDB_NOTFOUND if the specified key/data
+	 * This function will return #DMdbNotFound if the specified key/data
 	 * pair is not in the database.
 	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
 	 * @param[in] dbi A database handle returned by #f_OpenDatabase()
@@ -219,15 +219,15 @@ namespace NMib::NDatabase
 		DMibRequire(key);
 		using namespace NPrivate;
 
-		if (!TXN_DBI_EXIST(this, dbi, DB_USRVALID))
+		if (!DTxnDbiExist(this, dbi, DDbUserValid))
 			DMibError("Database does not exists");
 
 		f_CheckBlocked();
 
-		if (mt_flags & (MDB_TXN_RDONLY))
+		if (mt_flags & (DMdbTxnReadOnly))
 			DMibError("Trying to write to read only transaction");
 
-		if (!F_ISSET(mt_dbs[dbi].md_flags, EDatabaseSubFlag_SortedDuplicates))
+		if (!DFIsSet(mt_dbs[dbi].md_flags, EDatabaseSubFlag_SortedDuplicates))
 		{
 			/* must ignore any data */
 			data = nullptr;
@@ -284,9 +284,9 @@ namespace NMib::NDatabase
 		EDatabaseCursorGet op;
 		CDatabaseValue rdata, *xdata;
 		int rc, exact = 0;
-		DKBUF;
+		DKBuf;
 
-		DMibDatabaseTrace("====> delete db {} key [{}]", dbi, DKEY(key));
+		DMibDatabaseTrace("====> delete db {} key [{}]", dbi, DKey(key));
 
 		mdb_cursor_init(&mc, txn, dbi, &mx);
 

@@ -83,13 +83,13 @@ namespace NMib::NDatabase::NResultSet
 
 	// Utility class for converting to/from result data types
 
-#define DAODB_DefineTypeToDataType(_InType, _OutType, _Enum)	\
+#define DAODB_DefineTypeToDataType(d_InType, d_OutType, d_Enum)	\
 	template<>	\
-	struct TCTypeToDataType< _InType >	\
+	struct TCTypeToDataType< d_InType >	\
 	{	\
-		using CDataType = _OutType; \
-		static constexpr EResultDataType mc_Type = _Enum; \
-		static _OutType fs_Convert(_InType _V) { return _OutType (_V); } \
+		using CDataType = d_OutType; \
+		static constexpr EResultDataType mc_Type = d_Enum; \
+		static d_OutType fs_Convert(d_InType _V) { return d_OutType (_V); } \
 	}
 
 	DAODB_DefineTypeToDataType(fp64, fp64, EResultDataType_fp64);

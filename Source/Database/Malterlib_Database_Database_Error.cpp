@@ -89,9 +89,9 @@ namespace NMib::NDatabase::NPrivate
 		if (!_Error)
 			return "Successful return: 0";
 
-		if (_Error >= MDB_KEYEXIST && _Error <= MDB_LAST_ERRCODE)
+		if (_Error >= DMdbKeyExist && _Error <= DMdbLastErrcode)
 		{
-			int i = _Error - MDB_KEYEXIST;
+			int i = _Error - DMdbKeyExist;
 			return g_ErrorStrings[i];
 		}
 
@@ -125,9 +125,9 @@ namespace NMib::NDatabase::NPrivate
 		if (!_Error)
 			return "Successful return: 0";
 
-		if (_Error >= MDB_KEYEXIST && _Error <= MDB_LAST_ERRCODE)
+		if (_Error >= DMdbKeyExist && _Error <= DMdbLastErrcode)
 		{
-			int i = _Error - MDB_KEYEXIST;
+			int i = _Error - DMdbKeyExist;
 			return g_ErrorStrings[i];
 		}
 

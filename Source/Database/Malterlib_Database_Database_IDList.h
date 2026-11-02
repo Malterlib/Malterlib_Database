@@ -50,21 +50,21 @@ namespace NMib::NDatabase::NPrivate
 	/* IDL sizes - likely should be even bigger
 	 *   limiting factors: sizeof(ID), thread stack size
 	 */
-#define	MDB_IDL_LOGN	16	/* DB_SIZE is 2^16, UM_SIZE is 2^17 */
-#define MDB_IDL_DB_SIZE		(1<<MDB_IDL_LOGN)
-#define MDB_IDL_UM_SIZE		(1<<(MDB_IDL_LOGN+1))
+#define	DMdbIdlLogn	16	/* DB_SIZE is 2^16, UM_SIZE is 2^17 */
+#define DMdbIdlDbSize		(1<<DMdbIdlLogn)
+#define DMdbIdlUmSize		(1<<(DMdbIdlLogn+1))
 
-#define MDB_IDL_DB_MAX		(MDB_IDL_DB_SIZE-1)
-#define MDB_IDL_UM_MAX		(MDB_IDL_UM_SIZE-1)
+#define DMdbIdlDbMax		(DMdbIdlDbSize-1)
+#define DMdbIdlUmMax		(DMdbIdlUmSize-1)
 
-#define MDB_IDL_SIZEOF(ids)		(((ids)[0]+1) * sizeof(MDB_ID))
-#define MDB_IDL_IS_ZERO(ids) ( (ids)[0] == 0 )
-#define MDB_IDL_CPY( dst, src ) (memcpy( dst, src, MDB_IDL_SIZEOF( src ) ))
-#define MDB_IDL_FIRST( ids )	( (ids)[1] )
-#define MDB_IDL_LAST( ids )		( (ids)[(ids)[0]] )
+#define DMdbIdlSizeof(d_Ids)		(((d_Ids)[0]+1) * sizeof(MDB_ID))
+#define DMdbIdlIsZero(d_Ids) ( (d_Ids)[0] == 0 )
+#define DMdbIdlCpy( d_Dst, d_Src ) (memcpy( d_Dst, d_Src, DMdbIdlSizeof( d_Src ) ))
+#define DMdbIdlFirst( d_Ids )	( (d_Ids)[1] )
+#define DMdbIdlLast( d_Ids )		( (d_Ids)[(d_Ids)[0]] )
 
 	/** Current max length of an #mdb_midl_alloc()ed IDL */
-#define MDB_IDL_ALLOCLEN( ids )	( (ids)[-1] )
+#define DMdbIdlAlloclen( d_Ids )	( (d_Ids)[-1] )
 
 	/** Append ID to IDL. The IDL must be big enough. */
 	inline_always void mdb_midl_xappend(MDB_IDL idl, MDB_ID id)

@@ -29,7 +29,7 @@ namespace NMib::NDatabase::NPrivate
 	/** @defgroup idls	ID List Management
 	 *	@{
 	 */
-#define CMP(x,y)	 ( (x) < (y) ? -1 : (x) > (y) )
+#define DCmp(d_Left,d_Right)	 ( (d_Left) < (d_Right) ? -1 : (d_Left) > (d_Right) )
 
 	unsigned mdb_midl_search(MDB_IDL ids, MDB_ID id)
 	{
@@ -47,7 +47,7 @@ namespace NMib::NDatabase::NPrivate
 		{
 			unsigned pivot = n >> 1;
 			cursor = base + pivot + 1;
-			val = CMP(ids[cursor], id);
+			val = DCmp(ids[cursor], id);
 
 			if (val < 0)
 				n = pivot;
@@ -86,10 +86,10 @@ namespace NMib::NDatabase::NPrivate
 	void mdb_midl_shrink(MDB_IDL *idp)
 	{
 		MDB_IDL ids = *idp;
-		umint NewSize = (MDB_IDL_UM_MAX + 2) * sizeof(MDB_ID);
-		if (*(--ids) > MDB_IDL_UM_MAX && (ids = (MDB_IDL)NMib::NMemory::fg_Resize(ids, NewSize, 0)))
+		umint NewSize = (DMdbIdlUmMax + 2) * sizeof(MDB_ID);
+		if (*(--ids) > DMdbIdlUmMax && (ids = (MDB_IDL)NMib::NMemory::fg_Resize(ids, NewSize, 0)))
 		{
-			*ids++ = MDB_IDL_UM_MAX;
+			*ids++ = DMdbIdlUmMax;
 			*idp = ids;
 		}
 	}
@@ -124,7 +124,7 @@ namespace NMib::NDatabase::NPrivate
 		/* Too big? */
 		if (ids[0] >= ids[-1])
 		{
-			mdb_midl_grow(idp, MDB_IDL_UM_MAX);
+			mdb_midl_grow(idp, DMdbIdlUmMax);
 			ids = *idp;
 		}
 		ids[0]++;
@@ -150,7 +150,7 @@ namespace NMib::NDatabase::NPrivate
 		/* Too big? */
 		if (len + n > ids[-1])
 		{
-			mdb_midl_grow(idp, n | MDB_IDL_UM_MAX);
+			mdb_midl_grow(idp, n | DMdbIdlUmMax);
 			ids = *idp;
 		}
 		ids[0] = len + n;
@@ -176,8 +176,8 @@ namespace NMib::NDatabase::NPrivate
 
 	/* Quicksort + Insertion sort for small arrays */
 
-#define SMALL	8
-#define	MIDL_SWAP(a,b)	{ itmp=(a); (a)=(b); (b)=itmp; }
+#define DSmall	8
+#define	DMidlSwap(d_Left,d_Right)	{ itmp=(d_Left); (d_Left)=(d_Right); (d_Right)=itmp; }
 
 	void mdb_midl_sort(MDB_IDL ids)
 	{
@@ -191,7 +191,7 @@ namespace NMib::NDatabase::NPrivate
 		jstack = 0;
 		for (;;)
 		{
-			if (ir - l < SMALL)
+			if (ir - l < DSmall)
 			{ // Insertion sort
 				for (j = l + 1; j <= ir; j++)
 				{
@@ -212,13 +212,13 @@ namespace NMib::NDatabase::NPrivate
 			else
 			{
 				k = (l + ir) >> 1; // Choose median of left, center, right
-				MIDL_SWAP(ids[k], ids[l + 1]);
+				DMidlSwap(ids[k], ids[l + 1]);
 				if (ids[l] < ids[ir])
-					MIDL_SWAP(ids[l], ids[ir]);
+					DMidlSwap(ids[l], ids[ir]);
 				if (ids[l + 1] < ids[ir])
-					MIDL_SWAP(ids[l + 1], ids[ir]);
+					DMidlSwap(ids[l + 1], ids[ir]);
 				if (ids[l] < ids[l + 1])
-					MIDL_SWAP(ids[l], ids[l + 1]);
+					DMidlSwap(ids[l], ids[l + 1]);
 				i = l + 1;
 				j = ir;
 				a = ids[l + 1];
@@ -232,7 +232,7 @@ namespace NMib::NDatabase::NPrivate
 					while (ids[j] < a);
 					if (j < i)
 						break;
-					MIDL_SWAP(ids[i], ids[j]);
+					DMidlSwap(ids[i], ids[j]);
 				}
 				ids[l + 1] = ids[j];
 				ids[j] = a;
@@ -269,7 +269,7 @@ namespace NMib::NDatabase::NPrivate
 		{
 			unsigned pivot = n >> 1;
 			cursor = base + pivot + 1;
-			val = CMP(id, ids[cursor].mid);
+			val = DCmp(id, ids[cursor].mid);
 
 			if (val < 0)
 				n = pivot;
@@ -305,7 +305,7 @@ namespace NMib::NDatabase::NPrivate
 			return -1;
 		}
 
-		if (ids[0].mid >= MDB_IDL_UM_MAX)
+		if (ids[0].mid >= DMdbIdlUmMax)
 		{
 			/* too big */
 			return -2;
@@ -325,7 +325,7 @@ namespace NMib::NDatabase::NPrivate
 	int mdb_mid2l_append(MDB_ID2L ids, MDB_ID2 *id)
 	{
 		/* Too big? */
-		if (ids[0].mid >= MDB_IDL_UM_MAX)
+		if (ids[0].mid >= DMdbIdlUmMax)
 			return -2;
 		ids[0].mid++;
 		ids[ids[0].mid] = *id;
@@ -349,7 +349,7 @@ namespace NMib::NDatabase::NPrivate
 		{
 			unsigned pivot = n >> 1;
 			cursor = base + pivot + 1;
-			val = CMP(id, ids[cursor].mid);
+			val = DCmp(id, ids[cursor].mid);
 
 			if (val < 0)
 				n = pivot;

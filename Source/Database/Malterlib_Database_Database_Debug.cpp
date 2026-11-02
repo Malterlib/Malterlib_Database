@@ -46,13 +46,13 @@ namespace NMib::NDatabase::NPrivate
 	pgno_t mdb_dbg_pgno(MDB_page const *mp)
 	{
 		pgno_t ret;
-		COPY_PGNO(ret, mp->mp_p.p_pgno);
+		DCopyPgno(ret, mp->mp_p.p_pgno);
 		return ret;
 	}
 
 	/** Display a key in hexadecimal and return the address of the result.
 	 * @param[in] key the key to display
-	 * @param[in] buf the buffer to write into. Should always be #DKBUF.
+	 * @param[in] buf the buffer to write into. Should always be #DKBuf.
 	 * @return The key in hexadecimal form.
 	 */
 	char const *mdb_dkey(CDatabaseValue const *key, char *buf)
@@ -60,12 +60,12 @@ namespace NMib::NDatabase::NPrivate
 		char *ptr = buf;
 		unsigned char *c = (unsigned char *)key->m_pData;
 		uint32 i;
-		size_t buf_len = DKBUF_MAXKEYSIZE * 2;
+		size_t buf_len = DKBufMaxKeySize * 2;
 
 		if (!key)
 			return "";
 
-		if (key->m_Size > DKBUF_MAXKEYSIZE)
+		if (key->m_Size > DKBufMaxKeySize)
 			return "MDB_MAXKEYSIZE";
 		/* may want to make this a dynamic check: if the key is mostly
 		 * printable characters, print it as-is instead of converting to hex.
@@ -87,72 +87,72 @@ namespace NMib::NDatabase::NPrivate
 	char const *mdb_leafnode_type(MDB_node const *n)
 	{
 		static char const * const tp[2][2] = {{"", ": DB"}, {": sub-page", ": sub-DB"}};
-		return F_ISSET(n->mn_flags, F_BIGDATA) ? ": overflow page" : tp[F_ISSET(n->mn_flags, F_DUPDATA)][F_ISSET(n->mn_flags, F_SUBDATA)];
+		return DFIsSet(n->mn_flags, DFBigData) ? ": overflow page" : tp[DFIsSet(n->mn_flags, DFDupData)][DFIsSet(n->mn_flags, DFSubData)];
 	}
 
 	/** Display all the keys in the page. */
 	void mdb_page_list(MDB_page const *mp)
 	{
 		pgno_t pgno = mdb_dbg_pgno(mp);
-		char const *type, *state = (mp->mp_flags & P_DIRTY) ? ", dirty" : "";
+		char const *type, *state = (mp->mp_flags & DPDirty) ? ", dirty" : "";
 		MDB_node *node;
 		uint32 i, nkeys, nsize, total = 0;
 		CDatabaseValue key;
-		DKBUF;
+		DKBuf;
 
-		switch (mp->mp_flags & (P_BRANCH | P_LEAF | P_LEAF2 | P_META | P_OVERFLOW | P_SUBP))
+		switch (mp->mp_flags & (DPBranch | DPLeaf | DPLeaf2 | DPMeta | DPOverflow | DPSubp))
 		{
-		case P_BRANCH: type = "Branch page"; break;
-		case P_LEAF: type = "Leaf page"; break;
-		case P_LEAF | P_SUBP: type = "Sub-page"; break;
-		case P_LEAF | P_LEAF2: type = "LEAF2 page"; break;
-		case P_LEAF | P_LEAF2 | P_SUBP: type = "LEAF2 sub-page"; break;
-		case P_OVERFLOW:
+		case DPBranch: type = "Branch page"; break;
+		case DPLeaf: type = "Leaf page"; break;
+		case DPLeaf | DPSubp: type = "Sub-page"; break;
+		case DPLeaf | DPLeaf2: type = "LEAF2 page"; break;
+		case DPLeaf | DPLeaf2 | DPSubp: type = "LEAF2 sub-page"; break;
+		case DPOverflow:
 			DMibConErrOut("Overflow page {} pages {}{}\n", pgno, mp->mp_pages, state);
 			return;
-		case P_META:
-			DMibConErrOut("Meta-page {} txnid {}\n", pgno, fg_RemoveQualifiers(((MDB_meta *)METADATA(mp))->mm_txnid.f_Load(NAtomic::gc_MemoryOrder_Relaxed)));
+		case DPMeta:
+			DMibConErrOut("Meta-page {} txnid {}\n", pgno, fg_RemoveQualifiers(((MDB_meta *)DMetaData(mp))->mm_txnid.f_Load(NAtomic::gc_MemoryOrder_Relaxed)));
 			return;
 		default:
 			DMibConErrOut("Bad page {} flags 0x{nfh,sf0,sj4}\n", pgno, mp->mp_flags);
 			return;
 		}
 
-		nkeys = NUMKEYS(mp);
+		nkeys = DNumKeys(mp);
 		DMibConErrOut("{} {} numkeys {}{}\n", type, pgno, nkeys, state);
 
 		for (i = 0; i < nkeys; i++)
 		{
-			if (IS_LEAF2(mp))
+			if (DIsLeaf2(mp))
 			{ // LEAF2 pages have no mp_ptrs[] or node headers
 				key.m_Size = nsize = mp->mp_pad;
-				key.m_pData = LEAF2KEY(mp, i, nsize);
+				key.m_pData = DLeaf2Key(mp, i, nsize);
 				total += nsize;
-				DMibConErrOut("key {}: nsize {}, {}\n", i, nsize, DKEY(&key));
+				DMibConErrOut("key {}: nsize {}, {}\n", i, nsize, DKey(&key));
 				continue;
 			}
-			node = NODEPTR(mp, i);
+			node = DNodePtr(mp, i);
 			key.m_Size = node->mn_ksize;
 			key.m_pData = node->mn_data;
-			nsize = uint32(NODESIZE + key.m_Size);
-			if (IS_BRANCH(mp))
+			nsize = uint32(DNodeSize + key.m_Size);
+			if (DIsBranch(mp))
 			{
-				DMibConErrOut("key {}: page {}, {}\n", i, NODEPGNO(node), DKEY(&key));
+				DMibConErrOut("key {}: page {}, {}\n", i, DNodePgno(node), DKey(&key));
 				total += nsize;
 			}
 			else
 			{
-				if (F_ISSET(node->mn_flags, F_BIGDATA))
+				if (DFIsSet(node->mn_flags, DFBigData))
 					nsize += sizeof(pgno_t);
 				else
-					nsize += NODEDSZ(node);
+					nsize += DNodeDataSize(node);
 				total += nsize;
 				nsize += sizeof(indx_t);
-				DMibConErrOut("key {}: nsize {}, {}{}\n", i, nsize, DKEY(&key), mdb_leafnode_type(node));
+				DMibConErrOut("key {}: nsize {}, {}{}\n", i, nsize, DKey(&key), mdb_leafnode_type(node));
 			}
-			total = EVEN(total);
+			total = DEven(total);
 		}
-		DMibConErrOut("Total: header {} + contents {} + unused {}\n", IS_LEAF2(mp) ? PAGEHDRSZ : PAGEBASE + mp->mp_lower, total, SIZELEFT(mp));
+		DMibConErrOut("Total: header {} + contents {} + unused {}\n", DIsLeaf2(mp) ? DPageHeaderSize : DPageBase + mp->mp_lower, total, DSizeLeft(mp));
 	}
 
 	void mdb_cursor_chk(MDB_cursor const *mc)
@@ -162,21 +162,21 @@ namespace NMib::NDatabase::NPrivate
 		MDB_node *node;
 		MDB_page *mp;
 
-		if (!mc->mc_snum || !(mc->mc_flags & C_INITIALIZED))
+		if (!mc->mc_snum || !(mc->mc_flags & DCInitialized))
 			return;
 		for (i = 0; i < mc->mc_top; i++)
 		{
 			mp = mc->mc_pg[i];
-			node = NODEPTR(mp, mc->mc_ki[i]);
-			if (NODEPGNO(node) != mc->mc_pg[i + 1]->mp_p.p_pgno)
+			node = DNodePtr(mp, mc->mc_ki[i]);
+			if (DNodePgno(node) != mc->mc_pg[i + 1]->mp_p.p_pgno)
 				printf("oops!\n");
 		}
-		if (mc->mc_ki[i] >= NUMKEYS(mc->mc_pg[i]))
+		if (mc->mc_ki[i] >= DNumKeys(mc->mc_pg[i]))
 			printf("ack!\n");
-		if (XCURSOR_INITED(mc))
+		if (DXCursorInited(mc))
 		{
-			node = NODEPTR(mc->mc_pg[mc->mc_top], mc->mc_ki[mc->mc_top]);
-			if (((node->mn_flags & (F_DUPDATA | F_SUBDATA)) == F_DUPDATA) && mc->mc_xcursor->mx_cursor.mc_pg[0] != (MDB_page *)NODEDATA(node))
+			node = DNodePtr(mc->mc_pg[mc->mc_top], mc->mc_ki[mc->mc_top]);
+			if (((node->mn_flags & (DFDupData | DFSubData)) == DFDupData) && mc->mc_xcursor->mx_cursor.mc_pg[0] != (MDB_page *)DNodeData(node))
 				printf("blah!\n");
 		}
 	}
@@ -197,45 +197,45 @@ namespace NMib::NDatabase::NPrivate
 		int rc;
 
 		freecount = 0;
-		mdb_cursor_init(&mc, txn, FREE_DBI, nullptr);
+		mdb_cursor_init(&mc, txn, DFreeDbi, nullptr);
 		while ((rc = mdb_cursor_get(&mc, &key, &data, MDB_NEXT)) == 0)
 			freecount += *(MDB_ID *)data.m_pData;
-		DMibCheck(rc == MDB_NOTFOUND);
+		DMibCheck(rc == DMdbNotFound);
 
 		count = 0;
 		for (i = 0; i < txn->mt_numdbs; i++)
 		{
 			MDB_xcursor mx;
-			if (!(txn->mt_dbflags[i] & DB_VALID))
+			if (!(txn->mt_dbflags[i] & DDbValid))
 				continue;
 			mdb_cursor_init(&mc, txn, i, &mx);
-			if (txn->mt_dbs[i].md_root == P_INVALID)
+			if (txn->mt_dbs[i].md_root == DPInvalid)
 				continue;
 			count += txn->mt_dbs[i].md_branch_pages + txn->mt_dbs[i].md_leaf_pages + txn->mt_dbs[i].md_overflow_pages;
 			if (txn->mt_dbs[i].md_flags & EDatabaseSubFlag_SortedDuplicates)
 			{
-				rc = mdb_page_search(&mc, nullptr, MDB_PS_FIRST);
-				for (; rc == MDB_SUCCESS; rc = mdb_cursor_sibling(&mc, 1))
+				rc = mdb_page_search(&mc, nullptr, DMdbPsFirst);
+				for (; rc == DMdbSuccess; rc = mdb_cursor_sibling(&mc, 1))
 				{
 					unsigned j;
 					MDB_page *mp;
 					mp = mc.mc_pg[mc.mc_top];
-					for (j = 0; j < NUMKEYS(mp); j++)
+					for (j = 0; j < DNumKeys(mp); j++)
 					{
-						MDB_node *leaf = NODEPTR(mp, j);
-						if (leaf->mn_flags & F_SUBDATA)
+						MDB_node *leaf = DNodePtr(mp, j);
+						if (leaf->mn_flags & DFSubData)
 						{
 							MDB_db db;
-							memcpy(&db, NODEDATA(leaf), sizeof(db));
+							memcpy(&db, DNodeData(leaf), sizeof(db));
 							count += db.md_branch_pages + db.md_leaf_pages + db.md_overflow_pages;
 						}
 					}
 				}
-				DMibCheck(rc == MDB_NOTFOUND);
+				DMibCheck(rc == DMdbNotFound);
 			}
 		}
-		if (freecount + count + NUM_METAS != txn->mt_next_pgno)
-			DMibConErrOut("audit: {} freecount: {} count: {} total: {} next_pgno: {}\n", txn->mt_txnid, freecount, count + NUM_METAS, freecount + count + NUM_METAS, txn->mt_next_pgno);
+		if (freecount + count + DNumMetas != txn->mt_next_pgno)
+			DMibConErrOut("audit: {} freecount: {} count: {} total: {} next_pgno: {}\n", txn->mt_txnid, freecount, count + DNumMetas, freecount + count + DNumMetas, txn->mt_next_pgno);
 	}
 #endif
 }

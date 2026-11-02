@@ -47,10 +47,10 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <limits.h>
 
 #ifndef _GNU_SOURCE
-#	define _GNU_SOURCE 1
+#	define _GNU_SOURCE 1 // NOLINT(malterlib-macro-naming)
 #endif
 #if defined(DMibDatabase_Always64BitSupport) || defined(__WIN64__)
-#	define _FILE_OFFSET_BITS	64
+#	define _FILE_OFFSET_BITS	64 // NOLINT(malterlib-macro-naming)
 #endif
 #ifdef DPlatformFamily_Windows
 #	include <windows.h>
@@ -90,11 +90,11 @@ using CThreadID = DWORD;
 #	ifdef __GNUC__
 #		include <sys/param.h>
 #	else
-#		define LITTLE_ENDIAN	1234
-#		define BIG_ENDIAN	4321
-#		define BYTE_ORDER	LITTLE_ENDIAN
+#		define LITTLE_ENDIAN	1234 // NOLINT(malterlib-macro-naming)
+#		define BIG_ENDIAN	4321 // NOLINT(malterlib-macro-naming)
+#		define BYTE_ORDER	LITTLE_ENDIAN // NOLINT(malterlib-macro-naming)
 #		ifndef SSIZE_MAX
-#			define SSIZE_MAX	INT_MAX
+#			define SSIZE_MAX	INT_MAX // NOLINT(malterlib-macro-naming)
 #		endif
 #	endif
 #else
@@ -115,9 +115,9 @@ using CThreadID = pthread_t;
 /* MIPS has cache coherency issues, requires explicit cache control */
 #	include <asm/cachectl.h>
 extern int cacheflush(char *addr, int nbytes, int cache);
-#	define CACHEFLUSH(addr, bytes, cache)	cacheflush(addr, bytes, cache)
+#	define DCacheFlush(d_Addr, d_Bytes, d_Cache)	cacheflush(d_Addr, d_Bytes, d_Cache)
 #else
-#	define CACHEFLUSH(addr, bytes, cache)
+#	define DCacheFlush(d_Addr, d_Bytes, d_Cache)
 #endif
 
 #include <errno.h>
@@ -136,7 +136,7 @@ extern int cacheflush(char *addr, int nbytes, int cache);
 #endif
 
 #if defined (__sun)
-#	define _POSIX_PTHREAD_SEMANTICS	1
+#	define _POSIX_PTHREAD_SEMANTICS	1 // NOLINT(malterlib-macro-naming)
 #endif
 
 #if !(defined(BYTE_ORDER) || defined(__BYTE_ORDER))
@@ -145,21 +145,21 @@ extern int cacheflush(char *addr, int nbytes, int cache);
 #endif
 
 #if defined(__APPLE__) || defined (BSD) || defined(__FreeBSD_kernel__)
-#	if !(defined(MDB_USE_POSIX_MUTEX) || defined(MDB_USE_POSIX_SEM))
-#		define MDB_USE_SYSV_SEM	1
+#	if !(defined(DMdbUsePosixMutex) || defined(MDB_USE_POSIX_SEM))
+#		define DMdbUseSysvSem	1
 #	endif
-#	define MDB_FDATASYNC		fsync
+#	define DMdbFDataSync		fsync
 #elif defined(__ANDROID__)
-#	define MDB_FDATASYNC		fsync
+#	define DMdbFDataSync		fsync
 #endif
 
 #ifndef DPlatformFamily_Windows
 #	include <pthread.h>
 #	include <signal.h>
 #	ifdef MDB_USE_POSIX_SEM
-#		define MDB_USE_HASH		1
+#		define DMdbUseHash		1
 #		include <semaphore.h>
-#	elif defined(MDB_USE_SYSV_SEM)
+#	elif defined(DMdbUseSysvSem)
 #		include <sys/ipc.h>
 #		include <sys/sem.h>
 #		ifdef _SEM_SEMUN_UNDEFINED
@@ -171,39 +171,39 @@ union semun
 };
 #		endif /* _SEM_SEMUN_UNDEFINED */
 #	else
-#		define MDB_USE_POSIX_MUTEX	1
+#		define DMdbUsePosixMutex	1
 #	endif /* MDB_USE_POSIX_SEM */
 #endif /* !DPlatformFamily_Windows */
 
-#if defined(DPlatformFamily_Windows) + defined(MDB_USE_POSIX_SEM) + defined(MDB_USE_SYSV_SEM) \
-	+ defined(MDB_USE_POSIX_MUTEX) != 1
+#if defined(DPlatformFamily_Windows) + defined(MDB_USE_POSIX_SEM) + defined(DMdbUseSysvSem) \
+	+ defined(DMdbUsePosixMutex) != 1
 #	error "Ambiguous shared-lock implementation"
 #endif
 
 #ifndef BYTE_ORDER
 #	if (defined(_LITTLE_ENDIAN) || defined(_BIG_ENDIAN)) && !(defined(_LITTLE_ENDIAN) && defined(_BIG_ENDIAN))
 /* Solaris just defines one or the other */
-#		define LITTLE_ENDIAN	1234
-#		define BIG_ENDIAN	4321
+#		define LITTLE_ENDIAN	1234 // NOLINT(malterlib-macro-naming)
+#		define BIG_ENDIAN	4321 // NOLINT(malterlib-macro-naming)
 #		ifdef _LITTLE_ENDIAN
-#			define BYTE_ORDER  LITTLE_ENDIAN
+#			define BYTE_ORDER  LITTLE_ENDIAN // NOLINT(malterlib-macro-naming)
 #		else
-#			define BYTE_ORDER  BIG_ENDIAN
+#			define BYTE_ORDER  BIG_ENDIAN // NOLINT(malterlib-macro-naming)
 #		endif
 #	else
-#		define BYTE_ORDER   __BYTE_ORDER
+#		define BYTE_ORDER   __BYTE_ORDER // NOLINT(malterlib-macro-naming)
 #	endif
 #endif
 
 #ifndef LITTLE_ENDIAN
-#	define LITTLE_ENDIAN	__LITTLE_ENDIAN
+#	define LITTLE_ENDIAN	__LITTLE_ENDIAN // NOLINT(malterlib-macro-naming)
 #endif
 #ifndef BIG_ENDIAN
-#	define BIG_ENDIAN	__BIG_ENDIAN
+#	define BIG_ENDIAN	__BIG_ENDIAN // NOLINT(malterlib-macro-naming)
 #endif
 
 #if defined(__i386) || defined(__x86_64) || defined(_M_IX86)
-#	define MISALIGNED_OK	1
+#	define DMisalignedOk	1
 #endif
 
 namespace NMib::NDatabase
@@ -240,37 +240,37 @@ namespace NMib::NDatabase
 		 *	@{
 		 */
 		/**	Successful result */
-#define MDB_SUCCESS	 0
+#define DMdbSuccess	 0
 		/** key/data pair already exists */
-#define MDB_KEYEXIST	(-30799)
+#define DMdbKeyExist	(-30799)
 		/** key/data pair not found (EOF) */
-#define MDB_NOTFOUND	(-30798)
+#define DMdbNotFound	(-30798)
 		/** Requested page not found - this usually indicates corruption */
-#define MDB_PAGE_NOTFOUND	(-30797)
+#define DMdbPageNotfound	(-30797)
 		/** Located page was wrong type */
-#define MDB_CORRUPTED	(-30796)
+#define DMdbCorrupted	(-30796)
 		/** Update of meta page failed or environment had fatal error */
-#define MDB_PANIC		(-30795)
+#define DMdbPanic		(-30795)
 		/** Environment version mismatch */
-#define MDB_VERSION_MISMATCH	(-30794)
+#define DMdbVersionMismatch	(-30794)
 		/** File is not a valid LMDB file */
-#define MDB_INVALID	(-30793)
+#define DMdbInvalid	(-30793)
 		/** Environment mapsize reached */
-#define MDB_MAP_FULL	(-30792)
+#define DMdbMapFull	(-30792)
 		/** Environment maxdbs reached */
-#define MDB_DBS_FULL	(-30791)
+#define DMdbDbsFull	(-30791)
 		/** Environment maxreaders reached */
-#define MDB_READERS_FULL	(-30790)
+#define DMdbReadersFull	(-30790)
 		/** Too many TLS keys in use - Windows only */
-#define MDB_TLS_FULL	(-30789)
+#define DMdbTlsFull	(-30789)
 		/** Txn has too many dirty pages */
-#define MDB_TXN_FULL	(-30788)
+#define DMdbTxnFull	(-30788)
 		/** Cursor stack too deep - internal error */
-#define MDB_CURSOR_FULL	(-30787)
+#define DMdbCursorFull	(-30787)
 		/** Page has not enough space - internal error */
-#define MDB_PAGE_FULL	(-30786)
+#define DMdbPageFull	(-30786)
 		/** Database contents grew beyond environment mapsize */
-#define MDB_MAP_RESIZED	(-30785)
+#define DMdbMapResized	(-30785)
 		/** Operation and DB incompatible, or DB type changed. This can mean:
 		 *	<ul>
 		 *	<li>The operation expects an #EDatabaseSubFlag_SortedDuplicates / #EDatabaseSubFlag_SortedDuplicatesFixedSize database.
@@ -279,19 +279,19 @@ namespace NMib::NDatabase
 		 *	<li>The database was dropped and recreated with different flags.
 		 *	</ul>
 		 */
-#define MDB_INCOMPATIBLE	(-30784)
+#define DMdbIncompatible	(-30784)
 		/** Invalid reuse of reader locktable slot */
-#define MDB_BAD_RSLOT		(-30783)
+#define DMdbBadRslot		(-30783)
 		/** Transaction must abort, has a child, or is invalid */
-#define MDB_BAD_TXN			(-30782)
+#define DMdbBadTxn			(-30782)
 		/** Unsupported size of key/DB name/data, or wrong DUPFIXED size */
-#define MDB_BAD_VALSIZE		(-30781)
+#define DMdbBadValsize		(-30781)
 		/** The specified DBI was changed unexpectedly */
-#define MDB_BAD_DBI		(-30780)
+#define DMdbBadDbi		(-30780)
 		/** Unexpected problem - txn should abort */
-#define MDB_PROBLEM		(-30779)
+#define DMdbProblem		(-30779)
 		/** The last defined error code */
-#define MDB_LAST_ERRCODE	MDB_PROBLEM
+#define DMdbLastErrcode	DMdbProblem
 		/** @} */
 
 		using MDB_env = CDatabaseEnvironment_Internal;
@@ -321,9 +321,9 @@ namespace NMib::NDatabase
 #endif
 
 #ifdef DPlatformFamily_Windows
-#	define CALL_CONV WINAPI
+#	define DCallConv WINAPI
 #else
-#	define CALL_CONV
+#	define DCallConv
 #endif
 
 		/** @defgroup internal	LMDB Internals
@@ -338,8 +338,8 @@ namespace NMib::NDatabase
 		 */
 
 			/** Features under development */
-#ifndef MDB_DEVEL
-#	define MDB_DEVEL 0
+#ifndef DMdbDevel
+#	define DMdbDevel 0
 #endif
 
 			/** Wrapper around __func__, which is a C99 feature */
@@ -353,17 +353,17 @@ namespace NMib::NDatabase
 #endif
 
 		/* Internal error codes, not exposed outside liblmdb */
-#define	MDB_NO_ROOT		(MDB_LAST_ERRCODE + 10)
+#define	DMdbNoRoot		(DMdbLastErrcode + 10)
 #ifdef DPlatformFamily_Windows
-#	define MDB_OWNERDEAD	((int) WAIT_ABANDONED)
-#elif defined MDB_USE_SYSV_SEM
-#	define MDB_OWNERDEAD	(MDB_LAST_ERRCODE + 11)
-#elif defined(MDB_USE_POSIX_MUTEX) && defined(EOWNERDEAD)
-#	define MDB_OWNERDEAD	EOWNERDEAD	/**< #LOCK_MUTEX0() result if dead owner */
+#	define DMdbOwnerdead	((int) WAIT_ABANDONED)
+#elif defined DMdbUseSysvSem
+#	define DMdbOwnerdead	(DMdbLastErrcode + 11)
+#elif defined(DMdbUsePosixMutex) && defined(EOWNERDEAD)
+#	define DMdbOwnerdead	EOWNERDEAD	/**< #DLockMutex0() result if dead owner */
 #endif
 
 #ifdef __GLIBC__
-#	define	GLIBC_VER	((__GLIBC__ << 16 )| __GLIBC_MINOR__)
+#	define	DGlibcVer	((__GLIBC__ << 16 )| __GLIBC_MINOR__)
 #endif
 		/** Some platforms define the EOWNERDEAD error code
 		 * even though they don't support Robust Mutexes.
@@ -373,72 +373,72 @@ namespace NMib::NDatabase
 		 * also Robust, but some systems don't support them
 		 * either.)
 		 */
-#ifndef MDB_USE_ROBUST
+#ifndef DMdbUseRobust
 		/* Android currently lacks Robust Mutex support. So does glibc < 2.4. */
-#	if defined(MDB_USE_POSIX_MUTEX) && (defined(__ANDROID__) || \
-		(defined(__GLIBC__) && GLIBC_VER < 0x020004))
-#		define MDB_USE_ROBUST	0
+#	if defined(DMdbUsePosixMutex) && (defined(__ANDROID__) || \
+		(defined(__GLIBC__) && DGlibcVer < 0x020004))
+#		define DMdbUseRobust	0
 #	else
-#		define MDB_USE_ROBUST	1
+#		define DMdbUseRobust	1
 #	endif
-#endif /* !MDB_USE_ROBUST */
+#endif /* !DMdbUseRobust */
 
-#if defined(MDB_USE_POSIX_MUTEX) && (MDB_USE_ROBUST)
+#if defined(DMdbUsePosixMutex) && (DMdbUseRobust)
 		/* glibc < 2.12 only provided _np API */
-#	if (defined(__GLIBC__) && GLIBC_VER < 0x02000c) || \
+#	if (defined(__GLIBC__) && DGlibcVer < 0x02000c) || \
 		(defined(PTHREAD_MUTEX_ROBUST_NP) && !defined(PTHREAD_MUTEX_ROBUST))
-#		define PTHREAD_MUTEX_ROBUST	PTHREAD_MUTEX_ROBUST_NP
-#		define pthread_mutexattr_setrobust(attr, flag)	pthread_mutexattr_setrobust_np(attr, flag)
-#		define pthread_mutex_consistent(mutex)	pthread_mutex_consistent_np(mutex)
+#		define PTHREAD_MUTEX_ROBUST	PTHREAD_MUTEX_ROBUST_NP // NOLINT(malterlib-macro-naming)
+#		define pthread_mutexattr_setrobust(d_Attr, d_Flag)	pthread_mutexattr_setrobust_np(d_Attr, d_Flag)
+#		define pthread_mutex_consistent(d_Mutex)	pthread_mutex_consistent_np(d_Mutex)
 #	endif
-#endif /* MDB_USE_POSIX_MUTEX && MDB_USE_ROBUST */
+#endif /* DMdbUsePosixMutex && DMdbUseRobust */
 
-#if defined(MDB_OWNERDEAD) && (MDB_USE_ROBUST)
-#	define MDB_ROBUST_SUPPORTED	1
+#if defined(DMdbOwnerdead) && (DMdbUseRobust)
+#	define DMdbRobustSupported	1
 #endif
 
 #ifdef DPlatformFamily_Windows
-#	define MDB_USE_HASH	1
-#	define MDB_PIDLOCK	0
+#	define DMdbUseHash	1
+#	define DMdbPidLock	0
 #	define pthread_t	HANDLE
 #	define pthread_mutex_t	HANDLE
 #	define pthread_cond_t	HANDLE
 		typedef HANDLE mdb_mutex_t, mdb_mutexref_t;
 #	define pthread_key_t	DWORD
 #	define pthread_self()	GetCurrentThreadId()
-#	define pthread_key_create(x,y)	\
-		((*(x) = TlsAlloc()) == TLS_OUT_OF_INDEXES ? ErrCode() : 0)
-#	define pthread_key_delete(x)	TlsFree(x)
-#	define pthread_getspecific(x)	TlsGetValue(x)
-#	define pthread_setspecific(x,y)	(TlsSetValue(x,y) ? 0 : ErrCode())
-#	define pthread_mutex_unlock(x)	ReleaseMutex(*x)
-#	define pthread_mutex_lock(x)	WaitForSingleObject(*x, INFINITE)
-#	define pthread_cond_signal(x)	SetEvent(*x)
-#	define pthread_cond_wait(cond,mutex)	do{SignalObjectAndWait(*mutex, *cond, INFINITE, FALSE); WaitForSingleObject(*mutex, INFINITE);}while(0)
-#	define LOCK_MUTEX0(mutex)		WaitForSingleObject(mutex, INFINITE)
-#	define UNLOCK_MUTEX(mutex)		ReleaseMutex(mutex)
-#	define mdb_mutex_consistent(mutex)	0
+#	define pthread_key_create(d_Key,d_Destructor)	\
+		((*(d_Key) = TlsAlloc()) == TLS_OUT_OF_INDEXES ? DErrCode() : 0)
+#	define pthread_key_delete(d_Key)	TlsFree(d_Key)
+#	define pthread_getspecific(d_Key)	TlsGetValue(d_Key)
+#	define pthread_setspecific(d_Key,d_Value)	(TlsSetValue(d_Key,d_Value) ? 0 : DErrCode())
+#	define pthread_mutex_unlock(d_Mutex)	ReleaseMutex(*d_Mutex)
+#	define pthread_mutex_lock(d_Mutex)	WaitForSingleObject(*d_Mutex, INFINITE)
+#	define pthread_cond_signal(d_Condition)	SetEvent(*d_Condition)
+#	define pthread_cond_wait(d_Cond,d_Mutex)	do{SignalObjectAndWait(*d_Mutex, *d_Cond, INFINITE, FALSE); WaitForSingleObject(*d_Mutex, INFINITE);}while(0)
+#	define DLockMutex0(d_Mutex)		WaitForSingleObject(d_Mutex, INFINITE)
+#	define DUnlockMutex(d_Mutex)		ReleaseMutex(d_Mutex)
+#	define mdb_mutex_consistent(d_Mutex)	0
 #	define getpid()	GetCurrentProcessId()
-#	define	MDB_FDATASYNC(fd)	(!FlushFileBuffers(fd))
-#	define	MDB_MSYNC(addr,len,flags)	(!FlushViewOfFile(addr,len))
-#	define	ErrCode()	GetLastError()
-#	define	close(fd)	(CloseHandle(fd) ? 0 : -1)
-#	define	munmap(ptr,len)	UnmapViewOfFile(ptr)
+#	define	DMdbFDataSync(d_Fd)	(!FlushFileBuffers(d_Fd))
+#	define	DMdbMsync(d_Addr,d_Len,d_Flags)	(!FlushViewOfFile(d_Addr,d_Len))
+#	define	DErrCode()	GetLastError()
+#	define	close(d_Fd)	(CloseHandle(d_Fd) ? 0 : -1)
+#	define	munmap(d_Ptr,d_Len)	UnmapViewOfFile(d_Ptr)
 #	ifdef PROCESS_QUERY_LIMITED_INFORMATION
-#		define MDB_PROCESS_QUERY_LIMITED_INFORMATION PROCESS_QUERY_LIMITED_INFORMATION
+#		define DMdbProcessQueryLimitedInformation PROCESS_QUERY_LIMITED_INFORMATION
 #	else
-#		define MDB_PROCESS_QUERY_LIMITED_INFORMATION 0x1000
+#		define DMdbProcessQueryLimitedInformation 0x1000
 #	endif
 #else
 
-		/** For MDB_LOCK_FORMAT: True if readers take a pid lock in the lockfile */
-#	define MDB_PIDLOCK			1
+		/** For DMdbLockFormat: True if readers take a pid lock in the lockfile */
+#	define DMdbPidLock			1
 
 #	ifdef MDB_USE_POSIX_SEM
 
 		typedef sem_t *mdb_mutex_t, *mdb_mutexref_t;
-#		define LOCK_MUTEX0(mutex)		mdb_sem_wait(mutex)
-#		define UNLOCK_MUTEX(mutex)		sem_post(mutex)
+#		define DLockMutex0(d_Mutex)		mdb_sem_wait(d_Mutex)
+#		define DUnlockMutex(d_Mutex)		sem_post(d_Mutex)
 
 		inline_always static int mdb_sem_wait(sem_t *sem)
 		{
@@ -447,7 +447,7 @@ namespace NMib::NDatabase
 			return rc;
 		}
 
-#	elif defined MDB_USE_SYSV_SEM
+#	elif defined DMdbUseSysvSem
 
 		struct mdb_mutex
 		{
@@ -459,12 +459,12 @@ namespace NMib::NDatabase
 		using mdb_mutexref_t = mdb_mutex *;
 		using mdb_mutex_t = mdb_mutex[1];
 
-#		define LOCK_MUTEX0(mutex)		mdb_sem_wait(mutex)
-#		define UNLOCK_MUTEX(mutex)		do { \
+#		define DLockMutex0(d_Mutex)		mdb_sem_wait(d_Mutex)
+#		define DUnlockMutex(d_Mutex)		do { \
 				struct sembuf sb = { 0, 1, SEM_UNDO }; \
-				sb.sem_num = (mutex)->semnum; \
-				*(mutex)->locked = 0; \
-				semop((mutex)->semid, &sb, 1); \
+				sb.sem_num = (d_Mutex)->semnum; \
+				*(d_Mutex)->locked = 0; \
+				semop((d_Mutex)->semid, &sb, 1); \
 			} while(0)
 
 		inline_always static int mdb_sem_wait(mdb_mutexref_t sem)
@@ -476,7 +476,7 @@ namespace NMib::NDatabase
 			{
 				if (!semop(sem->semid, &sb, 1))
 				{
-					rc = *locked ? MDB_OWNERDEAD : MDB_SUCCESS;
+					rc = *locked ? DMdbOwnerdead : DMdbSuccess;
 					*locked = 1;
 					break;
 				}
@@ -485,9 +485,9 @@ namespace NMib::NDatabase
 			return rc;
 		}
 
-#		define mdb_mutex_consistent(mutex)	0
+#		define mdb_mutex_consistent(d_Mutex)	0
 
-#	else	/* MDB_USE_POSIX_MUTEX: */
+#	else	/* DMdbUsePosixMutex: */
 		/** Shared mutex/semaphore as the original is stored.
 		 *
 		 *	Not for copies.  Instead it can be assigned to an #mdb_mutexref_t.
@@ -498,61 +498,61 @@ namespace NMib::NDatabase
 		/** Reference to an #mdb_mutex_t */
 		typedef pthread_mutex_t *mdb_mutexref_t;
 		/** Lock the reader or writer mutex.
-		 *	Returns 0 or a code to give #mdb_mutex_failed(), as in #LOCK_MUTEX().
+		 *	Returns 0 or a code to give #mdb_mutex_failed(), as in #DLockMutex().
 		 */
-#		define LOCK_MUTEX0(mutex)	pthread_mutex_lock(mutex)
+#		define DLockMutex0(d_Mutex)	pthread_mutex_lock(d_Mutex)
 		/** Unlock the reader or writer mutex.
 		 */
-#		define UNLOCK_MUTEX(mutex)	pthread_mutex_unlock(mutex)
+#		define DUnlockMutex(d_Mutex)	pthread_mutex_unlock(d_Mutex)
 		/** Mark mutex-protected data as repaired, after death of previous owner.
 		 */
-#		define mdb_mutex_consistent(mutex)	pthread_mutex_consistent(mutex)
-#	endif	/* MDB_USE_POSIX_SEM || MDB_USE_SYSV_SEM */
+#		define mdb_mutex_consistent(d_Mutex)	pthread_mutex_consistent(d_Mutex)
+#	endif	/* MDB_USE_POSIX_SEM || DMdbUseSysvSem */
 
 		/** Get the error code for the last failed system function.
 		 */
-#	define	ErrCode()	errno
+#	define	DErrCode()	errno
 
 		/** An abstraction for a file handle.
 		 *	On POSIX systems file handles are small integers. On Windows
 		 *	they're opaque pointers.
 		 */
-#	define	HANDLE	int
+#	define	HANDLE	int // NOLINT(malterlib-macro-naming)
 
 		/**	A value for an invalid file handle.
 		 *	Mainly used to initialize file variables and signify that they are
 		 *	unused.
 		 */
-#	define INVALID_HANDLE_VALUE	(-1)
+#	define INVALID_HANDLE_VALUE	(-1) // NOLINT(malterlib-macro-naming)
 
 #endif
 
-#ifdef MDB_USE_SYSV_SEM
-#	define MNAME_LEN	(sizeof(int))
+#ifdef DMdbUseSysvSem
+#	define DMnameLen	(sizeof(int))
 #else
-#	define MNAME_LEN	(sizeof(pthread_mutex_t))
+#	define DMnameLen	(sizeof(pthread_mutex_t))
 #endif
 
 		/** Initial part of #MDB_env.me_mutexname[].
-		 *	Changes to this code must be reflected in #MDB_LOCK_FORMAT.
+		 *	Changes to this code must be reflected in #DMdbLockFormat.
 		 */
 #ifdef DPlatformFamily_Windows
-#	define MUTEXNAME_PREFIX		"Global\\MDB"
+#	define DMutexNamePrefix		"Global\\MDB"
 #elif defined MDB_USE_POSIX_SEM
-#	define MUTEXNAME_PREFIX		"/MDB"
+#	define DMutexNamePrefix		"/MDB"
 #endif
 
 		/** @} */
 
-#ifdef MDB_ROBUST_SUPPORTED
+#ifdef DMdbRobustSupported
 		/** Lock mutex, handle any error, set rc = result.
 		 *	Return 0 on success, nonzero (not rc) on error.
 		 */
-#	define LOCK_MUTEX(rc, env, mutex) \
-		(((rc) = LOCK_MUTEX0(mutex)) && \
-		 ((rc) = env->mdb_mutex_failed(mutex, rc)))
+#	define DLockMutex(d_Rc, d_Env, d_Mutex) \
+		(((d_Rc) = DLockMutex0(d_Mutex)) && \
+		 ((d_Rc) = d_Env->mdb_mutex_failed(d_Mutex, d_Rc)))
 #else
-#	define LOCK_MUTEX(rc, env, mutex) ((rc) = LOCK_MUTEX0(mutex))
+#	define DLockMutex(d_Rc, d_Env, d_Mutex) ((d_Rc) = DLockMutex0(d_Mutex))
 #endif
 
 #ifndef DPlatformFamily_Windows
@@ -564,11 +564,11 @@ namespace NMib::NDatabase
 		 *	@note If O_DSYNC is undefined but exists in /usr/include,
 		 * preferably set some compiler flag to get the definition.
 		 */
-#	ifndef MDB_DSYNC
+#	ifndef DMdbDSync
 #		ifdef O_DSYNC
-#			define MDB_DSYNC	O_DSYNC
+#			define DMdbDSync	O_DSYNC
 #		else
-#			define MDB_DSYNC	O_SYNC
+#			define DMdbDSync	O_SYNC
 #		endif
 #	endif
 #endif
@@ -576,20 +576,20 @@ namespace NMib::NDatabase
 		/** Function for flushing the data of a file. Define this to fsync
 		 *	if fdatasync() is not supported.
 		 */
-#ifndef MDB_FDATASYNC
-#	define MDB_FDATASYNC	fdatasync
+#ifndef DMdbFDataSync
+#	define DMdbFDataSync	fdatasync
 #endif
 
-#ifndef MDB_MSYNC
-#	define MDB_MSYNC(addr,len,flags)	msync(addr,len,flags)
+#ifndef DMdbMsync
+#	define DMdbMsync(d_Addr,d_Len,d_Flags)	msync(d_Addr,d_Len,d_Flags)
 #endif
 
 #ifndef MS_SYNC
-#	define	MS_SYNC	1
+#	define	MS_SYNC	1 // NOLINT(malterlib-macro-naming)
 #endif
 
 #ifndef MS_ASYNC
-#	define	MS_ASYNC	0
+#	define	MS_ASYNC	0 // NOLINT(malterlib-macro-naming)
 #endif
 
 		/** A page number in the database.
@@ -634,15 +634,15 @@ namespace NMib::NDatabase
 		/**	Print a debug string.
 		 *	The string is printed literally, with no format processing.
 		 */
-#define DPUTS(arg)	DMibDatabaseTrace("{}", arg)
+#define DPuts(d_Arg)	DMibDatabaseTrace("{}", d_Arg)
 		/** Debuging output value of a cursor DBI: Negative in a sub-cursor. */
-#define DDBI(mc) \
-	(((mc)->mc_flags & C_SUB) ? -(int)(mc)->mc_dbi : (int)(mc)->mc_dbi)
+#define DDbi(d_Mc) \
+	(((d_Mc)->mc_flags & DCSub) ? -(int)(d_Mc)->mc_dbi : (int)(d_Mc)->mc_dbi)
 		/** @} */
 
 		/**	@brief The maximum size of a database page.
 		 *
-		 *	It is 32k or 64k, since value-PAGEBASE must fit in
+		 *	It is 32k or 64k, since value-DPageBase must fit in
 		 *	#MDB_page.%mp_upper.
 		 *
 		 *	LMDB will use database pages < OS pages if needed.
@@ -656,7 +656,7 @@ namespace NMib::NDatabase
 		 *	pressure from other processes is high. So until OSs have
 		 *	actual paging support for Huge pages, they're not viable.
 		 */
-#define MAX_PAGESIZE	 (PAGEBASE ? 0x10000 : 0x8000)
+#define DMaxPageSize	 (DPageBase ? 0x10000 : 0x8000)
 
 		/** The minimum number of keys required in a database page.
 		 *	Setting this to a larger value will place a smaller bound on the
@@ -670,29 +670,29 @@ namespace NMib::NDatabase
 		 *	value, items larger than 2KB will go into overflow pages, and on
 		 *	average only 1KB will be wasted.
 		 */
-#define MDB_MINKEYS	 2
+#define DMdbMinKeys	 2
 
 		/**	A stamp that identifies a file as an LMDB file.
 		 *	There's nothing special about this value other than that it is easily
 		 *	recognizable, and it will reflect any byte order mismatches.
 		 */
-#define MDB_MAGIC	 0xBEEFC0DE
+#define DMdbMagic	 0xBEEFC0DE
 
 		/**	The version number for a database's datafile format. */
-#define MDB_DATA_VERSION	 ((MDB_DEVEL) ? 999 : 1)
+#define DMdbDataVersion	 ((DMdbDevel) ? 999 : 1)
 		/**	The version number for a database's lockfile format. */
-#define MDB_LOCK_VERSION	 ((MDB_DEVEL) ? 999 : 2)
-		/** Number of bits representing #MDB_LOCK_VERSION in #MDB_LOCK_FORMAT.
+#define DMdbLockVersion	 ((DMdbDevel) ? 999 : 2)
+		/** Number of bits representing #DMdbLockVersion in #DMdbLockFormat.
 		 *	The remaining bits must leave room for #MDB_lock_desc.
 		 */
-#define MDB_LOCK_VERSION_BITS 12
+#define DMdbLockVersionBits 12
 
 			/**	@brief The max size of a key we can write, or 0 for computed max.
 			 *
 			 *	This macro should normally be left alone or set to 0.
 			 *	Note that a database with big keys or dupsort data cannot be
 			 *	reliably modified by a liblmdb which uses a smaller max.
-			 *	The default is 511 for backwards compat, or 0 when #MDB_DEVEL.
+			 *	The default is 511 for backwards compat, or 0 when #DMdbDevel.
 			 *
 			 *	Other values are allowed, for backwards compat.  However:
 			 *	A value bigger than the computed max can break if you do not
@@ -703,60 +703,60 @@ namespace NMib::NDatabase
 			 *	this size, since they're actually keys of a sub-DB.  Keys and
 			 *	#EDatabaseSubFlag_SortedDuplicates data items must fit on a node in a regular page.
 			 */
-#ifndef MDB_MAXKEYSIZE
-//#define MDB_MAXKEYSIZE	 ((MDB_DEVEL) ? 0 : 511)
-#	define MDB_MAXKEYSIZE	 0
+#ifndef DMdbMaxKeySize
+//#define DMdbMaxKeySize	 ((DMdbDevel) ? 0 : 511)
+#	define DMdbMaxKeySize	 0
 #endif
 
 			/**	The maximum size of a key we can write to the environment. */
-#if MDB_MAXKEYSIZE
-#	define ENV_MAXKEY(env)	(MDB_MAXKEYSIZE)
+#if DMdbMaxKeySize
+#	define DEnvMaxkey(d_Env)	(DMdbMaxKeySize)
 #else
-#	define ENV_MAXKEY(env)	((env)->me_maxkey)
+#	define DEnvMaxkey(d_Env)	((d_Env)->me_maxkey)
 #endif
 
 		/**	@brief The maximum size of a data item.
 		 *
 		 *	We only store a 32 bit value for node sizes.
 		 */
-#define MAXDATASIZE	0xffffffffUL
+#define DMaxDataSize	0xffffffffUL
 
 #if DMibDatabaseDebug
-		/**	Key size which fits in a #DKBUF.
+		/**	Key size which fits in a #DKBuf.
 		 *	@ingroup debug
 		 */
-#	define DKBUF_MAXKEYSIZE ((MDB_MAXKEYSIZE) > 0 ? (MDB_MAXKEYSIZE) : 511)
+#	define DKBufMaxKeySize ((DMdbMaxKeySize) > 0 ? (DMdbMaxKeySize) : 511)
 		/**	A key buffer.
 		 *	@ingroup debug
 		 *	This is used for printing a hex dump of a key's contents.
 		 */
-#	define DKBUF	char kbuf[DKBUF_MAXKEYSIZE*2+1]
+#	define DKBuf	char kbuf[DKBufMaxKeySize*2+1]
 		/**	Display a key in hex.
 		 *	@ingroup debug
 		 *	Invoke a function to display a key in hex.
 		 */
-#	define	DKEY(x)	mdb_dkey(x, kbuf)
+#	define	DKey(d_Key)	mdb_dkey(d_Key, kbuf)
 #else
-#	define	DKBUF
-#	define DKEY(x)	0
+#	define	DKBuf
+#	define DKey(d_Key)	0
 #endif
 
 		/** An invalid page number.
 		 *	Mainly used to denote an empty tree.
 		 */
-#define P_INVALID	 (~(pgno_t)0)
+#define DPInvalid	 (~(pgno_t)0)
 
 		/** Test if the flags \b f are set in a flag word \b w. */
-#define F_ISSET(w, f)	 (((w) & (f)) == (f))
+#define DFIsSet(d_Word, d_Flag)	 (((d_Word) & (d_Flag)) == (d_Flag))
 
 		/** Round \b n up to an even number. */
-#define EVEN(n)		(((n) + 1U) & -2) /* sign-extending -2 to match n+1U */
+#define DEven(d_Number)		(((d_Number) + 1U) & -2) /* sign-extending -2 to match n+1U */
 
 		/** Least significant 1-bit of \b n.  n must be of an unsigned type. */
-#define LOW_BIT(n)		((n) & (-(n)))
+#define DLowBit(d_Number)		((d_Number) & (-(d_Number)))
 
 		/** (log2(\b p2) % \b n), for p2 = power of 2 and 0 < n < 8. */
-#define LOG2_MOD(p2, n)	(7 - 86 / ((p2) % ((1U<<(n))-1) + 11))
+#define DLog2Mod(d_P2, d_Number)	(7 - 86 / ((d_P2) % ((1U<<(d_Number))-1) + 11))
 		/* Explanation: Let p2 = 2**(n*y + x), x<n and M = (1U<<n)-1. Now p2 =
 		 * (M+1)**y * 2**x = 2**x (mod M). Finally "/" "happens" to return 7-x.
 		 */
@@ -771,9 +771,9 @@ namespace NMib::NDatabase
 
 		mdb_hash_t mdb_hash(void const *val, size_t len);
 		void mdb_env_mname_init(MDB_env *env);
-#define MUTEXNAME(env, ch) ( \
-	(void) ((env)->me_mutexname[sizeof(MUTEXNAME_PREFIX)-1] = (ch)), \
-	(env)->me_mutexname)
+#define DMutexName(d_Env, d_Ch) ( \
+	(void) ((d_Env)->me_mutexname[sizeof(DMutexNamePrefix)-1] = (d_Ch)), \
+	(d_Env)->me_mutexname)
 
 #ifdef DPlatformFamily_Windows
 		/** @brief Map a result from an NTAPI call to WIN32. */
@@ -784,7 +784,7 @@ namespace NMib::NDatabase
 		 *	This is certainly too small for any actual applications. Apps should always set
 		 *	the size explicitly using #f_SetMapSize().
 		 */
-#define DEFAULT_MAPSIZE	1048576
+#define DDefaultMapSize	1048576
 
 		/**	@defgroup readers	Reader Lock Table
 		 *	Readers don't acquire any locks for their data access. Instead, they
@@ -830,7 +830,7 @@ namespace NMib::NDatabase
 		 *	couple mutexes fit exactly into 8KB on my development machine.
 		 *	Applications should set the table size using #f_SetMaxReaders().
 		 */
-#define DEFAULT_READERS	126
+#define DDefaultReaders	126
 
 		/**	The information we store in a single slot of the reader table.
 		 *	In addition to a transaction ID, we also record the process and
@@ -873,9 +873,9 @@ namespace NMib::NDatabase
 		struct MDB_txbody
 		{
 			/** Stamp identifying this as an LMDB file. It must be set
-			 *	to #MDB_MAGIC. */
+			 *	to #DMdbMagic. */
 			uint32 mtb_magic;
-			/** Format of this lock file. Must be set to #MDB_LOCK_FORMAT. */
+			/** Format of this lock file. Must be set to #DMdbLockFormat. */
 			uint32 mtb_format;
 			/**	The ID of the last transaction committed to the database.
 			 *	This is recorded here only for convenience; the value can always
@@ -890,12 +890,12 @@ namespace NMib::NDatabase
 #if defined(DPlatformFamily_Windows) || defined(MDB_USE_POSIX_SEM)
 			/** Binary form of names of the reader/writer locks */
 			mdb_hash_t mtb_mutexid;
-#elif defined(MDB_USE_SYSV_SEM)
+#elif defined(DMdbUseSysvSem)
 			int mtb_semid;
 			int mtb_rlocked;
 #else
 			/** Mutex protecting access to this table.
-			 *	This is the reader table lock used with LOCK_MUTEX().
+			 *	This is the reader table lock used with DLockMutex().
 			 */
 			mdb_mutex_t mtb_rmutex;
 #endif
@@ -907,7 +907,7 @@ namespace NMib::NDatabase
 			align_cacheline MDB_txbody m_TransactionBody;
 
 #if !(defined(DPlatformFamily_Windows) || defined(MDB_USE_POSIX_SEM))
-#	ifdef MDB_USE_SYSV_SEM
+#	ifdef DMdbUseSysvSem
 			align_cacheline int m_WriteLock;
 #	else
 			align_cacheline mdb_mutex_t m_WriteLock;
@@ -917,26 +917,26 @@ namespace NMib::NDatabase
 		};
 
 		/** Lockfile format signature: version, features and field layout */
-#define MDB_LOCK_FORMAT \
+#define DMdbLockFormat \
 	((uint32_t)         \
-	 (((MDB_LOCK_VERSION) % (1U << MDB_LOCK_VERSION_BITS)) \
-	  + MDB_lock_desc     * (1U << MDB_LOCK_VERSION_BITS)))
+	 (((DMdbLockVersion) % (1U << DMdbLockVersionBits)) \
+	  + MDB_lock_desc     * (1U << DMdbLockVersionBits)))
 
-			/** Lock type and layout. Values 0-119. DPlatformFamily_Windows implies #MDB_PIDLOCK.
+			/** Lock type and layout. Values 0-119. DPlatformFamily_Windows implies #DMdbPidLock.
 			 *	Some low values are reserved for future tweaks.
 			 */
 #ifdef DPlatformFamily_Windows
-#	define MDB_LOCK_TYPE	(0 + alignof(mdb_hash_t)/8 % 2)
+#	define DMdbLockType	(0 + alignof(mdb_hash_t)/8 % 2)
 #elif defined MDB_USE_POSIX_SEM
-#	define MDB_LOCK_TYPE	(4 + alignof(mdb_hash_t)/8 % 2)
-#elif defined MDB_USE_SYSV_SEM
-#	define MDB_LOCK_TYPE	(8)
-#elif defined MDB_USE_POSIX_MUTEX
+#	define DMdbLockType	(4 + alignof(mdb_hash_t)/8 % 2)
+#elif defined DMdbUseSysvSem
+#	define DMdbLockType	(8)
+#elif defined DMdbUsePosixMutex
 		/* We do not know the inside of a POSIX mutex and how to check if mutexes
 		 * used by two executables are compatible. Just check alignment and size.
 		 */
-#	define MDB_LOCK_TYPE	(10 + \
-		LOG2_MOD(alignof(pthread_mutex_t), 5) + \
+#	define DMdbLockType	(10 + \
+		DLog2Mod(alignof(pthread_mutex_t), 5) + \
 		sizeof(pthread_mutex_t) / 4U % 22 * 5)
 #endif
 
@@ -951,39 +951,39 @@ namespace NMib::NDatabase
 			 *
 			 *	The detected ranges are mostly guesswork, or based simply on how
 			 *	big they could be without using more bits.  So we can tweak them
-			 *	in good conscience when updating #MDB_LOCK_VERSION.
+			 *	in good conscience when updating #DMdbLockVersion.
 			 */
 			MDB_lock_desc =
 			/* Default CACHELINE=64 vs. other values (have seen mention of 32-256) */
-			(DMibPMemoryCacheLineSize == 64 ? 0 : 1 + LOG2_MOD(DMibPMemoryCacheLineSize >> int(DMibPMemoryCacheLineSize > 64), 5))
+			(DMibPMemoryCacheLineSize == 64 ? 0 : 1 + DLog2Mod(DMibPMemoryCacheLineSize >> int(DMibPMemoryCacheLineSize > 64), 5))
 			+ 6 * (sizeof(CProcessID) / 4 % 3) // legacy(2) to word(4/8)?
 			+ 18 * (sizeof(pthread_t) / 4 % 5) // can be struct{id, active data}
 			+ 90 * (sizeof(MDB_txbody) / DMibPMemoryCacheLineSize % 3)
-			+ 270 * (MDB_LOCK_TYPE % 120)
+			+ 270 * (DMdbLockType % 120)
 			/* The above is < 270*120 < 2**15 */
 			+ ((sizeof(CTransactionID) == 8) << 15) // 32bit/64bit
 			+ ((sizeof(MDB_reader) > DMibPMemoryCacheLineSize) << 16)
-			/* Not really needed - implied by MDB_LOCK_TYPE != (DPlatformFamily_Windows locking) */
-			+ (((MDB_PIDLOCK) != 0) << 17)
-			/* 18 bits total: Must be <= (32 - MDB_LOCK_VERSION_BITS). */
+			/* Not really needed - implied by DMdbLockType != (DPlatformFamily_Windows locking) */
+			+ (((DMdbPidLock) != 0) << 17)
+			/* 18 bits total: Must be <= (32 - DMdbLockVersionBits). */
 		};
 
 		/** @} */
 
 		/** Common header for all page types. The page type depends on #mp_flags.
 		 *
-		 * #P_BRANCH and #P_LEAF pages have unsorted '#MDB_node's at the end, with
-		 * sorted #mp_ptrs[] entries referring to them. Exception: #P_LEAF2 pages
+		 * #DPBranch and #DPLeaf pages have unsorted '#MDB_node's at the end, with
+		 * sorted #mp_ptrs[] entries referring to them. Exception: #DPLeaf2 pages
 		 * omit mp_ptrs and pack sorted #MDB_DUPFIXED values after the page header.
 		 *
-		 * #P_OVERFLOW records occupy one or more contiguous pages where only the
-		 * first has a page header. They hold the real data of #F_BIGDATA nodes.
+		 * #DPOverflow records occupy one or more contiguous pages where only the
+		 * first has a page header. They hold the real data of #DFBigData nodes.
 		 *
-		 * #P_SUBP sub-pages are small leaf "pages" with duplicate data.
-		 * A node with flag #F_DUPDATA but not #F_SUBDATA contains a sub-page.
+		 * #DPSubp sub-pages are small leaf "pages" with duplicate data.
+		 * A node with flag #DFDupData but not #DFSubData contains a sub-page.
 		 * (Duplicate data can also go in sub-databases, which use normal pages.)
 		 *
-		 * #P_META pages contain #MDB_meta, the start point of an LMDB snapshot.
+		 * #DPMeta pages contain #MDB_meta, the start point of an LMDB snapshot.
 		 *
 		 * Each non-metapage up to #MDB_meta.%mm_last_pg is reachable exactly once
 		 * in the snapshot: Either used by a database or listed in a freeDB record.
@@ -1001,15 +1001,15 @@ namespace NMib::NDatabase
 			 *	Flags for the page headers.
 			 *	@{
 			 */
-#define	P_BRANCH	 0x01		/**< branch page */
-#define	P_LEAF		 0x02		/**< leaf page */
-#define	P_OVERFLOW	 0x04		/**< overflow page */
-#define	P_META		 0x08		/**< meta page */
-#define	P_DIRTY		 0x10		/**< dirty page, also set for #P_SUBP pages */
-#define	P_LEAF2		 0x20		/**< for #EDatabaseSubFlag_SortedDuplicatesFixedSize records */
-#define	P_SUBP		 0x40		/**< for #EDatabaseSubFlag_SortedDuplicates sub-pages */
-#define	P_LOOSE		 0x4000		/**< page was dirtied then freed, can be reused */
-#define	P_KEEP		 0x8000		/**< leave this page alone during spill */
+#define	DPBranch	 0x01		/**< branch page */
+#define	DPLeaf		 0x02		/**< leaf page */
+#define	DPOverflow	 0x04		/**< overflow page */
+#define	DPMeta		 0x08		/**< meta page */
+#define	DPDirty		 0x10		/**< dirty page, also set for #DPSubp pages */
+#define	DPLeaf2		 0x20		/**< for #EDatabaseSubFlag_SortedDuplicatesFixedSize records */
+#define	DPSubp		 0x40		/**< for #EDatabaseSubFlag_SortedDuplicates sub-pages */
+#define	DPLoose		 0x4000		/**< page was dirtied then freed, can be reused */
+#define	DPKeep		 0x8000		/**< leave this page alone during spill */
 			/** @} */
 			uint16 mp_flags; ///< @ref mdb_page
 #define mp_lower	mp_pb.pb.pb_lower
@@ -1028,50 +1028,50 @@ namespace NMib::NDatabase
 		};
 
 		/** Size of the page header, excluding dynamic data at the end */
-#define PAGEHDRSZ	 ((unsigned) offsetof(MDB_page, mp_ptrs))
+#define DPageHeaderSize	 ((unsigned) offsetof(MDB_page, mp_ptrs))
 
 		/** Address of first usable data byte in a page, after the header */
-#define METADATA(p)	 ((uint8 *)(p) + PAGEHDRSZ)
+#define DMetaData(d_Page)	 ((uint8 *)(d_Page) + DPageHeaderSize)
 
-			/** ITS#7713, change PAGEBASE to handle 65536 byte pages */
-//#define	PAGEBASE	((MDB_DEVEL) ? PAGEHDRSZ : 0)
-#define	PAGEBASE	PAGEHDRSZ
+			/** ITS#7713, change DPageBase to handle 65536 byte pages */
+//#define	DPageBase	((DMdbDevel) ? DPageHeaderSize : 0)
+#define	DPageBase	DPageHeaderSize
 
 		/** Number of nodes on a page */
-#define NUMKEYS(p)	 (((p)->mp_lower - (PAGEHDRSZ-PAGEBASE)) >> 1)
+#define DNumKeys(d_Page)	 (((d_Page)->mp_lower - (DPageHeaderSize-DPageBase)) >> 1)
 
 		/** The amount of space remaining in the page */
-#define SIZELEFT(p)	 (indx_t)((p)->mp_upper - (p)->mp_lower)
+#define DSizeLeft(d_Page)	 (indx_t)((d_Page)->mp_upper - (d_Page)->mp_lower)
 
 		/** The percentage of space used in the page, in tenths of a percent. */
-#define PAGEFILL(env, p) (1000L * ((env)->me_psize - PAGEHDRSZ - SIZELEFT(p)) / \
-	((env)->me_psize - PAGEHDRSZ))
+#define DPageFill(d_Env, d_Page) (1000L * ((d_Env)->me_psize - DPageHeaderSize - DSizeLeft(d_Page)) / \
+	((d_Env)->me_psize - DPageHeaderSize))
 		/** The minimum page fill factor, in tenths of a percent.
 		 *	Pages emptier than this are candidates for merging.
 		 */
-#define FILL_THRESHOLD	 250
+#define DFillThreshold	 250
 
 		/** Test if a page is a leaf page */
-#define IS_LEAF(p)	 F_ISSET((p)->mp_flags, P_LEAF)
+#define DIsLeaf(d_Page)	 DFIsSet((d_Page)->mp_flags, DPLeaf)
 		/** Test if a page is a LEAF2 page */
-#define IS_LEAF2(p)	 F_ISSET((p)->mp_flags, P_LEAF2)
+#define DIsLeaf2(d_Page)	 DFIsSet((d_Page)->mp_flags, DPLeaf2)
 		/** Test if a page is a branch page */
-#define IS_BRANCH(p)	 F_ISSET((p)->mp_flags, P_BRANCH)
+#define DIsBranch(d_Page)	 DFIsSet((d_Page)->mp_flags, DPBranch)
 		/** Test if a page is an overflow page */
-#define IS_OVERFLOW(p)	 F_ISSET((p)->mp_flags, P_OVERFLOW)
+#define DIsOverflow(d_Page)	 DFIsSet((d_Page)->mp_flags, DPOverflow)
 		/** Test if a page is a sub page */
-#define IS_SUBP(p)	 F_ISSET((p)->mp_flags, P_SUBP)
+#define DIsSubp(d_Page)	 DFIsSet((d_Page)->mp_flags, DPSubp)
 
 		/** The number of overflow pages needed to store the given size. */
-#define OVPAGES(size, psize)	((PAGEHDRSZ-1 + (size)) / (psize) + 1)
+#define DOverflowPages(d_Size, d_Psize)	((DPageHeaderSize-1 + (d_Size)) / (d_Psize) + 1)
 
 		/** Link in #MDB_txn.%mt_loose_pgs list.
 		 *  Kept outside the page header, which is needed when reusing the page.
 		 */
-#define NEXT_LOOSE_PAGE(p)		(*(MDB_page **)((p) + 2))
+#define DNextLoosePage(d_Page)		(*(MDB_page **)((d_Page) + 2))
 
 		/** Header for a single key/data pair within a page.
-		 * Used in pages of type #P_BRANCH and #P_LEAF without #P_LEAF2.
+		 * Used in pages of type #DPBranch and #DPLeaf without #DPLeaf2.
 		 * We guarantee 2-byte alignment for 'MDB_node's.
 		 *
 		 * #mn_lo and #mn_hi are used for data size on leaf nodes, and for child
@@ -1079,10 +1079,10 @@ namespace NMib::NDatabase
 		 * for pgno.  (Branch nodes have no flags).  Lo and hi are in host byte
 		 * order in case some accesses can be optimized to 32-bit word access.
 		 *
-		 * Leaf node flags describe node contents.  #F_BIGDATA says the node's
+		 * Leaf node flags describe node contents.  #DFBigData says the node's
 		 * data part is the page number of an overflow page with actual data.
-		 * #F_DUPDATA and #F_SUBDATA can be combined giving duplicate data in
-		 * a sub-page/sub-database, and named databases (just #F_SUBDATA).
+		 * #DFDupData and #DFSubData can be combined giving duplicate data in
+		 * a sub-page/sub-database, and named databases (just #DFSubData).
 		 */
 		struct MDB_node
 		{
@@ -1099,12 +1099,12 @@ namespace NMib::NDatabase
 			 *	Flags for node headers.
 			 *	@{
 			 */
-#define F_BIGDATA	 0x01			/**< data put on overflow page */
-#define F_SUBDATA	 0x02			/**< data is a sub-database */
-#define F_DUPDATA	 0x04			/**< data has duplicates */
+#define DFBigData	 0x01			/**< data put on overflow page */
+#define DFSubData	 0x02			/**< data is a sub-database */
+#define DFDupData	 0x04			/**< data has duplicates */
 
 			/** valid flags for #mdb_node_add() */
-#define	NODE_ADD_FLAGS	(F_DUPDATA|F_SUBDATA|EDatabaseWriteFlag_ReserveSpace|EDatabaseWriteFlag_Append)
+#define	DNodeAddFlags	(DFDupData|DFSubData|EDatabaseWriteFlag_ReserveSpace|EDatabaseWriteFlag_Append)
 
 			/** @} */
 			unsigned short mn_flags; ///< @ref mdb_node
@@ -1113,66 +1113,66 @@ namespace NMib::NDatabase
 		};
 
 		/** Size of the node header, excluding dynamic data at the end */
-#define NODESIZE	 offsetof(MDB_node, mn_data)
+#define DNodeSize	 offsetof(MDB_node, mn_data)
 
 		/** Bit position of top word in page number, for shifting mn_flags */
-#define PGNO_TOPWORD ((pgno_t)-1 > 0xffffffffu ? 32 : 0)
+#define DPgnoTopword ((pgno_t)-1 > 0xffffffffu ? 32 : 0)
 
 		/** Size of a node in a branch page with a given key.
 		 *	This is just the node header plus the key, there is no data.
 		 */
-#define INDXSIZE(k)	 (NODESIZE + ((k) == nullptr ? 0 : (k)->m_Size))
+#define DIndexSize(d_Key)	 (DNodeSize + ((d_Key) == nullptr ? 0 : (d_Key)->m_Size))
 
 		/** Size of a node in a leaf page with a given key and data.
 		 *	This is node header plus key plus data size.
 		 */
-#define LEAFSIZE(k, d)	 (NODESIZE + (k)->m_Size + (d)->m_Size)
+#define DLeafSize(d_Key, d_Data)	 (DNodeSize + (d_Key)->m_Size + (d_Data)->m_Size)
 
 		/** Address of node \b i in page \b p */
-#define NODEPTR(p, i)	 ((MDB_node *)((char *)(p) + (p)->mp_ptrs[i] + PAGEBASE))
+#define DNodePtr(d_Page, d_Index)	 ((MDB_node *)((char *)(d_Page) + (d_Page)->mp_ptrs[d_Index] + DPageBase))
 
 		/** Address of the key for the node */
-#define NODEKEY(node)	 (uint8 *)((node)->mn_data)
+#define DNodeKey(d_Node)	 (uint8 *)((d_Node)->mn_data)
 
 		/** Address of the data for a node */
-#define NODEDATA(node)	 ((uint8 *)(node)->mn_data + (node)->mn_ksize)
+#define DNodeData(d_Node)	 ((uint8 *)(d_Node)->mn_data + (d_Node)->mn_ksize)
 
 		/** Get the page number pointed to by a branch node */
-#define NODEPGNO(node) \
-	((node)->mn_lo | ((pgno_t) (node)->mn_hi << 16) | \
-	 (PGNO_TOPWORD ? ((pgno_t) (node)->mn_flags << PGNO_TOPWORD) : 0))
+#define DNodePgno(d_Node) \
+	((d_Node)->mn_lo | ((pgno_t) (d_Node)->mn_hi << 16) | \
+	 (DPgnoTopword ? ((pgno_t) (d_Node)->mn_flags << DPgnoTopword) : 0))
 		/** Set the page number in a branch node */
-#define SETPGNO(node,pgno)	do { \
-	(node)->mn_lo = (pgno) & 0xffff; (node)->mn_hi = (pgno) >> 16; \
-	if (PGNO_TOPWORD) (node)->mn_flags = (pgno) >> PGNO_TOPWORD; } while(0)
+#define DSetPgno(d_Node,d_Pgno)	do { \
+	(d_Node)->mn_lo = (d_Pgno) & 0xffff; (d_Node)->mn_hi = (d_Pgno) >> 16; \
+	if (DPgnoTopword) (d_Node)->mn_flags = (d_Pgno) >> DPgnoTopword; } while(0)
 
 		/** Get the size of the data in a leaf node */
-#define NODEDSZ(node)	 ((node)->mn_lo | ((unsigned)(node)->mn_hi << 16))
+#define DNodeDataSize(d_Node)	 ((d_Node)->mn_lo | ((unsigned)(d_Node)->mn_hi << 16))
 		/** Set the size of the data for a leaf node */
-#define SETDSZ(node,size)	do { \
-	(node)->mn_lo = (size) & 0xffff; (node)->mn_hi = (size) >> 16;} while(0)
+#define DSetDataSize(d_Node,d_Size)	do { \
+	(d_Node)->mn_lo = (d_Size) & 0xffff; (d_Node)->mn_hi = (d_Size) >> 16;} while(0)
 		/** The size of a key in a node */
-#define NODEKSZ(node)	 ((node)->mn_ksize)
+#define DNodeKeySize(d_Node)	 ((d_Node)->mn_ksize)
 
 			/** Copy a page number from src to dst */
-#ifdef MISALIGNED_OK
-#	define COPY_PGNO(dst,src)	dst = src
+#ifdef DMisalignedOk
+#	define DCopyPgno(d_Dst,d_Src)	d_Dst = d_Src
 #else
 #	if DMibDatabase_IDBits > 32
-#		define COPY_PGNO(dst,src)	do { \
+#		define DCopyPgno(d_Dst,d_Src)	do { \
 				unsigned short *s, *d;	\
-				s = (unsigned short *)&(src);	\
-				d = (unsigned short *)&(dst);	\
+				s = (unsigned short *)&(d_Src);	\
+				d = (unsigned short *)&(d_Dst);	\
 				*d++ = *s++;	\
 				*d++ = *s++;	\
 				*d++ = *s++;	\
 				*d = *s;	\
 			} while (0)
 #	else
-#		define COPY_PGNO(dst,src)	do { \
+#		define DCopyPgno(d_Dst,d_Src)	do { \
 				unsigned short *s, *d;	\
-				s = (unsigned short *)&(src);	\
-				d = (unsigned short *)&(dst);	\
+				s = (unsigned short *)&(d_Src);	\
+				d = (unsigned short *)&(d_Dst);	\
 				*d++ = *s++;	\
 				*d = *s;	\
 			} while (0)
@@ -1182,14 +1182,14 @@ namespace NMib::NDatabase
 		 *	LEAF2 pages are used for #EDatabaseSubFlag_SortedDuplicatesFixedSize sorted-duplicate sub-DBs.
 		 *	There are no node headers, keys are stored contiguously.
 		 */
-#define LEAF2KEY(p, i, ks)	((uint8 *)(p) + PAGEHDRSZ + ((i)*(ks)))
+#define DLeaf2Key(d_Page, d_Index, d_Ks)	((uint8 *)(d_Page) + DPageHeaderSize + ((d_Index)*(d_Ks)))
 
 		/** Set the \b node's key into \b keyptr, if requested. */
-#define MDB_GET_KEY(node, keyptr)	{ if ((keyptr) != nullptr) { \
-	(keyptr)->m_Size = NODEKSZ(node); (keyptr)->m_pData = (uint8 *)NODEKEY(node); } }
+#define DMdbGetKey(d_Node, d_Keyptr)	{ if ((d_Keyptr) != nullptr) { \
+	(d_Keyptr)->m_Size = DNodeKeySize(d_Node); (d_Keyptr)->m_pData = (uint8 *)DNodeKey(d_Node); } }
 
 		/** Set the \b node's key into \b key. */
-#define MDB_GET_KEY2(node, key)	{ key.m_Size = NODEKSZ(node); key.m_pData = NODEKEY(node); }
+#define DMdbGetKey2(d_Node, d_Key)	{ d_Key.m_Size = DNodeKeySize(d_Node); d_Key.m_pData = DNodeKey(d_Node); }
 
 		/** Information about a single database in the environment. */
 		struct MDB_db
@@ -1204,21 +1204,21 @@ namespace NMib::NDatabase
 			pgno_t md_root;             ///< the root page of this tree
 		};
 
-#define MDB_VALID	0x8000		/**< DB handle is valid, for me_dbflags */
-#define PERSISTENT_FLAGS	(0xffff & ~(MDB_VALID))
+#define DMdbValid	0x8000		/**< DB handle is valid, for me_dbflags */
+#define DPersistentFlags	(0xffff & ~(DMdbValid))
 		/** f_OpenDatabase flags */
-#define VALID_FLAGS	(EDatabaseSubFlag_ReverseKeys|EDatabaseSubFlag_SortedDuplicates|EDatabaseSubFlag_IntegerKeys|EDatabaseSubFlag_SortedDuplicatesFixedSize|\
+#define DValidFlags	(EDatabaseSubFlag_ReverseKeys|EDatabaseSubFlag_SortedDuplicates|EDatabaseSubFlag_IntegerKeys|EDatabaseSubFlag_SortedDuplicatesFixedSize|\
 	EDatabaseSubFlag_SortedDuplicatesIntegerKeys|EDatabaseSubFlag_SortedDuplicatesReverseKeys|EDatabaseSubFlag_Create)
 
 		/** Handle for the DB used to track free pages. */
-#define	FREE_DBI	0
+#define	DFreeDbi	0
 		/** Handle for the default DB. */
-#define	MAIN_DBI	1
+#define	DMainDbi	1
 		/** Number of DBs in metapage (free and main) - also hardcoded elsewhere */
-#define CORE_DBS	2
+#define DCoreDbs	2
 
 		/** Number of meta pages - also hardcoded elsewhere */
-#define NUM_METAS	2
+#define DNumMetas	2
 
 		/** Meta page content.
 		 *	A meta page is the start point for accessing a database snapshot.
@@ -1227,9 +1227,9 @@ namespace NMib::NDatabase
 		struct MDB_meta
 		{
 			/** Stamp identifying this as an LMDB file. It must be set
-			 *	to #MDB_MAGIC. */
+			 *	to #DMdbMagic. */
 			uint32 mm_magic;
-			/** Version number of this file. Must be set to #MDB_DATA_VERSION. */
+			/** Version number of this file. Must be set to #DMdbDataVersion. */
 			uint32 mm_version;
 #ifdef DMibDatabase_Always64BitSupport
 			union
@@ -1242,7 +1242,7 @@ namespace NMib::NDatabase
 			void *mm_address; ///< address for fixed mapping
 #endif
 			CDatabaseOffset mm_mapsize; ///< size of mmap region
-			MDB_db mm_dbs[CORE_DBS];    ///< first is free space, 2nd is main db
+			MDB_db mm_dbs[DCoreDbs];    ///< first is free space, 2nd is main db
 			/** Last used page in the datafile.
 			 *	Actually the file may be shorter if the freeDB lists the final pages.
 			 */
@@ -1260,7 +1260,7 @@ namespace NMib::NDatabase
 			MDB_page mb_page;
 			struct
 			{
-				char mm_pad[PAGEHDRSZ];
+				char mm_pad[DPageHeaderSize];
 				MDB_meta mm_meta;
 			} mb_metabuf;
 		} MDB_metabuf;
@@ -1302,7 +1302,7 @@ namespace NMib::NDatabase
 		NPrivate::MDB_cursor *f_Cursor(CDatabaseSubID _DatabaseID);
 
 		NPrivate::MDB_txn *mt_parent; ///< parent of a nested txn
-		/** Nested txn under this txn, set together with flag #MDB_TXN_HAS_CHILD */
+		/** Nested txn under this txn, set together with flag #DMdbTxnHasChild */
 		NPrivate::MDB_txn *mt_child;
 		NPrivate::pgno_t mt_next_pgno; ///< next unallocated page
 #ifdef DMibDatabase_Always64BitSupport
@@ -1318,7 +1318,7 @@ namespace NMib::NDatabase
 		 */
 		NPrivate::MDB_IDL mt_free_pgs;
 		/** The list of loose pages that became unused and may be reused
-		 *	in this transaction, linked through #NEXT_LOOSE_PAGE(page).
+		 *	in this transaction, linked through #DNextLoosePage(page).
 		 */
 		NPrivate::MDB_page *mt_loose_pgs;
 		/** Number of loose pages (#mt_loose_pgs) */
@@ -1345,12 +1345,12 @@ namespace NMib::NDatabase
 		 *	@ingroup internal
 		 * @{
 		 */
-#define DB_DIRTY	0x01		/**< DB was written in this txn */
-#define DB_STALE	0x02		/**< Named-DB record is older than txnID */
-#define DB_NEW		0x04		/**< Named-DB handle opened in this txn */
-#define DB_VALID	0x08		/**< DB handle is valid, see also #MDB_VALID */
-#define DB_USRVALID	0x10		/**< As #DB_VALID, but not set for #FREE_DBI */
-#define DB_DUPDATA	0x20		/**< DB is #MDB_DUPSORT data */
+#define DDbDirty	0x01		/**< DB was written in this txn */
+#define DDbStale	0x02		/**< Named-DB record is older than txnID */
+#define DDbNew		0x04		/**< Named-DB handle opened in this txn */
+#define DDbValid	0x08		/**< DB handle is valid, see also #DMdbValid */
+#define DDbUserValid	0x10		/**< As #DDbValid, but not set for #DFreeDbi */
+#define DDbDupData	0x20		/**< DB is #MDB_DUPSORT data */
 		/** @} */
 		/** In write txns, array of cursors for each DB */
 		NPrivate::MDB_cursor **mt_cursors;
@@ -1364,9 +1364,9 @@ namespace NMib::NDatabase
 		 * a chunk boundary. We do the same on Linux for symmetry, and also to
 		 * reduce the frequency of mmap/munmap calls.
 		 */
-#	define MDB_RPAGE_CHUNK	16
-#	define MDB_TRPAGE_SIZE	4096	/**< size of #mt_rpages array of chunks */
-#	define MDB_TRPAGE_MAX	(MDB_TRPAGE_SIZE-1)	/**< maximum chunk index */
+#	define DMdbRpageChunk	16
+#	define DMdbTrpageSize	4096	/**< size of #mt_rpages array of chunks */
+#	define DMdbTrpageMax	(DMdbTrpageSize-1)	/**< maximum chunk index */
 		uint32 mt_rpcheck; ///< threshold for reclaiming unref'd chunks
 #endif
 		/**	Number of DB records in use, or 0 when the txn is finished.
@@ -1380,19 +1380,19 @@ namespace NMib::NDatabase
 		 *	@{
 		 */
 		/** #mdb_txn_begin() flags */
-#define MDB_TXN_BEGIN_FLAGS	(EDatabaseEnvironmentFlag_NoMetaSync|EDatabaseEnvironmentFlag_NoSync|EDatabaseEnvironmentFlag_ReadOnly)
-#define MDB_TXN_NOMETASYNC	EDatabaseEnvironmentFlag_NoMetaSync	/**< don't sync meta for this txn on commit */
-#define MDB_TXN_NOSYNC		EDatabaseEnvironmentFlag_NoSync	/**< don't sync this txn on commit */
-#define MDB_TXN_RDONLY		EDatabaseEnvironmentFlag_ReadOnly	/**< read-only transaction */
+#define DMdbTxnBeginFlags	(EDatabaseEnvironmentFlag_NoMetaSync|EDatabaseEnvironmentFlag_NoSync|EDatabaseEnvironmentFlag_ReadOnly)
+#define DMdbTxnNoMetaSync	EDatabaseEnvironmentFlag_NoMetaSync	/**< don't sync meta for this txn on commit */
+#define DMdbTxnNoSync		EDatabaseEnvironmentFlag_NoSync	/**< don't sync this txn on commit */
+#define DMdbTxnReadOnly		EDatabaseEnvironmentFlag_ReadOnly	/**< read-only transaction */
 		/* internal txn flags */
-#define MDB_TXN_WRITEMAP	EDatabaseEnvironmentFlag_WriteMap	/**< copy of #MDB_env flag in writers */
-#define MDB_TXN_FINISHED	0x01		/**< txn is finished or never began */
-#define MDB_TXN_ERROR		0x02		/**< txn is unusable after an error */
-#define MDB_TXN_DIRTY		0x04		/**< must write, even if dirty list is empty */
-#define MDB_TXN_SPILLS		0x08		/**< txn or a parent has spilled pages */
-#define MDB_TXN_HAS_CHILD	0x10		/**< txn has an #MDB_txn.%mt_child */
+#define DMdbTxnWriteMap	EDatabaseEnvironmentFlag_WriteMap	/**< copy of #MDB_env flag in writers */
+#define DMdbTxnFinished	0x01		/**< txn is finished or never began */
+#define DMdbTxnError		0x02		/**< txn is unusable after an error */
+#define DMdbTxnDirty		0x04		/**< must write, even if dirty list is empty */
+#define DMdbTxnSpills		0x08		/**< txn or a parent has spilled pages */
+#define DMdbTxnHasChild	0x10		/**< txn has an #MDB_txn.%mt_child */
 		/** most operations on the txn are currently illegal */
-#define MDB_TXN_BLOCKED		(MDB_TXN_FINISHED|MDB_TXN_ERROR|MDB_TXN_HAS_CHILD)
+#define DMdbTxnBlocked		(DMdbTxnFinished|DMdbTxnError|DMdbTxnHasChild)
 		/** @} */
 		uint32 mt_flags; ///< @ref mdb_txn
 		/** #dirty_list room: Array size - \#dirty pages visible to this txn.
@@ -1409,7 +1409,7 @@ namespace NMib::NDatabase
 		 * At 4 keys per node, enough for 2^64 nodes, so there's probably no need to
 		 * raise this on a 64 bit machine.
 		 */
-#define CURSOR_STACK		 32
+#define DCursorStack		 32
 
 		struct MDB_xcursor;
 
@@ -1418,8 +1418,8 @@ namespace NMib::NDatabase
 		 *	root to a position in the DB, plus other state. #EDatabaseSubFlag_SortedDuplicates
 		 *	cursors include an xcursor to the current data item. Write txns
 		 *	track their cursors and keep them up to date when data moves.
-		 *	Exception: An xcursor's pointer to a #P_SUBP page can be stale.
-		 *	(A node with #F_DUPDATA but no #F_SUBDATA contains a subpage).
+		 *	Exception: An xcursor's pointer to a #DPSubp page can be stale.
+		 *	(A node with #DFDupData but no #DFSubData contains a subpage).
 		 */
 	}
 
@@ -1448,28 +1448,28 @@ namespace NMib::NDatabase
 		 *	Cursor state flags.
 		 *	@{
 		 */
-#define C_INITIALIZED	0x01	/**< cursor has been initialized and is valid */
-#define C_EOF	0x02			/**< No more data */
-#define C_SUB	0x04			/**< Cursor is a sub-cursor */
-#define C_DEL	0x08			/**< last op was a cursor_del */
-#define C_UNTRACK	0x40		/**< Un-track cursor when closing */
-#define C_WRITEMAP	MDB_TXN_WRITEMAP /**< Copy of txn flag */
+#define DCInitialized	0x01	/**< cursor has been initialized and is valid */
+#define DCEof	0x02			/**< No more data */
+#define DCSub	0x04			/**< Cursor is a sub-cursor */
+#define DCDel	0x08			/**< last op was a cursor_del */
+#define DCUntrack	0x40		/**< Un-track cursor when closing */
+#define DCWriteMap	DMdbTxnWriteMap /**< Copy of txn flag */
 		/** Read-only cursor into the txn's original snapshot in the map.
-		 *	Set for read-only txns, and in #mdb_page_alloc() for #FREE_DBI when
-		 *	#MDB_DEVEL & 2. Only implements code which is necessary for this.
+		 *	Set for read-only txns, and in #mdb_page_alloc() for #DFreeDbi when
+		 *	#DMdbDevel & 2. Only implements code which is necessary for this.
 		 */
-#define C_ORIG_RDONLY	MDB_TXN_RDONLY
+#define DCOrigReadOnly	DMdbTxnReadOnly
 		/** @} */
 		uint32 mc_flags;                         ///< @ref mdb_cursor
-		NPrivate::MDB_page *mc_pg[CURSOR_STACK]; ///< stack of pushed pages
-		NPrivate::indx_t mc_ki[CURSOR_STACK];    ///< stack of page indices
+		NPrivate::MDB_page *mc_pg[DCursorStack]; ///< stack of pushed pages
+		NPrivate::indx_t mc_ki[DCursorStack];    ///< stack of page indices
 #ifdef DMibDatabase_Always64BitSupport
 		NPrivate::MDB_page *mc_ovpg; ///< a referenced overflow page
-#	define MC_OVPG(mc)			((mc)->mc_ovpg)
-#	define MC_SET_OVPG(mc, pg)	((mc)->mc_ovpg = (pg))
+#	define DMcOvpg(d_Mc)			((d_Mc)->mc_ovpg)
+#	define DMcSetOvpg(d_Mc, d_Pg)	((d_Mc)->mc_ovpg = (d_Pg))
 #else
-#	define MC_OVPG(mc)			((MDB_page *)0)
-#	define MC_SET_OVPG(mc, pg)	((void)0)
+#	define DMcOvpg(d_Mc)			((MDB_page *)0)
+#	define DMcSetOvpg(d_Mc, d_Pg)	((void)0)
 #endif
 		void f_Put(CDatabaseValue *key, CDatabaseValue *data, EDatabaseWriteFlag _WriteFlags);
 		void f_Delete(EDatabaseWriteFlag _WriteFlags);
@@ -1496,20 +1496,20 @@ namespace NMib::NDatabase
 		};
 
 		/** Check if there is an inited xcursor */
-#define XCURSOR_INITED(mc) \
-	((mc)->mc_xcursor && ((mc)->mc_xcursor->mx_cursor.mc_flags & C_INITIALIZED))
+#define DXCursorInited(d_Mc) \
+	((d_Mc)->mc_xcursor && ((d_Mc)->mc_xcursor->mx_cursor.mc_flags & DCInitialized))
 
 		/** Update the xcursor's sub-page pointer, if any, in \b mc.  Needed
 		 *	when the node which contains the sub-page may have moved.  Called
 		 *	with leaf page \b mp = mc->mc_pg[\b top].
 		 */
-#define XCURSOR_REFRESH(mc, top, mp) do { \
-		MDB_page *xr_pg = (mp); \
+#define DXCursorRefresh(d_Mc, d_Top, d_Mp) do { \
+		MDB_page *xr_pg = (d_Mp); \
 		MDB_node *xr_node; \
-		if (!XCURSOR_INITED(mc) || (mc)->mc_ki[top] >= NUMKEYS(xr_pg)) break; \
-		xr_node = NODEPTR(xr_pg, (mc)->mc_ki[top]); \
-		if ((xr_node->mn_flags & (F_DUPDATA|F_SUBDATA)) == F_DUPDATA) \
-			(mc)->mc_xcursor->mx_cursor.mc_pg[0] = (MDB_page *)NODEDATA(xr_node); \
+		if (!DXCursorInited(d_Mc) || (d_Mc)->mc_ki[d_Top] >= DNumKeys(xr_pg)) break; \
+		xr_node = DNodePtr(xr_pg, (d_Mc)->mc_ki[d_Top]); \
+		if ((xr_node->mn_flags & (DFDupData|DFSubData)) == DFDupData) \
+			(d_Mc)->mc_xcursor->mx_cursor.mc_pg[0] = (MDB_page *)DNodeData(xr_node); \
 	} while (0)
 
 		/** State of FreeDB old pages, stored in the MDB_env */
@@ -1526,7 +1526,7 @@ namespace NMib::NDatabase
 			MDB_pgstate mnt_pgstate; ///< parent transaction's saved freestate
 		};
 
-#if !(MDB_PIDLOCK)		/* Currently the same as defined(DPlatformFamily_Windows) */
+#if !(DMdbPidLock)		/* Currently the same as defined(DPlatformFamily_Windows) */
 		enum Pidlock_op
 		{
 			Pidset
@@ -1541,9 +1541,9 @@ namespace NMib::NDatabase
 #endif
 
 #ifdef O_CLOEXEC /* POSIX.1-2008: Set FD_CLOEXEC atomically at open() */
-#	define MDB_CLOEXEC		O_CLOEXEC
+#	define DMdbCloExec		O_CLOEXEC
 #else
-#	define MDB_CLOEXEC		0
+#	define DMdbCloExec		0
 #endif
 
 		/** File type, access mode etc. for #mdb_fopen() */
@@ -1559,13 +1559,13 @@ namespace NMib::NDatabase
 			/* A comment in mdb_fopen() explains some O_* flag choices. */
 			MDB_O_RDONLY = O_RDONLY ///< for RDONLY me_fd
 			, MDB_O_RDWR = O_RDWR | O_CREAT                          ///< for me_fd
-			, MDB_O_META = O_WRONLY | MDB_DSYNC | MDB_CLOEXEC        ///< for me_mfd
-			, MDB_O_COPY = O_WRONLY | O_CREAT | O_EXCL | MDB_CLOEXEC ///< for #mdb_env_copy()
+			, MDB_O_META = O_WRONLY | DMdbDSync | DMdbCloExec        ///< for me_mfd
+			, MDB_O_COPY = O_WRONLY | O_CREAT | O_EXCL | DMdbCloExec ///< for #mdb_env_copy()
 			/** Bitmask for open() flags in enum #mdb_fopen_type.  The other bits
 			 * distinguish otherwise-equal MDB_O_* constants from each other.
 			 */
-			, MDB_O_MASK  = MDB_O_RDWR | MDB_CLOEXEC | MDB_O_RDONLY | MDB_O_META | MDB_O_COPY
-			, MDB_O_LOCKS = MDB_O_RDWR | MDB_CLOEXEC | ((MDB_O_MASK + 1) & ~MDB_O_MASK) ///< for me_lfd
+			, MDB_O_MASK  = MDB_O_RDWR | DMdbCloExec | MDB_O_RDONLY | MDB_O_META | MDB_O_COPY
+			, MDB_O_LOCKS = MDB_O_RDWR | DMdbCloExec | ((MDB_O_MASK + 1) & ~MDB_O_MASK) ///< for me_lfd
 #endif
 		};
 
@@ -1585,13 +1585,13 @@ namespace NMib::NDatabase
 		HANDLE me_fmh; ///< File Mapping handle
 #endif
 		/** Failed to update the meta page. Probably an I/O error. */
-#define	MDB_FATAL_ERROR	0x80000000U
+#define	DMdbFatalError	0x80000000U
 		/** Some fields are initialized. */
-#define	MDB_ENV_ACTIVE	0x20000000U
+#define	DMdbEnvActive	0x20000000U
 		/** me_txkey is set */
-#define	MDB_ENV_TXKEY	0x10000000U
+#define	DMdbEnvTxkey	0x10000000U
 		/** fdatasync is unreliable */
-#define	MDB_FSYNCONLY	0x08000000U
+#define	DMdbFSyncOnly	0x08000000U
 		uint32 me_flags;     ///< @ref mdb_env
 		uint32 me_psize;     ///< DB page size, inited from me_os_psize
 		uint32 me_os_psize;  ///< OS page size
@@ -1604,7 +1604,7 @@ namespace NMib::NDatabase
 		NStr::CStr me_path;                                           ///< path to the DB files
 		char *me_map;                                                 ///< the memory map of the data file
 		NPrivate::CLocksMemoryMap *m_pLocksMemoryMap;                 ///< the memory map of the lock file or nullptr
-		NPrivate::MDB_meta *me_metas[NUM_METAS];                      ///< pointers to the two meta pages
+		NPrivate::MDB_meta *me_metas[DNumMetas];                      ///< pointers to the two meta pages
 		void *me_pbuf;                                                ///< scratch area for DUPSORT put()
 		NPrivate::MDB_txn *me_txn;                                    ///< current write transaction
 		NPrivate::MDB_txn *me_txn0;                                   ///< prealloc'd write transaction
@@ -1620,35 +1620,35 @@ namespace NMib::NDatabase
 		NPrivate::MDB_page *me_dpages;                                ///< list of malloc'd blocks for re-use
 		/** IDL of pages that became unused in a write txn */
 		NPrivate::MDB_IDL me_free_pgs;
-		/** ID2L of pages written during a write txn. Length MDB_IDL_UM_SIZE. */
+		/** ID2L of pages written during a write txn. Length DMdbIdlUmSize. */
 		NPrivate::MDB_ID2L me_dirty_list;
 		/** Max number of freelist items that can fit in a single overflow page */
 		int me_maxfree_1pg;
 		/** Max size of a node on a page */
 		uint32 me_nodemax;
-#if !(MDB_MAXKEYSIZE)
+#if !(DMdbMaxKeySize)
 		uint32 me_maxkey; ///< max size of a key
 #endif
 		int me_live_reader; ///< have liveness lock in reader table
 #ifdef DPlatformFamily_Windows
 		int me_pidquery; ///< Used in OpenProcess
 #endif
-#ifdef MDB_USE_POSIX_MUTEX	/* Posix mutexes reside in shared mem */
+#ifdef DMdbUsePosixMutex	/* Posix mutexes reside in shared mem */
 #	define		me_rmutex	m_pLocksMemoryMap->m_TransactionBody.mtb_rmutex /**< Shared reader lock */
 #	define		me_wmutex	m_pLocksMemoryMap->m_WriteLock /**< Shared writer lock */
 #else
 		NPrivate::mdb_mutex_t me_rmutex;
 		NPrivate::mdb_mutex_t me_wmutex;
 #	if defined(DPlatformFamily_Windows) || defined(MDB_USE_POSIX_SEM)
-		/** Half-initialized name of mutexes, to be completed by #MUTEXNAME() */
-		char me_mutexname[sizeof(MUTEXNAME_PREFIX) + 11];
+		/** Half-initialized name of mutexes, to be completed by #DMutexName() */
+		char me_mutexname[sizeof(DMutexNamePrefix) + 11];
 #	endif
 #endif
 #ifdef DMibDatabase_Always64BitSupport
 		NPrivate::MDB_ID3L me_rpages; ///< like #mt_rpages, but global to env
 		pthread_mutex_t me_rpmutex;   ///< control access to #me_rpages
-#	define MDB_ERPAGE_SIZE	16384
-#	define MDB_ERPAGE_MAX	(MDB_ERPAGE_SIZE-1)
+#	define DMdbErpageSize	16384
+#	define DMdbErpageMax	(DMdbErpageSize-1)
 		uint32 me_rpcheck;
 #endif
 		umint m_LockedThreadID = 0;
@@ -1669,7 +1669,7 @@ namespace NMib::NDatabase
 		void mdb_env_close0(int excl);
 		umint mdb_leaf_size(CDatabaseValue *key, CDatabaseValue *data);
 		umint mdb_branch_size(CDatabaseValue *key);
-#ifdef MDB_ROBUST_SUPPORTED
+#ifdef DMdbRobustSupported
 		void mdb_reader_check0(bool _bReadLock, umint *_pDead);
 #endif
 		void mdb_page_free(NPrivate::MDB_page *mp);
@@ -1684,7 +1684,7 @@ namespace NMib::NDatabase
 		int mdb_env_share_locks(int *excl);
 		int mdb_env_excl_lock(int *excl);
 		void mdb_env_setup_locks(NStr::CStr const &_LockPath, int mode, int *excl);
-#ifdef MDB_ROBUST_SUPPORTED
+#ifdef DMdbRobustSupported
 		int mdb_mutex_failed(NPrivate::mdb_mutexref_t mutex, int rc);
 #endif
 		int mdb_fopen(NStr::CStr const &_FileName, NPrivate::mdb_fopen_type which, NPrivate::mdb_mode_t mode, HANDLE *res);
@@ -1695,22 +1695,22 @@ namespace NMib::NDatabase
 	namespace NPrivate
 	{
 			/** max number of pages to commit in one writev() call */
-#define MDB_COMMIT_PAGES	 64
-#if defined(IOV_MAX) && IOV_MAX < MDB_COMMIT_PAGES
-#	undef MDB_COMMIT_PAGES
-#	define MDB_COMMIT_PAGES	IOV_MAX
+#define DMdbCommitPages	 64
+#if defined(IOV_MAX) && IOV_MAX < DMdbCommitPages
+#	undef DMdbCommitPages
+#	define DMdbCommitPages	IOV_MAX
 #endif
 
 			/** max bytes to write in one call */
-#define MAX_WRITE		(0x40000000U >> int(sizeof(smint) == 4))
+#define DMaxWrite		(0x40000000U >> int(sizeof(smint) == 4))
 
 			/** Check \b txn and \b dbi arguments to a function */
-#define TXN_DBI_EXIST(txn, dbi, validity) \
-	((txn) && (dbi)<(txn)->mt_numdbs && ((txn)->mt_dbflags[dbi] & (validity)))
+#define DTxnDbiExist(d_Txn, d_Dbi, d_Validity) \
+	((d_Txn) && (d_Dbi)<(d_Txn)->mt_numdbs && ((d_Txn)->mt_dbflags[d_Dbi] & (d_Validity)))
 
 			/** Check for misused \b dbi handles */
-#define TXN_DBI_CHANGED(txn, dbi) \
-	((txn)->mt_dbiseqs[dbi] != (txn)->mt_env->me_dbiseqs[dbi])
+#define DTxnDbiChanged(d_Txn, d_Dbi) \
+	((d_Txn)->mt_dbiseqs[d_Dbi] != (d_Txn)->mt_env->me_dbiseqs[d_Dbi])
 
 		int mdb_page_alloc(MDB_cursor *mc, int num, MDB_page **mp);
 		int mdb_page_new(MDB_cursor *mc, uint32 flags, int num, MDB_page **mp);
@@ -1748,7 +1748,7 @@ namespace NMib::NDatabase
 		int mdb_env_cwalk(CCompactingCopyState &_CopyState, pgno_t *pg, int flags);
 		int mdb_pid_insert(CProcessID *ids, CProcessID pid);
 
-#define MDB_END_NAMES {"committed", "empty-commit", "abort", "reset", \
+#define DMdbEndNames {"committed", "empty-commit", "abort", "reset", \
 	"reset-tmp", "fail-begin", "fail-beginchild"}
 		enum
 		{
@@ -1762,10 +1762,10 @@ namespace NMib::NDatabase
 			, MDB_END_FAIL_BEGINCHILD
 		};
 
-#define MDB_END_OPMASK	0x0F	/**< mask for #mdb_txn_end() operation number */
-#define MDB_END_UPDATE	0x10	/**< update env state (DBIs) */
-#define MDB_END_FREE	0x20	/**< free txn unless it is #MDB_env.%me_txn0 */
-#define MDB_END_SLOT EDatabaseEnvironmentFlag_NoTls	/**< release any reader slot if #EDatabaseEnvironmentFlag_NoTls */
+#define DMdbEndOpmask	0x0F	/**< mask for #mdb_txn_end() operation number */
+#define DMdbEndUpdate	0x10	/**< update env state (DBIs) */
+#define DMdbEndFree	0x20	/**< free txn unless it is #MDB_env.%me_txn0 */
+#define DMdbEndSlot EDatabaseEnvironmentFlag_NoTls	/**< release any reader slot if #EDatabaseEnvironmentFlag_NoTls */
 		void mdb_txn_end(MDB_txn *txn, unsigned mode);
 		void mdb_txn_abort(MDB_txn *txn);
 
@@ -1774,14 +1774,14 @@ namespace NMib::NDatabase
 
 		int mdb_page_get(MDB_cursor *mc, pgno_t pgno, MDB_page **mp, int *lvl);
 		int mdb_page_search_root(MDB_cursor *mc, CDatabaseValue const *key, int modify);
-#define MDB_PS_MODIFY	1
-#define MDB_PS_ROOTONLY	2
-#define MDB_PS_FIRST	4
-#define MDB_PS_LAST		8
+#define DMdbPsModify	1
+#define DMdbPsRootonly	2
+#define DMdbPsFirst	4
+#define DMdbPsLast		8
 		int mdb_page_search(MDB_cursor *mc, CDatabaseValue const *key, int flags);
 		int mdb_page_merge(MDB_cursor *csrc, MDB_cursor *cdst);
 
-#define MDB_SPLIT_REPLACE	EDatabaseWriteFlag_AppendDuplicateData	/**< newkey is not new */
+#define DMdbSplitReplace	EDatabaseWriteFlag_AppendDuplicateData	/**< newkey is not new */
 		int mdb_page_split(MDB_cursor *mc, CDatabaseValue *newkey, CDatabaseValue *newdata, pgno_t newpgno, uint32 nflags);
 
 		int mdb_page_flush(MDB_txn *txn, int keep);
@@ -1865,26 +1865,26 @@ namespace NMib::NDatabase
 		extern FDatabaseCompare g_mdb_cmp_long;
 
 #ifdef DPlatformFamily_Windows
-#	ifndef MAX_TLS_KEYS
-#		define MAX_TLS_KEYS	64
+#	ifndef DMaxTlsKeys
+#		define DMaxTlsKeys	64
 #	endif
 		extern int mdb_tls_nkeys;
-		extern pthread_key_t mdb_tls_keys[MAX_TLS_KEYS];
+		extern pthread_key_t mdb_tls_keys[DMaxTlsKeys];
 #endif
 
 		/** @endcond */
 
 		/** Compare two items pointing at '#CDatabaseOffset's of unknown alignment. */
-#ifdef MISALIGNED_OK
+#ifdef DMisalignedOk
 #	define g_mdb_cmp_clong g_mdb_cmp_long
 #else
 #	define g_mdb_cmp_clong g_mdb_cmp_cint
 #endif
 
 		/** True if we need #mdb_cmp_clong() instead of \b cmp for #MDB_INTEGERDUP */
-#define NEED_CMP_CLONG(cmp, ksize) \
+#define DNeedCmpClong(d_Cmp, d_Ksize) \
 	(32 < DMibDatabase_IDBits && \
-	 (cmp) == NPrivate::g_mdb_cmp_int && (ksize) == sizeof(CDatabaseOffset))
+	 (d_Cmp) == NPrivate::g_mdb_cmp_int && (d_Ksize) == sizeof(CDatabaseOffset))
 
 #ifdef DPlatformFamily_Windows
 		extern SECURITY_DESCRIPTOR mdb_null_sd;
@@ -1893,13 +1893,13 @@ namespace NMib::NDatabase
 #endif
 
 		/** Do not spill pages to disk if txn is getting full, may fail instead */
-#define MDB_NOSPILL	0x8000
+#define DMdbNoSpill	0x8000
 
 #ifdef DMibDatabase_Always64BitSupport
 		void mdb_page_unref(MDB_txn *txn, MDB_page *mp);
-#	define MDB_PAGE_UNREF(txn, mp)	mdb_page_unref(txn, mp)
+#	define DMdbPageUnref(d_Txn, d_Mp)	mdb_page_unref(d_Txn, d_Mp)
 #else
-#	define MDB_PAGE_UNREF(txn, mp)
+#	define DMdbPageUnref(d_Txn, d_Mp)
 #endif
 
 		/** Only a subset of the @ref mdb_env flags can be changed
@@ -1908,7 +1908,7 @@ namespace NMib::NDatabase
 		 */
 		static_assert
 			(
-				!(VALID_FLAGS & PERSISTENT_FLAGS & (EDatabaseEnvironmentFlag_Changable | EDatabaseEnvironmentFlag_Changeless))
+				!(DValidFlags & DPersistentFlags & (EDatabaseEnvironmentFlag_Changable | EDatabaseEnvironmentFlag_Changeless))
 				, "Persistent DB flags & env flags overlap, but both go in mm_flags"
 			)
 		;
@@ -1916,18 +1916,18 @@ namespace NMib::NDatabase
 		bool fg_BrokenFSync(MDB_env *_pEnvironment, HANDLE _FileDescriptor);
 
 		/** Perform \b act while tracking temporary cursor \b mn */
-#define WITH_CURSOR_TRACKING(mn, act) do { \
-		MDB_cursor dummy, *tracked, **tp = &(mn).mc_txn->mt_cursors[mn.mc_dbi]; \
-		if ((mn).mc_flags & C_SUB) { \
-			dummy.mc_flags =  C_INITIALIZED; \
-			dummy.mc_xcursor = (MDB_xcursor *)&(mn);	\
+#define DWithCursorTracking(d_Mn, d_Act) do { \
+		MDB_cursor dummy, *tracked, **tp = &(d_Mn).mc_txn->mt_cursors[d_Mn.mc_dbi]; \
+		if ((d_Mn).mc_flags & DCSub) { \
+			dummy.mc_flags =  DCInitialized; \
+			dummy.mc_xcursor = (MDB_xcursor *)&(d_Mn);	\
 			tracked = &dummy; \
 		} else { \
-			tracked = &(mn); \
+			tracked = &(d_Mn); \
 		} \
 		tracked->mc_next = *tp; \
 		*tp = tracked; \
-		{ act; } \
+		{ d_Act; } \
 		*tp = tracked->mc_next; \
 	} while (0)
 
@@ -1939,13 +1939,13 @@ namespace NMib::NDatabase
 
 #ifdef DMibDatabase_Always64BitSupport
 		void mdb_cursor_unref(MDB_cursor *mc);
-#	define MDB_CURSOR_UNREF(mc, force) \
-		(((force) || ((mc)->mc_flags & C_INITIALIZED)) \
-		 ? mdb_cursor_unref(mc) \
+#	define DMdbCursorUnref(d_Mc, d_Force) \
+		(((d_Force) || ((d_Mc)->mc_flags & DCInitialized)) \
+		 ? mdb_cursor_unref(d_Mc) \
 		 : (void)0)
 
 #else
-#	define MDB_CURSOR_UNREF(mc, force) ((void)0)
+#	define DMdbCursorUnref(d_Mc, d_Force) ((void)0)
 #endif /* DMibDatabase_Always64BitSupport */
 	}
 }
