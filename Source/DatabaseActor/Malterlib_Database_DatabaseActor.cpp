@@ -174,6 +174,9 @@ namespace NMib::NDatabase
 			ToRemove.f_Insert(fg_Move(Environment));
 		}
 
+		if (ToRemove.f_IsEmpty())
+			co_return {};
+
 		for (auto iToRemove : ToRemoveIndexes.f_Reverse())
 			mp_OldDatabaseEnvironments.f_Remove(iToRemove);
 
