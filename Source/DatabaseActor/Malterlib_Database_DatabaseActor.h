@@ -110,19 +110,32 @@ namespace NMib::NDatabase
 		;
 
 	private:
-		struct COldEnvironment
+		// An environment and its database. Transactions run on blocking actors and hold the environment they were opened on;
+		// their reference in m_DatabaseEnvironment's reference count is taken on this actor before the open is dispatched.
+		// Compaction publishes a new current environment on this actor and moves the old one to mp_OldDatabaseEnvironments,
+		// where it is closed once its reference count is zero, which can't increase again since only the current one gets new
+		// references
+		struct CEnvironment
 		{
 			CDatabaseEnvironment m_DatabaseEnvironment;
+			CDatabaseSub m_Database;
+		};
+
+		struct COldEnvironment
+		{
+			NStorage::TCSharedPointer<CEnvironment> m_pEnvironment;
 			NStr::CStr m_TempDeletePath;
 		};
 
 		NConcurrency::TCFuture<void> fp_Destroy();
 
 		NConcurrency::TCFuture<void> fp_TryDeletePending();
+		NConcurrency::TCFuture<void> fp_TransactionClosed(bool _bReader);
 
-		CDatabaseEnvironment mp_DatabaseEnvironment;
+		static void fsp_ReleaseEnvironment(NConcurrency::TCWeakActor<CDatabaseActor> const &_ThisActor, CEnvironment &_Environment, bool _bReader);
+
+		NStorage::TCSharedPointer<CEnvironment> mp_pEnvironment = fg_Construct();
 		NContainer::TCVector<COldEnvironment> mp_OldDatabaseEnvironments;
-		CDatabaseSub mp_Database;
 		NStorage::TCSharedPointer<NConcurrency::CCanDestroyTracker> mp_pCanDestroyTracker = fg_Construct();
 
 		NAtomic::TCAtomic<bool> mp_bDestroyed;
@@ -131,7 +144,7 @@ namespace NMib::NDatabase
 		NConcurrency::CSequencer mp_ReadSequencer{"DatabaseActor ReadSequencer"};
 		NContainer::TCVector<NConcurrency::TCPromise<void>> mp_WaitingForReaders;
 		umint mp_CompactionSequence = 0;
-		NAtomic::TCAtomic<umint> mp_nReaders = 0;
+		umint mp_nReaders = 0;
 		bool mp_bOpened = false;
 	};
 }

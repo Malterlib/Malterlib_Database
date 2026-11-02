@@ -31,26 +31,24 @@ namespace NMib::NDatabase
 
 		auto BlockingActorCheckout = fg_BlockingActor();
 
-		auto [DatabaseEnvironment, Database] = co_await
+		mp_pEnvironment = co_await
 			(
 				g_Dispatch(BlockingActorCheckout) / [_Directory, _MaxSize]
 				{
 					CFile::fs_CreateDirectory(_Directory);
-					CDatabaseEnvironment DatabaseEnvironment;
+					TCSharedPointer<CEnvironment> pEnvironment = fg_Construct();
+					auto &DatabaseEnvironment = pEnvironment->m_DatabaseEnvironment;
 					DatabaseEnvironment.f_SetMapSize(_MaxSize);
 					auto Attribs = EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid;
 					DatabaseEnvironment.f_Open(_Directory, gc_EnvironmentFlags, Attribs);
 					auto Transaction = DatabaseEnvironment.f_BeginWriteTransaction();
-					auto Database = Transaction.f_OpenDatabase();
+					pEnvironment->m_Database = Transaction.f_OpenDatabase();
 					Transaction.f_Commit();
 
-					return fg_Tuple(fg_Move(DatabaseEnvironment), Database);
+					return pEnvironment;
 				}
 			)
 		;
-
-		mp_DatabaseEnvironment = fg_Move(DatabaseEnvironment);
-		mp_Database = Database;
 
 		Cleanup.f_Clear();
 
@@ -65,15 +63,22 @@ namespace NMib::NDatabase
 		if (f_IsDestroyed())
 			co_return DMibErrorInstance("Database actor destroyed");
 
-		if (!_MaxSize)
-			_MaxSize = mp_DatabaseEnvironment.f_SizeStatistics().m_MapSize;
+		// The write transaction holds the write sequencer until it is destroyed at the end of this function, so the current
+		// environment is the one it was opened on, and no other transaction can be opened on it after the new one is published.
+		// It is shared with the compaction on the blocking actor, so it also lives until that is done if this function is aborted
+		TCSharedPointer<CTransactionWrite> pWriteTransaction = fg_Construct(fg_Move(_WriteTransaction));
+		auto pOldEnvironment = mp_pEnvironment;
 
-		co_await
+		if (!_MaxSize)
+			_MaxSize = pOldEnvironment->m_DatabaseEnvironment.f_SizeStatistics().m_MapSize;
+
+		CStr OriginalPath = pOldEnvironment->m_DatabaseEnvironment.f_GetPath();
+		auto BlockingActor = pWriteTransaction->mp_Checkout.f_Actor();
+
+		CStr OldEnvironmentPath = co_await
 			(
-				g_Dispatch(_WriteTransaction.mp_Checkout.f_Actor()) / [this, pCanDestroy = mp_pCanDestroyTracker, WriteTransaction = fg_Move(_WriteTransaction), _MaxSize]
-				() mutable -> TCFuture<void>
+				g_Dispatch(BlockingActor) / [pWriteTransaction, pCanDestroy = mp_pCanDestroyTracker, OriginalPath, _MaxSize]() -> TCFuture<CStr>
 				{
-					CStr OriginalPath = mp_DatabaseEnvironment.f_GetPath();
 					CStr CompactTempPath = OriginalPath + ".compact";
 					CStr TempDeletePath = OriginalPath + ".tempdelete";
 
@@ -104,7 +109,7 @@ namespace NMib::NDatabase
 						{
 							auto Transaction = OutDatabase.f_Transaction(OutTransaction);
 							auto iOut = Transaction.f_WriteCursor();
-							auto iSource = WriteTransaction.m_Transaction.f_ReadCursor();
+							auto iSource = pWriteTransaction->m_Transaction.f_ReadCursor();
 							iSource.f_First();
 							for (; iSource; ++iSource)
 								iOut.f_Insert(iSource.f_Key(), iSource.f_Value());
@@ -129,28 +134,44 @@ namespace NMib::NDatabase
 						CFile::fs_DeleteDirectory(CompactTempPath);
 					}
 
-					auto &OldEnvironment = mp_OldDatabaseEnvironments.f_Insert();
-					OldEnvironment.m_DatabaseEnvironment = fg_Move(fg_Move(mp_DatabaseEnvironment));
-					OldEnvironment.m_TempDeletePath = TempDeletePath;
-
-					{
-						auto CaptureScope = co_await g_CaptureExceptions;
-
-						mp_DatabaseEnvironment = {};
-						mp_DatabaseEnvironment.f_SetMapSize(_MaxSize);
-						auto Attribs = EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid;
-						mp_DatabaseEnvironment.f_Open(OriginalPath, gc_EnvironmentFlags, Attribs);
-						auto Transaction = mp_DatabaseEnvironment.f_BeginWriteTransaction();
-						mp_Database = Transaction.f_OpenDatabase();
-						Transaction.f_Commit();
-					}
-
-					++mp_CompactionSequence;
-
-					co_return {};
+					co_return fg_Move(TempDeletePath);
 				}
 			)
 		;
+
+		auto NewEnvironment = co_await
+			(
+				g_Dispatch(BlockingActor) / [pCanDestroy = mp_pCanDestroyTracker, OriginalPath, _MaxSize]
+				{
+					TCSharedPointer<CEnvironment> pEnvironment = fg_Construct();
+					auto &DatabaseEnvironment = pEnvironment->m_DatabaseEnvironment;
+					DatabaseEnvironment.f_SetMapSize(_MaxSize);
+					auto Attribs = EFileAttrib_UserWrite | EFileAttrib_UserRead | EFileAttrib_UnixAttributesValid;
+					DatabaseEnvironment.f_Open(OriginalPath, gc_EnvironmentFlags, Attribs);
+					auto Transaction = DatabaseEnvironment.f_BeginWriteTransaction();
+					pEnvironment->m_Database = Transaction.f_OpenDatabase();
+					Transaction.f_Commit();
+
+					return pEnvironment;
+				}
+			)
+			.f_Wrap()
+		;
+
+		// The original files have been moved to OldEnvironmentPath, so the old environment is retired even when the compacted
+		// database failed to open
+		auto &OldEnvironment = mp_OldDatabaseEnvironments.f_Insert();
+		OldEnvironment.m_pEnvironment = fg_Move(pOldEnvironment);
+		OldEnvironment.m_TempDeletePath = fg_Move(OldEnvironmentPath);
+
+		if (!NewEnvironment)
+		{
+			mp_pEnvironment = fg_Construct();
+			co_return NewEnvironment.f_GetException();
+		}
+
+		mp_pEnvironment = fg_Move(*NewEnvironment);
+		++mp_CompactionSequence;
 
 		co_return {};
 	}
@@ -167,7 +188,8 @@ namespace NMib::NDatabase
 		{
 			umint iThisEnv = iEnv++;
 
-			if (*Environment.m_DatabaseEnvironment.f_GetReferencesPointer() != 0)
+			// Only the current environment gets new references, so this can't become referenced again
+			if (*Environment.m_pEnvironment->m_DatabaseEnvironment.f_GetReferencesPointer() != 0)
 				continue;
 
 			ToRemoveIndexes.f_Insert(iThisEnv);
@@ -188,7 +210,7 @@ namespace NMib::NDatabase
 				{
 					for (auto &Environment : ToRemove)
 					{
-						Environment.m_DatabaseEnvironment.f_Close();
+						Environment.m_pEnvironment->m_DatabaseEnvironment.f_Close();
 						if (CFile::fs_FileExists(Environment.m_TempDeletePath))
 						{
 							try
@@ -205,6 +227,38 @@ namespace NMib::NDatabase
 		;
 
 		co_return {};
+	}
+
+	TCFuture<void> CDatabaseActor::fp_TransactionClosed(bool _bReader)
+	{
+		if (_bReader)
+		{
+			if (--mp_nReaders != 0)
+				co_return {};
+
+			for (auto &Waiting : mp_WaitingForReaders)
+				Waiting.f_SetResult();
+
+			mp_WaitingForReaders.f_Clear();
+		}
+		else if (mp_bDestroyed.f_Load())
+			co_return {};
+
+		co_await fp_TryDeletePending();
+
+		co_return {};
+	}
+
+	void CDatabaseActor::fsp_ReleaseEnvironment(TCWeakActor<CDatabaseActor> const &_ThisActor, CEnvironment &_Environment, bool _bReader)
+	{
+		--(*_Environment.m_DatabaseEnvironment.f_GetReferencesPointer());
+
+		// A destroyed actor has nothing left waiting for readers, and deletes the pending environments when it is destroyed
+		auto Actor = _ThisActor.f_Lock();
+		if (!Actor)
+			return;
+
+		Actor(&CDatabaseActor::fp_TransactionClosed, _bReader) > fg_LogError("Database", "Failed releasing after transaction closed");
 	}
 
 	CDatabaseActor::CTransactionRead::CTransactionRead(CActorSubscription &&_Subscription, CDatabaseReadTransaction &_MainTransaction, CDatabaseSubReadTransaction &&_Transaction)
@@ -360,7 +414,7 @@ namespace NMib::NDatabase
 
 	TCFuture<umint> CDatabaseActor::f_CheckForStaleReaders()
 	{
-		co_return mp_DatabaseEnvironment.f_CheckForStaleReaders();
+		co_return mp_pEnvironment->m_DatabaseEnvironment.f_CheckForStaleReaders();
 	}
 
 	auto CDatabaseActor::f_OpenTransactionRead() -> TCFuture<CTransactionRead>
@@ -376,9 +430,22 @@ namespace NMib::NDatabase
 			CDatabaseReadTransaction m_MainTransaction;
 		};
 
+		auto pCanDestroy = mp_pCanDestroyTracker;
 		auto SequenceSubscription = co_await mp_ReadSequencer.f_Sequence();
 
+		if (mp_bDestroyed.f_Load())
+			co_return DMibErrorInstance("Database actor destroyed");
+
 		auto BlockingActorCheckout = fg_BlockingActor();
+
+		// The reference is taken here, on this actor, so the environment can't be closed by a compaction before the
+		// transaction has been opened on it
+		auto pEnvironment = mp_pEnvironment;
+		if (!pEnvironment->m_DatabaseEnvironment.f_IsOpen())
+			co_return DMibErrorInstance("Database is not open: it failed to reopen after being compacted");
+
+		++(*pEnvironment->m_DatabaseEnvironment.f_GetReferencesPointer());
+		++mp_nReaders;
 
 		// Taken here, on this actor, since the blocking thread must not read this actor's self while it is being
 		// destroyed; weak, since an open transaction must not keep the actor alive
@@ -386,60 +453,31 @@ namespace NMib::NDatabase
 
 		co_return co_await
 			(
-				g_Dispatch(BlockingActorCheckout.f_Actor()) / [this, ThisActor, pCanDestroy = mp_pCanDestroyTracker]() mutable -> TCFuture<CTransactionRead>
+				g_Dispatch(BlockingActorCheckout.f_Actor()) / [ThisActor, pEnvironment, pCanDestroy = fg_Move(pCanDestroy)]() mutable -> TCFuture<CTransactionRead>
 				{
+					auto ReleaseOnError = g_OnScopeExit / [&]
+						{
+							fsp_ReleaseEnvironment(ThisActor, *pEnvironment, true);
+						}
+					;
+
 					auto CaptureScope = co_await g_CaptureExceptions;
 
 					NStorage::TCSharedPointer<CState> pState = fg_Construct();
 
-					pState->m_MainTransaction = this->mp_DatabaseEnvironment.f_BeginReadTransaction();
-					auto Transaction = this->mp_Database.f_Transaction(pState->m_MainTransaction);
+					pState->m_MainTransaction = pEnvironment->m_DatabaseEnvironment.f_BeginReadTransaction();
+					auto Transaction = pEnvironment->m_Database.f_Transaction(pState->m_MainTransaction);
 
-					++mp_nReaders;
-					auto *pReferences = mp_DatabaseEnvironment.f_GetReferencesPointer();
-					++(*pReferences);
-
-#ifndef DMibClangAnalyzerWorkaround
-					co_return CTransactionRead
+					auto Subscription = g_BlockingActorSubscription / [ThisActor, pEnvironment, pState, pCanDestroy = fg_Move(pCanDestroy)]() mutable
 						{
-							g_BlockingActorSubscription / [this, ThisActor, pReferences, pState, pCanDestroy = fg_Move(pCanDestroy)]() mutable
-							{
-								pState.f_Clear();
-								auto NewReaders = --mp_nReaders;
-								--(*pReferences);
-								if (NewReaders != 0)
-									return;
-
-								// A destroyed actor has nothing left waiting for readers
-								auto Actor = ThisActor.f_Lock();
-								if (!Actor)
-									return;
-
-								g_Dispatch(Actor) / [this, pCanDestroy = fg_Move(pCanDestroy)]() -> TCFuture<void>
-									{
-										if (mp_nReaders.f_Load() == 0)
-										{
-											for (auto &Waiting : mp_WaitingForReaders)
-												Waiting.f_SetResult();
-
-											mp_WaitingForReaders.f_Clear();
-										}
-
-										co_await fp_TryDeletePending();
-
-										co_return {};
-									}
-									> fg_LogError("Database", "Failed releasing after 0 readers")
-								;
-							}
-							, pState->m_MainTransaction
-							, fg_Move(Transaction)
+							pState.f_Clear();
+							fsp_ReleaseEnvironment(ThisActor, *pEnvironment, true);
 						}
 					;
-#else
-					(void)Transaction;
-					co_return DMibErrorInstance("Workaround analyzer bug");
-#endif
+
+					ReleaseOnError.f_Clear();
+
+					co_return CTransactionRead{fg_Move(Subscription), pState->m_MainTransaction, fg_Move(Transaction)};
 				}
 			)
 		;
@@ -460,7 +498,19 @@ namespace NMib::NDatabase
 
 		auto pCanDestroy = mp_pCanDestroyTracker;
 		auto SequenceSubscription = co_await mp_WriteSequencer.f_Sequence();
+
+		if (mp_bDestroyed.f_Load())
+			co_return DMibErrorInstance("Database actor destroyed");
+
 		auto BlockingActorCheckout = fg_BlockingActor();
+
+		// The reference is taken here, on this actor, so the environment can't be closed by a compaction before the
+		// transaction has been opened on it
+		auto pEnvironment = mp_pEnvironment;
+		if (!pEnvironment->m_DatabaseEnvironment.f_IsOpen())
+			co_return DMibErrorInstance("Database is not open: it failed to reopen after being compacted");
+
+		++(*pEnvironment->m_DatabaseEnvironment.f_GetReferencesPointer());
 		auto BlockingActor = BlockingActorCheckout.f_Actor();
 
 		// Taken here, on this actor, since the blocking thread must not read this actor's self while it is being
@@ -470,56 +520,34 @@ namespace NMib::NDatabase
 		co_return co_await
 			(
 				g_Dispatch(BlockingActor)
-				/ [this, ThisActor, pCanDestroy = fg_Move(pCanDestroy), SequenceSubscription = fg_Move(SequenceSubscription), BlockingActorCheckout = fg_Move(BlockingActorCheckout)]
+				/ [ThisActor, pEnvironment, pCanDestroy = fg_Move(pCanDestroy), SequenceSubscription = fg_Move(SequenceSubscription), BlockingActorCheckout = fg_Move(BlockingActorCheckout)]
 				() mutable -> TCFuture<CTransactionWrite>
 				{
-					if (mp_bDestroyed.f_Load())
-						co_return DMibErrorInstance("Database actor destroyed");
+					auto ReleaseOnError = g_OnScopeExit / [&]
+						{
+							fsp_ReleaseEnvironment(ThisActor, *pEnvironment, false);
+						}
+					;
 
 					auto CaptureScope = co_await g_CaptureExceptions;
 					NStorage::TCSharedPointer<CState> pState = fg_Construct();
 
-					pState->m_MainTransaction = this->mp_DatabaseEnvironment.f_BeginWriteTransaction();
-					auto Transaction = this->mp_Database.f_Transaction(pState->m_MainTransaction);
-
-					auto *pReferences = mp_DatabaseEnvironment.f_GetReferencesPointer();
-					++(*pReferences);
+					pState->m_MainTransaction = pEnvironment->m_DatabaseEnvironment.f_BeginWriteTransaction();
+					auto Transaction = pEnvironment->m_Database.f_Transaction(pState->m_MainTransaction);
 
 					auto BlockingActor = BlockingActorCheckout.f_Actor();
 
-#ifndef DMibClangAnalyzerWorkaround
-					co_return CTransactionWrite
+					auto Subscription = g_ActorSubscription(BlockingActor)
+						/ [ThisActor, pEnvironment, pState, SequenceSubscription = fg_Move(SequenceSubscription), pCanDestroy = fg_Move(pCanDestroy)]() mutable
 						{
-							g_ActorSubscription(BlockingActor)
-							/ [this, ThisActor, pReferences, pState, SequenceSubscription = fg_Move(SequenceSubscription), pCanDestroy = fg_Move(pCanDestroy)]() mutable
-							{
-								pState.f_Clear();
-								--(*pReferences);
-
-								auto Actor = ThisActor.f_Lock();
-								if (!Actor)
-									return;
-
-								g_Dispatch(Actor) / [this, pCanDestroy = fg_Move(pCanDestroy)]() -> TCFuture<void>
-									{
-										if (mp_bDestroyed.f_Load())
-											co_return {};
-
-										co_await fp_TryDeletePending();
-
-										co_return {};
-									}
-									> fg_LogError("Database", "Failed delete pending after write transaction")
-								;
-							}
-							, pState->m_MainTransaction
-							, fg_Move(Transaction)
-							, fg_Move(BlockingActorCheckout)
+							pState.f_Clear();
+							fsp_ReleaseEnvironment(ThisActor, *pEnvironment, false);
 						}
 					;
-#else
-					co_return DMibErrorInstance("Workaround analyzer bug");
-#endif
+
+					ReleaseOnError.f_Clear();
+
+					co_return CTransactionWrite{fg_Move(Subscription), pState->m_MainTransaction, fg_Move(Transaction), fg_Move(BlockingActorCheckout)};
 				}
 			)
 		;
@@ -536,7 +564,7 @@ namespace NMib::NDatabase
 		auto CaptureScope = co_await g_CaptureExceptions;
 
 		CDatabaseStatistics Stats;
-		Stats = mp_DatabaseEnvironment.f_Statistics();
+		Stats = mp_pEnvironment->m_DatabaseEnvironment.f_Statistics();
 
 		auto ReadTransaction = co_await f_OpenTransactionRead();
 
@@ -582,7 +610,7 @@ namespace NMib::NDatabase
 		{
 			if (Result.f_GetExceptionStr().f_Find("MDB_MAP_FULL") >= 0)
 			{
-				DMibLogWithCategory(Database, Warning, "Compacting database at '{}' due to MDB_MAP_FULL", mp_DatabaseEnvironment.f_GetPath());
+				DMibLogWithCategory(Database, Warning, "Compacting database at '{}' due to MDB_MAP_FULL", mp_pEnvironment->m_DatabaseEnvironment.f_GetPath());
 				co_return co_await fDoWrite(true);
 			}
 			else
@@ -624,7 +652,7 @@ namespace NMib::NDatabase
 		if (f_IsDestroyed())
 			co_return DMibErrorInstance("Database actor destroyed");
 
-		co_return mp_DatabaseEnvironment.f_Statistics();
+		co_return mp_pEnvironment->m_DatabaseEnvironment.f_Statistics();
 	}
 
 	TCFuture<CDatabaseSizeStatistics> CDatabaseActor::f_SizeStatistics()
@@ -635,7 +663,7 @@ namespace NMib::NDatabase
 		if (f_IsDestroyed())
 			co_return DMibErrorInstance("Database actor destroyed");
 
-		co_return mp_DatabaseEnvironment.f_SizeStatistics();
+		co_return mp_pEnvironment->m_DatabaseEnvironment.f_SizeStatistics();
 	}
 
 	TCFuture<CDatabaseEnvironmentInfo> CDatabaseActor::f_Info()
@@ -646,7 +674,7 @@ namespace NMib::NDatabase
 		if (f_IsDestroyed())
 			co_return DMibErrorInstance("Database actor destroyed");
 
-		co_return mp_DatabaseEnvironment.f_Info();
+		co_return mp_pEnvironment->m_DatabaseEnvironment.f_Info();
 	}
 
 	TCFuture<CStr> CDatabaseActor::f_GetPath()
@@ -657,7 +685,7 @@ namespace NMib::NDatabase
 		if (f_IsDestroyed())
 			co_return DMibErrorInstance("Database actor destroyed");
 
-		co_return mp_DatabaseEnvironment.f_GetPath();
+		co_return mp_pEnvironment->m_DatabaseEnvironment.f_GetPath();
 	}
 
 	CBlockingActorCheckout const &CDatabaseActor::CTransactionWrite::f_Checkout() const
