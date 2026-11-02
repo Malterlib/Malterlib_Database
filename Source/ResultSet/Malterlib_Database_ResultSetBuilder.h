@@ -48,9 +48,9 @@ Usage Example:
 
 // Step 4: Attach metadata:
 // (can be done before or after step 3)
-	Builder.f_AddMetadata(0, MyMetadata);
-	Builder.f_SetKeyPartMetadata(0, OtherMetadata);
-	Builder.f_SetColumnMetadata(0, AnotherMetadata);
+	Builder.f_AddMetadata(0, fg_Move(MyMetadata));
+	Builder.f_SetKeyPartMetadata(0, fg_Move(OtherMetadata));
+	Builder.f_SetColumnMetadata(0, fg_Move(AnotherMetadata));
 
 */
 #pragma once
@@ -224,9 +224,9 @@ namespace NMib::NDatabase
 		;
 		void f_SetDescription(CResultSetDescription const &_Desc);
 
-		void f_AddMetadata(uint32 _ID, CResultMetadata _Data);
-		void f_SetKeyPartMetadata(umint _iKeyPart, CResultMetadata _Data);
-		void f_SetColumnMetadata(umint _iColumn, CResultMetadata _Data);
+		void f_AddMetadata(uint32 _ID, CResultMetadata &&_Data);
+		void f_SetKeyPartMetadata(umint _iKeyPart, CResultMetadata &&_Data);
+		void f_SetColumnMetadata(umint _iColumn, CResultMetadata &&_Data);
 
 		template <typename t_CType>
 		inline umint f_AddKeyPartValue(uint32 _iKeyPart, t_CType &&_Value);

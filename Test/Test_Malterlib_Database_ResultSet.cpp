@@ -56,20 +56,20 @@ namespace
 			NMib::NContainer::CByteVector Metadata;
 
 			Metadata.f_Insert(1);
-			_Builder.f_AddMetadata(1, Metadata);
+			_Builder.f_AddMetadata(1, fg_TempCopy(Metadata));
 			Metadata[0] = 2;
-			_Builder.f_AddMetadata(2, Metadata);
+			_Builder.f_AddMetadata(2, fg_TempCopy(Metadata));
 
 			// Add key part metadata.
 			Metadata[0] = 3;
-			_Builder.f_SetKeyPartMetadata(0, Metadata);
+			_Builder.f_SetKeyPartMetadata(0, fg_TempCopy(Metadata));
 
 			Metadata[0] = 4;
-			_Builder.f_SetKeyPartMetadata(1, Metadata);
+			_Builder.f_SetKeyPartMetadata(1, fg_TempCopy(Metadata));
 
 			// Add column metadata.
 			Metadata[0] = 5;
-			_Builder.f_SetColumnMetadata(0, Metadata);
+			_Builder.f_SetColumnMetadata(0, fg_Move(Metadata));
 		}
 
 		void f_PopulateBuilderColumnWise(CResultSetBuilder &_Builder)
@@ -124,20 +124,20 @@ namespace
 			NMib::NContainer::CByteVector Metadata;
 
 			Metadata.f_Insert(1);
-			_Builder.f_AddMetadata(1, Metadata);
+			_Builder.f_AddMetadata(1, fg_TempCopy(Metadata));
 			Metadata[0] = 2;
-			_Builder.f_AddMetadata(2, Metadata);
+			_Builder.f_AddMetadata(2, fg_TempCopy(Metadata));
 
 			// Add key part metadata.
 			Metadata[0] = 3;
-			_Builder.f_SetKeyPartMetadata(0, Metadata);
+			_Builder.f_SetKeyPartMetadata(0, fg_TempCopy(Metadata));
 
 			Metadata[0] = 4;
-			_Builder.f_SetKeyPartMetadata(1, Metadata);
+			_Builder.f_SetKeyPartMetadata(1, fg_TempCopy(Metadata));
 
 			// Add column metadata.
 			Metadata[0] = 5;
-			_Builder.f_SetColumnMetadata(0, Metadata);
+			_Builder.f_SetColumnMetadata(0, fg_Move(Metadata));
 		}
 
 		void f_TestResultSet(CResultSet const &_RS)

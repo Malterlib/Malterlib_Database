@@ -92,10 +92,20 @@ namespace NMib::NDatabase::NResultSet
 		static _OutType fs_Convert(_InType _V) { return _OutType (_V); } \
 	}
 
-	DAODB_DefineTypeToDataType(NStr::CStr, NStr::CStr, EResultDataType_CStr);
 	DAODB_DefineTypeToDataType(fp64, fp64, EResultDataType_fp64);
 	DAODB_DefineTypeToDataType(fp64 &, fp64, EResultDataType_fp64);
 	DAODB_DefineTypeToDataType(uint64, uint64, EResultDataType_uint64);
+
+	template <>
+	struct TCTypeToDataType<NStr::CStr>
+	{
+		using CDataType = NStr::CStr;
+		static constexpr EResultDataType mc_Type = EResultDataType_CStr;
+		static NStr::CStr fs_Convert(NStr::CStr &&_V)
+		{
+			return fg_Move(_V);
+		}
+	};
 
 	template <>
 	struct TCTypeToDataType<NContainer::CByteVector>

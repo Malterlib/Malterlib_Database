@@ -218,18 +218,18 @@ namespace NMib::NDatabase
 		f_SetDescription(_Desc.m_lKeyPartTypes, _Desc.m_lKeyPartSubTypes, _Desc.m_lColumnTypes, _Desc.m_lColumnSubTypes);
 	}
 
-	void CResultSetBuilder::f_AddMetadata(uint32 _ID, CResultMetadata _Data)
+	void CResultSetBuilder::f_AddMetadata(uint32 _ID, CResultMetadata &&_Data)
 	{
 		mp_Metadata[_ID] = fg_Move(_Data);
 	}
 
-	void CResultSetBuilder::f_SetKeyPartMetadata(umint _iKeyPart, CResultMetadata _Data)
+	void CResultSetBuilder::f_SetKeyPartMetadata(umint _iKeyPart, CResultMetadata &&_Data)
 	{
 		DMibCheck(mp_KeyPartInfos.f_IsPosValid(_iKeyPart))("Invalid key part");
 		mp_KeyPartInfos[_iKeyPart].m_Metadata = fg_Move(_Data);
 	}
 
-	void CResultSetBuilder::f_SetColumnMetadata(umint _iColumn, CResultMetadata _Data)
+	void CResultSetBuilder::f_SetColumnMetadata(umint _iColumn, CResultMetadata &&_Data)
 	{
 		DMibCheck(mp_ColumnInfos.f_IsPosValid(_iColumn))("Invalid column");
 		mp_ColumnInfos[_iColumn].m_Metadata = fg_Move(_Data);
