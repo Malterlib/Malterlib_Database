@@ -165,13 +165,13 @@ namespace NMib::NDatabase
 		umint iEnv = 0;
 		for (auto &Environment : mp_OldDatabaseEnvironments)
 		{
+			umint iThisEnv = iEnv++;
+
 			if (*Environment.m_DatabaseEnvironment.f_GetReferencesPointer() != 0)
 				continue;
 
-			ToRemoveIndexes.f_Insert(iEnv);
+			ToRemoveIndexes.f_Insert(iThisEnv);
 			ToRemove.f_Insert(fg_Move(Environment));
-
-			++iEnv;
 		}
 
 		for (auto iToRemove : ToRemoveIndexes.f_Reverse())
