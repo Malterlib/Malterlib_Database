@@ -18,8 +18,29 @@ using namespace NMib::NTime;
 
 namespace
 {
-	class CDatabaseValue_Tests : public NMib::NTest::CTest
+	struct CDatabaseValue_Tests : public NMib::NTest::CTest
 	{
+		void f_DoTests()
+		{
+			DMibTestSuite("Order")
+			{
+				fp_TestOrder<false>("Order");
+			};
+			DMibTestSuite("Order Descending")
+			{
+				fp_TestOrder<true>("OrderDescending");
+			};
+			DMibTestSuite("Roundtrip")
+			{
+				fp_TestRoundtrip<false>();
+			};
+			DMibTestSuite("Roundtrip Descending")
+			{
+				fp_TestRoundtrip<true>();
+			};
+		}
+
+	private:
 		static fp32 fs_ReverseEncodeFloat(uint8 _1, uint8 _2, uint8 _3, uint8 _4)
 		{
 			TCVector<uint8> KeyData;
@@ -269,27 +290,6 @@ namespace
 			DTestEncoding((CTestVariant{"String"}));
 			DTestEncoding((CTestVariant{55}));
 			DTestEncoding((CTestVariant{66}));
-		}
-
-	public:
-		void f_DoTests()
-		{
-			DMibTestSuite("Order")
-			{
-				fp_TestOrder<false>("Order");
-			};
-			DMibTestSuite("Order Descending")
-			{
-				fp_TestOrder<true>("OrderDescending");
-			};
-			DMibTestSuite("Roundtrip")
-			{
-				fp_TestRoundtrip<false>();
-			};
-			DMibTestSuite("Roundtrip Descending")
-			{
-				fp_TestRoundtrip<true>();
-			};
 		}
 	};
 

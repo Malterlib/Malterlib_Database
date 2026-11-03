@@ -10,9 +10,8 @@ using namespace NMib::NDatabase;
 
 namespace
 {
-	class CResultSet_Tests : public NMib::NTest::CTest
+	struct CResultSet_Tests : public NMib::NTest::CTest
 	{
-	public:
 		void f_PopulateBuilder(CResultSetBuilder &_Builder)
 		{
 			CResultSetDescription Desc;

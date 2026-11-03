@@ -78,31 +78,10 @@ namespace NMib::NDatabase
 	// Result Set
 	//
 
-	class CResultSetBuilder;
+	struct CResultSetBuilder;
 
-	class CResultSet
+	struct CResultSet
 	{
-	private:
-	protected:
-		//
-		// Structure:
-		//
-
-		NContainer::TCVector<NResultSet::CMetadataEntry> mp_Metadata;   // Lookup by uint32 m_ID
-		NContainer::TCVector<NResultSet::CElementInfo> mp_KeyPartInfos; // Index by iKeyPart
-		NContainer::TCVector<NResultSet::CElementInfo> mp_ColumnInfos;  // Index by iColumn
-
-		//
-		// Data:
-		//
-
-		NContainer::TCVector<NResultSet::CValueVector> mp_KeyPartValues; // Index by iKeyPart, then by iKeyPartValue
-
-		umint mp_nRows;                                                               // Cached for easy access, == mp_KeyParse[X].f_GetLen()
-		NContainer::TCVector<NContainer::TCVector<uint32>> mp_KeyPartRowValueIndices; // Index by iKeyPart and then by iRow to get value index.
-		NContainer::TCVector<NResultSet::CSparseValueVector> mp_Columns;              // Index by iColumn, then by iterator (as values are sparse)
-
-	public:
 		//
 		// Iterators
 		//
@@ -131,7 +110,7 @@ namespace NMib::NDatabase
 			CKeyPartIterator(CResultSet const &_ResultSet, umint _iRow, umint _iKeyPart = 0);
 
 		private:
-			friend class CResultSet;
+			friend struct CResultSet;
 
 			CResultSet const *mp_pResultSet;
 			umint mp_iRow;
@@ -163,7 +142,7 @@ namespace NMib::NDatabase
 			CColumnValueIterator(CResultSet const &_ResultSet, umint _iRow, NContainer::TCVector<umint> const &_ColumnValueIterators, umint _iCol = 0);
 
 		private:
-			friend class CResultSet;
+			friend struct CResultSet;
 
 			CResultSet const *mp_pResultSet;
 			NContainer::TCVector<umint> mp_ColumnValueIterators;
@@ -212,7 +191,7 @@ namespace NMib::NDatabase
 			umint f_GetNumRows() const;
 
 		private:
-			friend class CResultSet;
+			friend struct CResultSet;
 
 			CRowIterator(CResultSet const &_ResultSet, umint _iRow = 0);
 
@@ -226,7 +205,7 @@ namespace NMib::NDatabase
 	private:
 		friend struct CColumnValueIterator;
 		friend struct CRowIterator;
-		friend class CResultSetBuilder;
+		friend struct CResultSetBuilder;
 
 	public:
 		CResultSet();
@@ -264,6 +243,26 @@ namespace NMib::NDatabase
 
 		template <typename tf_CStream>
 		void f_Consume(tf_CStream &_Stream);
+
+	private:
+	protected:
+		//
+		// Structure:
+		//
+
+		NContainer::TCVector<NResultSet::CMetadataEntry> mp_Metadata;   // Lookup by uint32 m_ID
+		NContainer::TCVector<NResultSet::CElementInfo> mp_KeyPartInfos; // Index by iKeyPart
+		NContainer::TCVector<NResultSet::CElementInfo> mp_ColumnInfos;  // Index by iColumn
+
+		//
+		// Data:
+		//
+
+		NContainer::TCVector<NResultSet::CValueVector> mp_KeyPartValues; // Index by iKeyPart, then by iKeyPartValue
+
+		umint mp_nRows;                                                               // Cached for easy access, == mp_KeyParse[X].f_GetLen()
+		NContainer::TCVector<NContainer::TCVector<uint32>> mp_KeyPartRowValueIndices; // Index by iKeyPart and then by iRow to get value index.
+		NContainer::TCVector<NResultSet::CSparseValueVector> mp_Columns;              // Index by iColumn, then by iterator (as values are sparse)
 	};
 }
 

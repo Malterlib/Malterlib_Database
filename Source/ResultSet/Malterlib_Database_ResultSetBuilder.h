@@ -64,16 +64,15 @@ namespace NMib::NDatabase
 	{
 		struct CAccessor
 		{
+			inline CAccessor &f_KeyPart(EResultDataType _Type, NResultSet::CSubType _SubType = 0);
+			inline CAccessor &f_Column(EResultDataType _Type, NResultSet::CSubType _SubType = 0);
+
 		private:
 			CResultSetDescription &mp_Desc;
 
 			inline CAccessor(CResultSetDescription &_Desc);
 
 			friend struct CResultSetDescription;
-
-		public:
-			inline CAccessor &f_KeyPart(EResultDataType _Type, NResultSet::CSubType _SubType = 0);
-			inline CAccessor &f_Column(EResultDataType _Type, NResultSet::CSubType _SubType = 0);
 		};
 
 		NContainer::TCVector<EResultDataType> m_lKeyPartTypes;
@@ -86,7 +85,7 @@ namespace NMib::NDatabase
 		inline CAccessor f_Column(EResultDataType _Type, NResultSet::CSubType _SubType = 0);
 	};
 
-	class CResultSetBuilder
+	struct CResultSetBuilder
 	{
 	protected:
 		//
@@ -117,23 +116,6 @@ namespace NMib::NDatabase
 	public:
 		struct CRow
 		{
-		private:
-			CResultSetBuilder *mp_pBuilder;
-
-			uint32 mp_nKeyParts; // Cached from builder.
-			uint32 mp_nColumns;  // Cached from builder.
-
-			uint32 mp_iRow;
-
-			uint32 mp_iCurKeyPart;
-			uint32 mp_iCurColumn;
-
-			CRow(CResultSetBuilder &_Builder, uint32 _iRow);
-			CRow(CRow const &_ToCopy) = delete;
-
-			friend class CResultSetBuilder;
-
-		public:
 			CRow(CRow &&_ToMove);
 			~CRow();
 
@@ -148,10 +130,34 @@ namespace NMib::NDatabase
 			inline CRow &f_Column(t_CType &&_Value);
 
 			CRow &f_Column(std::nullptr_t);
+
+		private:
+			CResultSetBuilder *mp_pBuilder;
+
+			uint32 mp_nKeyParts; // Cached from builder.
+			uint32 mp_nColumns;  // Cached from builder.
+
+			uint32 mp_iRow;
+
+			uint32 mp_iCurKeyPart;
+			uint32 mp_iCurColumn;
+
+			CRow(CResultSetBuilder &_Builder, uint32 _iRow);
+			CRow(CRow const &_ToCopy) = delete;
+
+			friend struct CResultSetBuilder;
 		};
 
 		struct CKeyPart
 		{
+			CKeyPart(CKeyPart &&_ToMove);
+			~CKeyPart();
+
+			// template<typename t_CType>
+			// inline CKeyPart& f_AddValue(t_CType&& _Value);
+
+			inline CKeyPart &f_AddValue(uint32 _iValueIndex);
+
 		private:
 			CResultSetBuilder *mp_pBuilder;
 
@@ -160,20 +166,19 @@ namespace NMib::NDatabase
 			CKeyPart(CResultSetBuilder &_Builder, uint32 _iKeyPart);
 			CKeyPart(CKeyPart const &_ToCopy) = delete;
 
-			friend class CResultSetBuilder;
-
-		public:
-			CKeyPart(CKeyPart &&_ToMove);
-			~CKeyPart();
-
-			// template<typename t_CType>
-			// inline CKeyPart& f_AddValue(t_CType&& _Value);
-
-			inline CKeyPart &f_AddValue(uint32 _iValueIndex);
+			friend struct CResultSetBuilder;
 		};
 
 		struct CColumn
 		{
+			CColumn(CColumn &&_ToMove);
+			~CColumn();
+
+			template <typename t_CType>
+			inline CColumn &f_AddValue(t_CType &&_Value);
+
+			inline CColumn &f_AddValue(std::nullptr_t);
+
 		private:
 			CResultSetBuilder *mp_pBuilder;
 
@@ -184,16 +189,7 @@ namespace NMib::NDatabase
 			CColumn(CResultSetBuilder &_Builder, uint32 _iKeyPart);
 			CColumn(CColumn const &_ToCopy) = delete;
 
-			friend class CResultSetBuilder;
-
-		public:
-			CColumn(CColumn &&_ToMove);
-			~CColumn();
-
-			template <typename t_CType>
-			inline CColumn &f_AddValue(t_CType &&_Value);
-
-			inline CColumn &f_AddValue(std::nullptr_t);
+			friend struct CResultSetBuilder;
 		};
 
 	public:
