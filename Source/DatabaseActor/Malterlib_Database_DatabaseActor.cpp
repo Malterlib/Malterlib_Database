@@ -14,7 +14,7 @@ namespace NMib::NDatabase
 	using namespace NFile;
 	using namespace NStr;
 
-	static auto gc_EnvironmentFlags = EDatabaseEnvironmentFlag_NoTls | EDatabaseEnvironmentFlag_AllowOneProcessLocking;
+	static constexpr auto gc_EnvironmentFlags = EDatabaseEnvironmentFlag_NoTls | EDatabaseEnvironmentFlag_AllowOneProcessLocking;
 
 	TCFuture<void> CDatabaseActor::f_OpenDatabase(CStr _Directory, uint64 _MaxSize)
 	{

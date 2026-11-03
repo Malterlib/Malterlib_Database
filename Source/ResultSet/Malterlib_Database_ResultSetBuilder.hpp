@@ -20,18 +20,18 @@ namespace NMib::NDatabase
 
 	CResultSetDescription::CAccessor &CResultSetDescription::CAccessor::f_KeyPart(EResultDataType _Type, NResultSet::CSubType _SubType)
 	{
-		DMibCheck(mp_Desc.m_lColumnTypes.f_IsEmpty())("You must specify all key part types before specifying any column types");
-		mp_Desc.m_lKeyPartTypes.f_Insert(_Type);
-		mp_Desc.m_lKeyPartSubTypes.f_Insert(_SubType);
+		DMibCheck(mp_Desc.m_ColumnTypes.f_IsEmpty())("You must specify all key part types before specifying any column types");
+		mp_Desc.m_KeyPartTypes.f_Insert(_Type);
+		mp_Desc.m_KeyPartSubTypes.f_Insert(_SubType);
 
 		return *this;
 	}
 
 	CResultSetDescription::CAccessor &CResultSetDescription::CAccessor::f_Column(EResultDataType _Type, NResultSet::CSubType _SubType)
 	{
-		DMibCheck(!mp_Desc.m_lKeyPartTypes.f_IsEmpty())("Specifying column type before key part type.");
-		mp_Desc.m_lColumnTypes.f_Insert(_Type);
-		mp_Desc.m_lColumnSubTypes.f_Insert(_SubType);
+		DMibCheck(!mp_Desc.m_KeyPartTypes.f_IsEmpty())("Specifying column type before key part type.");
+		mp_Desc.m_ColumnTypes.f_Insert(_Type);
+		mp_Desc.m_ColumnSubTypes.f_Insert(_SubType);
 
 		return *this;
 	}
@@ -42,18 +42,18 @@ namespace NMib::NDatabase
 
 	CResultSetDescription::CAccessor CResultSetDescription::f_KeyPart(EResultDataType _Type, NResultSet::CSubType _SubType)
 	{
-		DMibCheck(m_lColumnTypes.f_IsEmpty())("You must specify all key part types before specifying any column types");
-		m_lKeyPartTypes.f_Insert(_Type);
-		m_lKeyPartSubTypes.f_Insert(_SubType);
+		DMibCheck(m_ColumnTypes.f_IsEmpty())("You must specify all key part types before specifying any column types");
+		m_KeyPartTypes.f_Insert(_Type);
+		m_KeyPartSubTypes.f_Insert(_SubType);
 
 		return CAccessor(*this);
 	}
 
 	CResultSetDescription::CAccessor CResultSetDescription::f_Column(EResultDataType _Type, NResultSet::CSubType _SubType)
 	{
-		DMibCheck(!m_lKeyPartTypes.f_IsEmpty())("Specifying column type before key part type.");
-		m_lColumnTypes.f_Insert(_Type);
-		m_lColumnSubTypes.f_Insert(_SubType);
+		DMibCheck(!m_KeyPartTypes.f_IsEmpty())("Specifying column type before key part type.");
+		m_ColumnTypes.f_Insert(_Type);
+		m_ColumnSubTypes.f_Insert(_SubType);
 
 		return CAccessor(*this);
 	}
@@ -130,14 +130,14 @@ namespace NMib::NDatabase
 	{
 		using NResultSet::TCTypeToDataType;
 
-		static constexpr EResultDataType Type = TCTypeToDataType<tf_CType>::mc_Type;
+		static constexpr EResultDataType c_Type = TCTypeToDataType<tf_CType>::mc_Type;
 
 		DMibCheck(mp_pBuilder)("Adding a column value to an invalid row.");
 		DMibCheck(mp_iCurKeyPart == mp_nKeyParts)("A column value is being specified before all key parts have been.");
 		DMibCheck(mp_iCurColumn < mp_nColumns)("Too many column values are being specified!");
-		DMibCheck(mp_pBuilder->mp_ColumnInfos[mp_iCurColumn].m_Type == Type)("Invalid type used for column value");
+		DMibCheck(mp_pBuilder->mp_ColumnInfos[mp_iCurColumn].m_Type == c_Type)("Invalid type used for column value");
 
-		mp_pBuilder->mp_Columns[mp_iCurColumn].f_Get<Type>().f_Insert({mp_iRow, TCTypeToDataType<tf_CType>::fs_Convert(std::forward<tf_CType>(_Value))});
+		mp_pBuilder->mp_Columns[mp_iCurColumn].f_Get<c_Type>().f_Insert({mp_iRow, TCTypeToDataType<tf_CType>::fs_Convert(std::forward<tf_CType>(_Value))});
 
 		++mp_iCurColumn;
 
@@ -169,19 +169,19 @@ namespace NMib::NDatabase
 	{
 		using NResultSet::TCTypeToDataType;
 
-		static constexpr EResultDataType Type = TCTypeToDataType<tf_CType>::mc_Type;
+		static constexpr EResultDataType c_Type = TCTypeToDataType<tf_CType>::mc_Type;
 
 		DMibCheck(mp_pBuilder)("Adding a key part value to an invalid column.");
 		DMibCheck(mp_iColumn < mp_pBuilder->mp_ColumnInfos.f_GetLen())("Invalid column");
 
-		auto &lArray = mp_pBuilder->mp_Columns[mp_iColumn].f_Get<Type>();
+		auto &Array = mp_pBuilder->mp_Columns[mp_iColumn].f_Get<c_Type>();
 
-		if (mp_iCurRow == 0 && !lArray.f_IsEmpty())
-			mp_iCurRow = lArray.f_GetLast().m_iRow;
+		if (mp_iCurRow == 0 && !Array.f_IsEmpty())
+			mp_iCurRow = Array.f_GetLast().m_iRow;
 
 		DMibCheck(mp_iCurRow < mp_pBuilder->mp_nRows)("Attempting to add a column value for a row that has no key parts specified.");
 
-		lArray.f_Insert({mp_iCurRow, TCTypeToDataType<tf_CType>::fs_Convert(std::forward<tf_CType>(_Value))});
+		Array.f_Insert({mp_iCurRow, TCTypeToDataType<tf_CType>::fs_Convert(std::forward<tf_CType>(_Value))});
 
 		++mp_iCurRow;
 
@@ -244,16 +244,16 @@ namespace NMib::NDatabase
 	{
 		using NResultSet::TCTypeToDataType;
 
-		static constexpr EResultDataType Type = TCTypeToDataType<tf_CType>::mc_Type;
+		static constexpr EResultDataType c_Type = TCTypeToDataType<tf_CType>::mc_Type;
 
 		DMibCheck(_iKeyPart < mp_KeyPartInfos.f_GetLen())("Values for too many key parts are being specified!");
-		DMibCheck(mp_KeyPartInfos[_iKeyPart].m_Type == Type)("Invalid type used for key part values");
+		DMibCheck(mp_KeyPartInfos[_iKeyPart].m_Type == c_Type)("Invalid type used for key part values");
 
-		auto &lKeyPartValues = mp_KeyPartValues[_iKeyPart].f_Get<Type>();
+		auto &KeyPartValues = mp_KeyPartValues[_iKeyPart].f_Get<c_Type>();
 
-		lKeyPartValues.f_Insert(TCTypeToDataType<tf_CType>::fs_Convert(std::forward<tf_CType>(_Value)));
+		KeyPartValues.f_Insert(TCTypeToDataType<tf_CType>::fs_Convert(std::forward<tf_CType>(_Value)));
 
-		return lKeyPartValues.f_GetLen();
+		return KeyPartValues.f_GetLen();
 	}
 
 	template <typename tf_CType>
@@ -261,14 +261,14 @@ namespace NMib::NDatabase
 	{
 		using NResultSet::TCTypeToDataType;
 
-		static constexpr EResultDataType Type = TCTypeToDataType<tf_CType>::mc_Type;
+		static constexpr EResultDataType c_Type = TCTypeToDataType<tf_CType>::mc_Type;
 
 		DMibCheck(_iKeyPart < mp_KeyPartInfos.f_GetLen())("Values for too many key parts are being specified!");
-		DMibCheck(mp_KeyPartInfos[_iKeyPart].m_Type == Type)("Invalid type used for key part values");
+		DMibCheck(mp_KeyPartInfos[_iKeyPart].m_Type == c_Type)("Invalid type used for key part values");
 
-		auto &lKeyPartValues = mp_KeyPartValues[_iKeyPart].f_Get<Type>();
+		auto &KeyPartValues = mp_KeyPartValues[_iKeyPart].f_Get<c_Type>();
 
-		lKeyPartValues = fg_Move(_Values);
+		KeyPartValues = fg_Move(_Values);
 
 		return 0;
 	}

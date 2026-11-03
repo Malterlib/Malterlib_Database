@@ -68,7 +68,7 @@ namespace NMib::NDatabase
 
 	void CDatabaseWriteTransaction::f_Commit()
 	{
-		if (mp_pTransaction.f_Get()->mt_child)
+		if (mp_pTransaction.f_Get()->m_pChild)
 			DMibError("Transaction still has a child transaction");
 
 		NPrivate::fg_TxnCommit(mp_pTransaction.f_Detach());
@@ -158,7 +158,7 @@ namespace NMib::NDatabase
 	{
 		auto pParentTransaction = mp_pTransaction.f_Get();
 		DMibRequire(pParentTransaction);
-		auto Transaction = pParentTransaction->mt_env->f_TxnBegin(mp_pTransaction.f_Get(), 0);
+		auto Transaction = pParentTransaction->m_pEnvironment->f_TxnBegin(mp_pTransaction.f_Get(), 0);
 		return fg_Move(Transaction);
 	}
 
@@ -174,29 +174,29 @@ namespace NMib::NDatabase
 
 	void CDatabaseTransactionCommon::CInternal::f_CheckBlocked() const
 	{
-		fs_CheckBlocked(mt_flags);
+		fs_CheckBlocked(m_Flags);
 	}
 
 	void CDatabaseEnvironment_Internal::f_DbiClose(CDatabaseSubID _DatabaseID)
 	{
-		void *ptr;
-		if (_DatabaseID < DCoreDbs || _DatabaseID >= me_maxdbs)
+		void *pName;
+		if (_DatabaseID < DCoreDbs || _DatabaseID >= m_MaxDatabases)
 			return;
 
 		auto pStaticDasabaseInfo = m_StaticDasabaseInfo.f_GetArray();
 
 		auto &StaticDasabaseInfo = pStaticDasabaseInfo[_DatabaseID];
 
-		ptr = (ch8 *)StaticDasabaseInfo.m_DatabaseName.m_pData;
+		pName = (ch8 *)StaticDasabaseInfo.m_DatabaseName.m_pData;
 		auto Size = StaticDasabaseInfo.m_DatabaseName.m_Size;
 		/* If there was no name, this was already closed */
-		if (ptr)
+		if (pName)
 		{
 			StaticDasabaseInfo.m_DatabaseName.m_pData = NULL;
 			StaticDasabaseInfo.m_DatabaseName.m_Size = 0;
-			me_dbflags[_DatabaseID] = 0;
-			me_dbiseqs[_DatabaseID]++;
-			NMemory::fg_Free(ptr, Size + 1);
+			m_pDatabaseFlags[_DatabaseID] = 0;
+			m_pDatabaseSequences[_DatabaseID]++;
+			NMemory::fg_Free(pName, Size + 1);
 		}
 	}
 
@@ -205,14 +205,14 @@ namespace NMib::NDatabase
 		using namespace NPrivate;
 
 		umint Size = 0;
-		if (_pTransaction->mt_parent)
+		if (_pTransaction->m_pParent)
 		{
-			Size = me_maxdbs * (sizeof(CMdbDb) + sizeof(CMdbCursor *) + 1);
+			Size = m_MaxDatabases * (sizeof(CMdbDb) + sizeof(CMdbCursor *) + 1);
 			Size += sizeof(CMdbNTxn);
 		}
-		else if (_pTransaction->mt_flags & EDatabaseEnvironmentFlag_ReadOnly)
+		else if (_pTransaction->m_Flags & EDatabaseEnvironmentFlag_ReadOnly)
 		{
-			Size = me_maxdbs * (sizeof(CMdbDb) + 1);
+			Size = m_MaxDatabases * (sizeof(CMdbDb) + 1);
 			Size += sizeof(CMdbTxn);
 		}
 		else
@@ -224,20 +224,20 @@ namespace NMib::NDatabase
 	CDatabaseTransactionCommon CDatabaseEnvironment_Internal::f_TxnBegin(NPrivate::CMdbTxn *_pParent, uint32 _Flags)
 	{
 		using namespace NPrivate;
-		CMdbTxn *txn = nullptr;
-		int size, tsize;
+		CMdbTxn *pTransaction = nullptr;
+		int Size, TransactionSize;
 
 		_Flags &= DMdbTxnBeginFlags;
-		_Flags |= me_flags & EDatabaseEnvironmentFlag_WriteMap;
+		_Flags |= m_Flags & EDatabaseEnvironmentFlag_WriteMap;
 
-		if (me_flags & EDatabaseEnvironmentFlag_ReadOnly & ~_Flags) // write txn in RDONLY env
+		if (m_Flags & EDatabaseEnvironmentFlag_ReadOnly & ~_Flags) // write txn in RDONLY env
 			DMibError("Cannot open write transaction in read only environment");
 
 		if (_pParent)
 		{
 			/* Nested transactions: Max 1 child, write txns only, no writemap */
-			_Flags |= _pParent->mt_flags;
-			if (_pParent->mt_flags & DMdbTxnReadOnly)
+			_Flags |= _pParent->m_Flags;
+			if (_pParent->m_Flags & DMdbTxnReadOnly)
 				DMibError("Cannot create child transaction for read only transaction");
 			if (_Flags & DMdbTxnReadOnly)
 				DMibError("Child transactions cannot be read only");
@@ -247,126 +247,126 @@ namespace NMib::NDatabase
 			CDatabaseTransactionCommon::CInternal::fs_CheckBlocked(_Flags);
 
 			/* Child txns save CMdbPgState and use own copy of cursors */
-			size = me_maxdbs * (sizeof(CMdbDb) + sizeof(CMdbCursor *) + 1);
-			size += tsize = sizeof(CMdbNTxn);
+			Size = m_MaxDatabases * (sizeof(CMdbDb) + sizeof(CMdbCursor *) + 1);
+			Size += TransactionSize = sizeof(CMdbNTxn);
 		}
 		else if (_Flags & EDatabaseEnvironmentFlag_ReadOnly)
 		{
-			size = me_maxdbs * (sizeof(CMdbDb) + 1);
-			size += tsize = sizeof(CMdbTxn);
+			Size = m_MaxDatabases * (sizeof(CMdbDb) + 1);
+			Size += TransactionSize = sizeof(CMdbTxn);
 		}
 		else
 		{
 			/* Reuse preallocated write txn. However, do not touch it until
 			 * fg_TxnRenew0() succeeds, since it currently may be active.
 			 */
-			txn = me_txn0;
+			pTransaction = m_pPreallocatedTransaction;
 		}
 		auto Cleanup = g_OnScopeExit / [&]
 			{
-				if (txn && txn != me_txn0)
-					NMemory::fg_Free(txn, size);
+				if (pTransaction && pTransaction != m_pPreallocatedTransaction)
+					NMemory::fg_Free(pTransaction, Size);
 			}
 		;
 
-		if (!txn)
+		if (!pTransaction)
 		{
-			txn = (CMdbTxn *)NMemory::fg_AllocInitZero(size);
+			pTransaction = (CMdbTxn *)NMemory::fg_AllocInitZero(Size);
 
 #ifdef DMibDatabase_Always64BitSupport
 			if (!_pParent)
 			{
-				txn->mt_rpages = (NPrivate::MDB_ID3L)NMemory::fg_Alloc(DMdbTrpageSize * sizeof(MDB_ID3));
-				txn->mt_rpages[0].mid = 0;
-				txn->mt_rpcheck = DMdbTrpageSize / 2;
+				pTransaction->m_pReadOnlyPages = (NPrivate::MDB_ID3L)NMemory::fg_Alloc(DMdbTrpageSize * sizeof(MDB_ID3));
+				pTransaction->m_pReadOnlyPages[0].m_ID = 0;
+				pTransaction->m_ReadOnlyPageCheck = DMdbTrpageSize / 2;
 			}
 #endif
-			txn->mt_dbxs = m_StaticDasabaseInfo.f_GetArray(); // static
-			txn->mt_dbs = (CMdbDb *)((char *)txn + tsize);
-			txn->mt_dbflags = (unsigned char *)txn + size - me_maxdbs;
-			txn->mt_flags = _Flags;
-			txn->mt_env = this;
+			pTransaction->m_pDatabaseInfos = m_StaticDasabaseInfo.f_GetArray(); // static
+			pTransaction->m_pDatabases = (CMdbDb *)((char *)pTransaction + TransactionSize);
+			pTransaction->m_pDatabaseFlags = (unsigned char *)pTransaction + Size - m_MaxDatabases;
+			pTransaction->m_Flags = _Flags;
+			pTransaction->m_pEnvironment = this;
 		}
 
 #ifdef DMibDatabase_Always64BitSupport
 		auto Cleanup2 = g_OnScopeExit / [&]
 			{
-				if (txn->mt_rpages)
-					NMemory::fg_Free(txn->mt_rpages, DMdbTrpageSize * sizeof(MDB_ID3));
+				if (pTransaction->m_pReadOnlyPages)
+					NMemory::fg_Free(pTransaction->m_pReadOnlyPages, DMdbTrpageSize * sizeof(MDB_ID3));
 			}
 		;
 #endif
 		if (_pParent)
 		{
-			uint32 i;
-			txn->mt_cursors = (CMdbCursor **)(txn->mt_dbs + me_maxdbs);
-			txn->mt_dbiseqs = _pParent->mt_dbiseqs;
-			txn->mt_u.dirty_list = (CMdbId2L)NMemory::fg_Alloc(sizeof(CMdbId2) * DMdbIdlUmSize);
+			uint32 iDatabase;
+			pTransaction->m_pCursors = (CMdbCursor **)(pTransaction->m_pDatabases + m_MaxDatabases);
+			pTransaction->m_pDatabaseSequences = _pParent->m_pDatabaseSequences;
+			pTransaction->m_pDirtyList = (CMdbId2L)NMemory::fg_Alloc(sizeof(CMdbId2) * DMdbIdlUmSize);
 			auto Cleanup3 = g_OnScopeExit / [&]
 				{
-					NMemory::fg_Free(txn->mt_u.dirty_list, sizeof(CMdbId2) * DMdbIdlUmSize);
+					NMemory::fg_Free(pTransaction->m_pDirtyList, sizeof(CMdbId2) * DMdbIdlUmSize);
 				}
 			;
-			txn->mt_free_pgs = fg_MidlAlloc(DMdbIdlUmMax);
+			pTransaction->m_pFreePages = fg_MidlAlloc(DMdbIdlUmMax);
 			auto Cleanup4 = g_OnScopeExit / [&]
 				{
-					fg_TxnEnd(txn, gc_MDB_END_FAIL_BEGINCHILD);
+					fg_TxnEnd(pTransaction, gc_MDB_END_FAIL_BEGINCHILD);
 				}
 			;
 			Cleanup3.f_Clear();
-			txn->mt_txnid = _pParent->mt_txnid;
-			txn->mt_dirty_room = _pParent->mt_dirty_room;
-			txn->mt_u.dirty_list[0].mid = 0;
-			txn->mt_spill_pgs = nullptr;
-			txn->mt_next_pgno = _pParent->mt_next_pgno;
-			_pParent->mt_flags |= DMdbTxnHasChild;
-			_pParent->mt_child = txn;
-			txn->mt_parent = _pParent;
-			txn->mt_numdbs = _pParent->mt_numdbs;
+			pTransaction->m_TransactionID = _pParent->m_TransactionID;
+			pTransaction->m_DirtyRoom = _pParent->m_DirtyRoom;
+			pTransaction->m_pDirtyList[0].m_ID = 0;
+			pTransaction->m_pSpillPages = nullptr;
+			pTransaction->m_NextPageNumber = _pParent->m_NextPageNumber;
+			_pParent->m_Flags |= DMdbTxnHasChild;
+			_pParent->m_pChild = pTransaction;
+			pTransaction->m_pParent = _pParent;
+			pTransaction->m_nDatabases = _pParent->m_nDatabases;
 #ifdef DMibDatabase_Always64BitSupport
-			txn->mt_rpages = _pParent->mt_rpages;
+			pTransaction->m_pReadOnlyPages = _pParent->m_pReadOnlyPages;
 #endif
-			memcpy(txn->mt_dbs, _pParent->mt_dbs, txn->mt_numdbs * sizeof(CMdbDb));
-			/* Copy _pParent->mt_dbflags, but clear DDbNew */
-			for (i = 0; i < txn->mt_numdbs; i++)
-				txn->mt_dbflags[i] = _pParent->mt_dbflags[i] & ~DDbNew;
-			NPrivate::CMdbNTxn *ntxn = (CMdbNTxn *)txn;
-			ntxn->mnt_pgstate = me_pgstate; // save parent me_pgstate.mf_pghead & co
-			if (me_pgstate.mf_pghead)
+			memcpy(pTransaction->m_pDatabases, _pParent->m_pDatabases, pTransaction->m_nDatabases * sizeof(CMdbDb));
+			/* Copy _pParent->m_pDatabaseFlags, but clear DDbNew */
+			for (iDatabase = 0; iDatabase < pTransaction->m_nDatabases; iDatabase++)
+				pTransaction->m_pDatabaseFlags[iDatabase] = _pParent->m_pDatabaseFlags[iDatabase] & ~DDbNew;
+			NPrivate::CMdbNTxn *pNestedTransaction = (CMdbNTxn *)pTransaction;
+			pNestedTransaction->m_PageState = m_PageState; // save parent m_PageState.m_pReclaimedPages & co
+			if (m_PageState.m_pReclaimedPages)
 			{
-				umint size = DMdbIdlSizeof(me_pgstate.mf_pghead);
-				me_pgstate.mf_pghead = fg_MidlAlloc(me_pgstate.mf_pghead[0]);
-				memcpy(me_pgstate.mf_pghead, ntxn->mnt_pgstate.mf_pghead, size);
+				umint Size = DMdbIdlSizeof(m_PageState.m_pReclaimedPages);
+				m_PageState.m_pReclaimedPages = fg_MidlAlloc(m_PageState.m_pReclaimedPages[0]);
+				memcpy(m_PageState.m_pReclaimedPages, pNestedTransaction->m_PageState.m_pReclaimedPages, Size);
 			}
-			NPrivate::fg_CursorShadow(_pParent, txn);
+			NPrivate::fg_CursorShadow(_pParent, pTransaction);
 
 			Cleanup4.f_Clear();
 			Cleanup3.f_Clear();
 		}
 		else
 		{ // EDatabaseEnvironmentFlag_ReadOnly
-			if (txn != me_txn0)
-				txn->mt_dbiseqs = me_dbiseqs;
-			fg_TxnRenew0(txn);
+			if (pTransaction != m_pPreallocatedTransaction)
+				pTransaction->m_pDatabaseSequences = m_pDatabaseSequences;
+			fg_TxnRenew0(pTransaction);
 		}
 #ifdef DMibDatabase_Always64BitSupport
 		Cleanup2.f_Clear();
 #endif
 		Cleanup.f_Clear();
-		txn->mt_flags |= _Flags; // could not change txn=me_txn0 earlier
+		pTransaction->m_Flags |= _Flags; // could not change pTransaction=m_pPreallocatedTransaction earlier
 		DMibDatabaseTrace
 			(
 				"begin txn {}{} {} on mdbenv {}, root page {}"
-				, txn->mt_txnid
+				, pTransaction->m_TransactionID
 				, (_Flags & EDatabaseEnvironmentFlag_ReadOnly) ? "r" : "w"
-				, (void *)txn
+				, (void *)pTransaction
 				, (void *)this
-				, txn->mt_dbs[DMainDbi].md_root
+				, pTransaction->m_pDatabases[DMainDbi].m_RootPage
 			)
 		;
 
 		CDatabaseTransactionCommon Transaction;
-		Transaction.mp_pTransaction = fg_Explicit(txn);
+		Transaction.mp_pTransaction = fg_Explicit(pTransaction);
 		return Transaction;
 	}
 
@@ -381,13 +381,13 @@ namespace NMib::NDatabase
 	 */
 	CDatabaseOffset CDatabaseTransactionCommon::f_TransactionID()
 	{
-		return mp_pTransaction->mt_txnid;
+		return mp_pTransaction->m_TransactionID;
 	}
 
 	bool CDatabaseTransactionCommon::f_HasDatabases() const
 	{
-		auto &Environment = *this->mp_pTransaction->mt_env;
-		return Environment.me_maxdbs > DCoreDbs;
+		auto &Environment = *this->mp_pTransaction->m_pEnvironment;
+		return Environment.m_MaxDatabases > DCoreDbs;
 	}
 
 	CDatabaseTransactionCommon::CInternal *CDatabaseTransactionCommon::fp_GetInternal()
@@ -415,13 +415,13 @@ namespace NMib::NDatabase
 	{
 		DMibRequire(_pTransaction);
 		using namespace NPrivate;
-		uint32 i, end_mode;
-		CMdbEnv *env;
+		uint32 iIndex, EndMode;
+		CMdbEnv *pEnvironment;
 
 		/* fg_TxnEnd() mode for a commit which writes nothing */
-		end_mode = NPrivate::gc_MDB_END_EMPTY_COMMIT | DMdbEndUpdate | DMdbEndSlot | DMdbEndFree;
+		EndMode = NPrivate::gc_MDB_END_EMPTY_COMMIT | DMdbEndUpdate | DMdbEndSlot | DMdbEndFree;
 
-		if (_pTransaction->mt_child)
+		if (_pTransaction->m_pChild)
 			DMibError("Transaction still has a child transaction");
 
 		auto Cleanup = g_OnScopeExit / [&]
@@ -430,245 +430,253 @@ namespace NMib::NDatabase
 			}
 		;
 
-		env = _pTransaction->mt_env;
+		pEnvironment = _pTransaction->m_pEnvironment;
 
-		if (DFIsSet(_pTransaction->mt_flags, DMdbTxnReadOnly))
+		if (DFIsSet(_pTransaction->m_Flags, DMdbTxnReadOnly))
 			goto done;
 
-		if (_pTransaction->mt_flags & (DMdbTxnFinished | DMdbTxnError))
+		if (_pTransaction->m_Flags & (DMdbTxnFinished | DMdbTxnError))
 		{
-			if (_pTransaction->mt_parent)
-				_pTransaction->mt_parent->mt_flags |= DMdbTxnError;
-			if (_pTransaction->mt_flags & DMdbTxnFinished)
+			if (_pTransaction->m_pParent)
+				_pTransaction->m_pParent->m_Flags |= DMdbTxnError;
+			if (_pTransaction->m_Flags & DMdbTxnFinished)
 				DMibError("Transaction has already finished");
-			if (_pTransaction->mt_flags & DMdbTxnError)
+			if (_pTransaction->m_Flags & DMdbTxnError)
 				DMibError("Transaction has already failed");
 		}
 
-		if (_pTransaction->mt_parent)
+		if (_pTransaction->m_pParent)
 		{
-			CMdbTxn *parent = _pTransaction->mt_parent;
-			CMdbPage **lp;
-			CMdbId2L dst, src;
-			CMdbIdl pspill;
-			unsigned x, y, len, ps_len;
+			CMdbTxn *pParent = _pTransaction->m_pParent;
+			CMdbPage **pLooseLink;
+			CMdbId2L pDestination, pSource;
+			CMdbIdl pParentSpill;
+			unsigned iDestination, iSource, Length, nParentSpill;
 
 			/* Append our free list to parent's */
-			fg_MidlAppendList(&parent->mt_free_pgs, _pTransaction->mt_free_pgs);
-			fg_MidlFree(_pTransaction->mt_free_pgs);
+			fg_MidlAppendList(&pParent->m_pFreePages, _pTransaction->m_pFreePages);
+			fg_MidlFree(_pTransaction->m_pFreePages);
 			/* Failures after this must either undo the changes
 			 * to the parent or set DMdbTxnError in the parent.
 			 */
 
-			parent->mt_next_pgno = _pTransaction->mt_next_pgno;
-			parent->mt_flags = _pTransaction->mt_flags;
+			pParent->m_NextPageNumber = _pTransaction->m_NextPageNumber;
+			pParent->m_Flags = _pTransaction->m_Flags;
 
 			/* Merge our cursors into parent's and close them */
 			fg_CursorsClose(_pTransaction, 1);
 
 			/* Update parent's DB table. */
-			memcpy(parent->mt_dbs, _pTransaction->mt_dbs, _pTransaction->mt_numdbs * sizeof(CMdbDb));
-			parent->mt_numdbs = _pTransaction->mt_numdbs;
-			parent->mt_dbflags[DFreeDbi] = _pTransaction->mt_dbflags[DFreeDbi];
-			parent->mt_dbflags[DMainDbi] = _pTransaction->mt_dbflags[DMainDbi];
-			for (i = DCoreDbs; i < _pTransaction->mt_numdbs; i++)
+			memcpy(pParent->m_pDatabases, _pTransaction->m_pDatabases, _pTransaction->m_nDatabases * sizeof(CMdbDb));
+			pParent->m_nDatabases = _pTransaction->m_nDatabases;
+			pParent->m_pDatabaseFlags[DFreeDbi] = _pTransaction->m_pDatabaseFlags[DFreeDbi];
+			pParent->m_pDatabaseFlags[DMainDbi] = _pTransaction->m_pDatabaseFlags[DMainDbi];
+			for (iIndex = DCoreDbs; iIndex < _pTransaction->m_nDatabases; iIndex++)
 			{
 				/* preserve parent's DDbNew status */
-				x = parent->mt_dbflags[i] & DDbNew;
-				parent->mt_dbflags[i] = _pTransaction->mt_dbflags[i] | x;
+				iDestination = pParent->m_pDatabaseFlags[iIndex] & DDbNew;
+				pParent->m_pDatabaseFlags[iIndex] = _pTransaction->m_pDatabaseFlags[iIndex] | iDestination;
 			}
 
-			dst = parent->mt_u.dirty_list;
-			src = _pTransaction->mt_u.dirty_list;
+			pDestination = pParent->m_pDirtyList;
+			pSource = _pTransaction->m_pDirtyList;
 			/* Remove anything in our dirty list from parent's spill list */
-			if ((pspill = parent->mt_spill_pgs) && (ps_len = pspill[0]))
+			if ((pParentSpill = pParent->m_pSpillPages) && (nParentSpill = pParentSpill[0]))
 			{
-				x = y = ps_len;
-				pspill[0] = (CPgno)-1;
+				iDestination = iSource = nParentSpill;
+				pParentSpill[0] = (CPgno)-1;
 				/* Mark our dirty pages as deleted in parent spill list */
-				for (i = 0, len = src[0].mid; ++i <= len;)
+				for (iIndex = 0, Length = pSource[0].m_ID; ++iIndex <= Length;)
 				{
-					CMdbId pn = src[i].mid << 1;
-					while (pn > pspill[x])
-						x--;
-					if (pn == pspill[x])
+					CMdbId ShiftedPageNumber = pSource[iIndex].m_ID << 1;
+					while (ShiftedPageNumber > pParentSpill[iDestination])
+						iDestination--;
+					if (ShiftedPageNumber == pParentSpill[iDestination])
 					{
-						pspill[x] = 1;
-						y = --x;
+						pParentSpill[iDestination] = 1;
+						iSource = --iDestination;
 					}
 				}
 				/* Squash deleted pagenums if we deleted any */
-				for (x = y; ++x <= ps_len;)
+				for (iDestination = iSource; ++iDestination <= nParentSpill;)
 				{
-					if (!(pspill[x] & 1))
-						pspill[++y] = pspill[x];
+					if (!(pParentSpill[iDestination] & 1))
+						pParentSpill[++iSource] = pParentSpill[iDestination];
 				}
-				pspill[0] = y;
+				pParentSpill[0] = iSource;
 			}
 
 			/* Remove anything in our spill list from parent's dirty list */
-			if (_pTransaction->mt_spill_pgs && _pTransaction->mt_spill_pgs[0])
+			if (_pTransaction->m_pSpillPages && _pTransaction->m_pSpillPages[0])
 			{
-				for (i = 1; i <= _pTransaction->mt_spill_pgs[0]; i++)
+				for (iIndex = 1; iIndex <= _pTransaction->m_pSpillPages[0]; iIndex++)
 				{
-					CMdbId pn = _pTransaction->mt_spill_pgs[i];
-					if (pn & 1)
+					CMdbId ShiftedPageNumber = _pTransaction->m_pSpillPages[iIndex];
+					if (ShiftedPageNumber & 1)
 						continue; // deleted spillpg
-					pn >>= 1;
-					y = fg_Mid2lSearch(dst, pn);
-					if (y <= dst[0].mid && dst[y].mid == pn)
+					ShiftedPageNumber >>= 1;
+					iSource = fg_Mid2lSearch(pDestination, ShiftedPageNumber);
+					if (iSource <= pDestination[0].m_ID && pDestination[iSource].m_ID == ShiftedPageNumber)
 					{
-						env->f_DPageFreeMemory((CMdbPage *)dst[y].mptr);
-						while (y < dst[0].mid)
+						pEnvironment->f_DPageFreeMemory((CMdbPage *)pDestination[iSource].m_pValue);
+						while (iSource < pDestination[0].m_ID)
 						{
-							dst[y] = dst[y + 1];
-							y++;
+							pDestination[iSource] = pDestination[iSource + 1];
+							iSource++;
 						}
-						dst[0].mid--;
+						pDestination[0].m_ID--;
 					}
 				}
 			}
 
 			/* Find len = length of merging our dirty list with parent's */
-			x = dst[0].mid;
-			dst[0].mid = 0; // simplify loops
-			if (parent->mt_parent)
+			iDestination = pDestination[0].m_ID;
+			pDestination[0].m_ID = 0; // simplify loops
+			if (pParent->m_pParent)
 			{
-				len = x + src[0].mid;
-				y = fg_Mid2lSearch(src, dst[x].mid + 1) - 1;
-				for (i = x; y && i; y--)
+				Length = iDestination + pSource[0].m_ID;
+				iSource = fg_Mid2lSearch(pSource, pDestination[iDestination].m_ID + 1) - 1;
+				for (iIndex = iDestination; iSource && iIndex; iSource--)
 				{
-					CPgno yp = src[y].mid;
-					while (yp < dst[i].mid)
-						i--;
-					if (yp == dst[i].mid)
+					CPgno SourcePageNumber = pSource[iSource].m_ID;
+					while (SourcePageNumber < pDestination[iIndex].m_ID)
+						iIndex--;
+					if (SourcePageNumber == pDestination[iIndex].m_ID)
 					{
-						i--;
-						len--;
+						iIndex--;
+						Length--;
 					}
 				}
 			}
 			else
 			{ // Simplify the above for single-ancestor case
-				len = DMdbIdlUmMax - _pTransaction->mt_dirty_room;
+				Length = DMdbIdlUmMax - _pTransaction->m_DirtyRoom;
 			}
 
 			/* Merge our dirty list with parent's */
-			y = src[0].mid;
-			for (i = len; y; dst[i--] = src[y--])
+			iSource = pSource[0].m_ID;
+			for (iIndex = Length; iSource; pDestination[iIndex--] = pSource[iSource--])
 			{
-				CPgno yp = src[y].mid;
-				while (yp < dst[x].mid)
-					dst[i--] = dst[x--];
-				if (yp == dst[x].mid)
-					env->f_DPageFreeMemory((CMdbPage *)dst[x--].mptr);
+				CPgno SourcePageNumber = pSource[iSource].m_ID;
+				while (SourcePageNumber < pDestination[iDestination].m_ID)
+					pDestination[iIndex--] = pDestination[iDestination--];
+				if (SourcePageNumber == pDestination[iDestination].m_ID)
+					pEnvironment->f_DPageFreeMemory((CMdbPage *)pDestination[iDestination--].m_pValue);
 			}
-			DMibCheck(i == x);
-			dst[0].mid = len;
-			NMemory::fg_Free(_pTransaction->mt_u.dirty_list, sizeof(CMdbId2) * DMdbIdlUmSize);
-			parent->mt_dirty_room = _pTransaction->mt_dirty_room;
-			if (_pTransaction->mt_spill_pgs)
+			DMibCheck(iIndex == iDestination);
+			pDestination[0].m_ID = Length;
+			NMemory::fg_Free(_pTransaction->m_pDirtyList, sizeof(CMdbId2) * DMdbIdlUmSize);
+			pParent->m_DirtyRoom = _pTransaction->m_DirtyRoom;
+			if (_pTransaction->m_pSpillPages)
 			{
-				if (parent->mt_spill_pgs)
+				if (pParent->m_pSpillPages)
 				{
 					/* TODO: Prevent failure here, so parent does not fail */
 					{
 						auto Cleanup = g_OnScopeExit / [&]()
 							{
-								parent->mt_flags |= DMdbTxnError;
+								pParent->m_Flags |= DMdbTxnError;
 							}
 						;
-						fg_MidlAppendList(&parent->mt_spill_pgs, _pTransaction->mt_spill_pgs);
+						fg_MidlAppendList(&pParent->m_pSpillPages, _pTransaction->m_pSpillPages);
 						Cleanup.f_Clear();
 					}
-					fg_MidlFree(_pTransaction->mt_spill_pgs);
-					fg_MidlSort(parent->mt_spill_pgs);
+					fg_MidlFree(_pTransaction->m_pSpillPages);
+					fg_MidlSort(pParent->m_pSpillPages);
 				}
 				else
-					parent->mt_spill_pgs = _pTransaction->mt_spill_pgs;
+					pParent->m_pSpillPages = _pTransaction->m_pSpillPages;
 			}
 
 			/* Append our loose page list to parent's */
-			for (lp = &parent->mt_loose_pgs; *lp; lp = &DNextLoosePage(*lp))
+			for (pLooseLink = &pParent->m_pLoosePages; *pLooseLink; pLooseLink = &DNextLoosePage(*pLooseLink))
 				;
-			*lp = _pTransaction->mt_loose_pgs;
-			parent->mt_loose_count += _pTransaction->mt_loose_count;
+			*pLooseLink = _pTransaction->m_pLoosePages;
+			pParent->m_nLoosePages += _pTransaction->m_nLoosePages;
 
-			parent->mt_child = nullptr;
-			fg_MidlFree(((CMdbNTxn *)_pTransaction)->mnt_pgstate.mf_pghead);
-			env->f_TxnFree(_pTransaction);
+			pParent->m_pChild = nullptr;
+			fg_MidlFree(((CMdbNTxn *)_pTransaction)->m_PageState.m_pReclaimedPages);
+			pEnvironment->f_TxnFree(_pTransaction);
 			Cleanup.f_Clear();
 			return;
 		}
 
-		if (_pTransaction != env->me_txn)
+		if (_pTransaction != pEnvironment->m_pTransaction)
 			DMibError("Trying to commit write transaction that is not the shared write transaction");
 
 		fg_CursorsClose(_pTransaction, 0);
 
-		if (!_pTransaction->mt_u.dirty_list[0].mid && !(_pTransaction->mt_flags & (DMdbTxnDirty | DMdbTxnSpills)))
+		if (!_pTransaction->m_pDirtyList[0].m_ID && !(_pTransaction->m_Flags & (DMdbTxnDirty | DMdbTxnSpills)))
 			goto done;
 
-		DMibDatabaseTrace("committing txn {} {} on mdbenv {}, root page {}", _pTransaction->mt_txnid, (void *)_pTransaction, (void *)env, _pTransaction->mt_dbs[DMainDbi].md_root);
+		DMibDatabaseTrace
+			(
+				"committing txn {} {} on mdbenv {}, root page {}"
+				, _pTransaction->m_TransactionID
+				, (void *)_pTransaction
+				, (void *)pEnvironment
+				, _pTransaction->m_pDatabases[DMainDbi].m_RootPage
+			)
+		;
 
 		/* Update DB root pointers */
-		if (_pTransaction->mt_numdbs > DCoreDbs)
+		if (_pTransaction->m_nDatabases > DCoreDbs)
 		{
-			CMdbCursor mc;
-			CDatabaseSubID i;
-			CDatabaseValue data;
-			data.m_Size = sizeof(CMdbDb);
+			CMdbCursor Cursor;
+			CDatabaseSubID iDatabase;
+			CDatabaseValue Data;
+			Data.m_Size = sizeof(CMdbDb);
 
-			NPrivate::fg_CursorInit(&mc, _pTransaction, DMainDbi, nullptr);
-			for (i = DCoreDbs; i < _pTransaction->mt_numdbs; i++)
+			NPrivate::fg_CursorInit(&Cursor, _pTransaction, DMainDbi, nullptr);
+			for (iDatabase = DCoreDbs; iDatabase < _pTransaction->m_nDatabases; iDatabase++)
 			{
-				if (_pTransaction->mt_dbflags[i] & DDbDirty)
+				if (_pTransaction->m_pDatabaseFlags[iDatabase] & DDbDirty)
 				{
-					if (DTxnDbiChanged(_pTransaction, i))
+					if (DTxnDbiChanged(_pTransaction, iDatabase))
 						DMibError("Stale write transaction");
-					data.m_pData = (uint8 *)&_pTransaction->mt_dbs[i];
-					int rc = fg_CursorPut(&mc, &_pTransaction->mt_dbxs[i].m_DatabaseName, &data, (EDatabaseWriteFlag)DFSubData);
-					if (rc)
-						DMibError(NStr::fg_Format("Error updating root pointers: {}", fg_StrError(rc)));
+					Data.m_pData = (uint8 *)&_pTransaction->m_pDatabases[iDatabase];
+					int Result = fg_CursorPut(&Cursor, &_pTransaction->m_pDatabaseInfos[iDatabase].m_DatabaseName, &Data, (EDatabaseWriteFlag)DFSubData);
+					if (Result)
+						DMibError(NStr::fg_Format("Error updating root pointers: {}", fg_StrError(Result)));
 				}
 			}
 		}
 
 		{
-			int rc = fg_FreelistSave(_pTransaction);
-			if (rc)
-				DMibError(NStr::fg_Format("Error saving free list: {}", fg_StrError(rc)));
+			int Result = fg_FreelistSave(_pTransaction);
+			if (Result)
+				DMibError(NStr::fg_Format("Error saving free list: {}", fg_StrError(Result)));
 		}
 
-		fg_MidlFree(env->me_pgstate.mf_pghead);
-		env->me_pgstate.mf_pghead = nullptr;
-		fg_MidlShrink(&_pTransaction->mt_free_pgs);
+		fg_MidlFree(pEnvironment->m_PageState.m_pReclaimedPages);
+		pEnvironment->m_PageState.m_pReclaimedPages = nullptr;
+		fg_MidlShrink(&_pTransaction->m_pFreePages);
 
 #if (DMibDatabaseDebug) > 2
 		fg_Audit(_pTransaction);
 #endif
 
-		if (int rc = fg_PageFlush(_pTransaction, 0))
-			DMibError(NStr::fg_Format("Error flushing pages: {}", fg_StrError(rc)));
-		if (!DFIsSet(_pTransaction->mt_flags, DMdbTxnNoSync))
-			env->f_Sync0(0, _pTransaction->mt_next_pgno);
-		if (int rc = NPrivate::fg_EnvWriteMeta(_pTransaction))
-			DMibError(NStr::fg_Format("Error writing metadata: {}", fg_StrError(rc)));
-		end_mode = gc_MDB_END_COMMITTED | DMdbEndUpdate;
-		if (env->me_flags & EDatabaseEnvironmentFlag_PreviousSnapshot)
+		if (int Result = fg_PageFlush(_pTransaction, 0))
+			DMibError(NStr::fg_Format("Error flushing pages: {}", fg_StrError(Result)));
+		if (!DFIsSet(_pTransaction->m_Flags, DMdbTxnNoSync))
+			pEnvironment->f_Sync0(0, _pTransaction->m_NextPageNumber);
+		if (int Result = NPrivate::fg_EnvWriteMeta(_pTransaction))
+			DMibError(NStr::fg_Format("Error writing metadata: {}", fg_StrError(Result)));
+		EndMode = gc_MDB_END_COMMITTED | DMdbEndUpdate;
+		if (pEnvironment->m_Flags & EDatabaseEnvironmentFlag_PreviousSnapshot)
 		{
-			if (!(env->me_flags & EDatabaseEnvironmentFlag_NoLock))
+			if (!(pEnvironment->m_Flags & EDatabaseEnvironmentFlag_NoLock))
 			{
-				int excl;
-				if (int rc = env->f_ShareLocks(&excl))
-					DMibError(NStr::fg_Format("Error sharing locks: {}", fg_StrError(rc)));
+				int Exclusive;
+				if (int Result = pEnvironment->f_ShareLocks(&Exclusive))
+					DMibError(NStr::fg_Format("Error sharing locks: {}", fg_StrError(Result)));
 			}
-			env->me_flags ^= EDatabaseEnvironmentFlag_PreviousSnapshot;
+			pEnvironment->m_Flags ^= EDatabaseEnvironmentFlag_PreviousSnapshot;
 		}
 
 	done:
 		Cleanup.f_Clear();
-		fg_TxnEnd(_pTransaction, end_mode);
+		fg_TxnEnd(_pTransaction, EndMode);
 	}
 
 	/** @brief Abandon all the operations of the transaction instead of saving them.
@@ -684,8 +692,8 @@ namespace NMib::NDatabase
 		if (_pTransaction == nullptr)
 			return;
 
-		if (_pTransaction->mt_child)
-			fg_TxnAbort(_pTransaction->mt_child);
+		if (_pTransaction->m_pChild)
+			fg_TxnAbort(_pTransaction->m_pChild);
 
 		fg_TxnEnd(_pTransaction, unsigned(NPrivate::gc_MDB_END_ABORT) | DMdbEndSlot | DMdbEndFree);
 	}
@@ -711,7 +719,7 @@ namespace NMib::NDatabase
 	{
 		auto pTransaction = mp_pTransaction.f_Get();
 		/* This call is only valid for read-only txns */
-		if (!(pTransaction->mt_flags & DMdbTxnReadOnly))
+		if (!(pTransaction->m_Flags & DMdbTxnReadOnly))
 			DMibError("You cannot reset a write rtransaction");
 
 		NPrivate::fg_TxnEnd(pTransaction, NPrivate::gc_MDB_END_RESET);
@@ -737,20 +745,20 @@ namespace NMib::NDatabase
 	{
 		auto pTransaction = mp_pTransaction.f_Get();
 
-		if (!(pTransaction->mt_flags & DMdbTxnReadOnly))
+		if (!(pTransaction->m_Flags & DMdbTxnReadOnly))
 			DMibError("Only read only transactions can be reused");
-		if (!(pTransaction->mt_flags & DMdbTxnFinished))
+		if (!(pTransaction->m_Flags & DMdbTxnFinished))
 			DMibError("Only finished transactions can be reused");
 
 		NPrivate::fg_TxnRenew0(pTransaction);
 		DMibDatabaseTrace
 			(
 				"renew txn {}{} {} on mdbenv {}, root page {}"
-				, pTransaction->mt_txnid
-				, (pTransaction->mt_flags & DMdbTxnReadOnly) ? "r" : "w"
+				, pTransaction->m_TransactionID
+				, (pTransaction->m_Flags & DMdbTxnReadOnly) ? "r" : "w"
 				, (void *)pTransaction
-				, (void *)pTransaction->mt_env
-				, pTransaction->mt_dbs[DMainDbi].md_root
+				, (void *)pTransaction->m_pEnvironment
+				, pTransaction->m_pDatabases[DMainDbi].m_RootPage
 			)
 		;
 		return fg_Move(mp_pTransaction);
@@ -766,30 +774,30 @@ namespace NMib::NDatabase
 	 */
 	void NPrivate::fg_TxnRenew0(CMdbTxn *_pTransaction)
 	{
-		CMdbEnv *env = _pTransaction->mt_env;
-		CLocksMemoryMap *pLocksMemoryMap = env->m_pLocksMemoryMap;
-		CMdbMeta *meta;
-		uint32 i, nr, flags = _pTransaction->mt_flags;
-		uint16 x;
-		int new_notls = 0;
+		CMdbEnv *pEnvironment = _pTransaction->m_pEnvironment;
+		CLocksMemoryMap *pLocksMemoryMap = pEnvironment->m_pLocksMemoryMap;
+		CMdbMeta *pMeta;
+		uint32 iIndex, nReaders, Flags = _pTransaction->m_Flags;
+		uint16 DatabaseFlags;
+		int NewNoTlsFlag = 0;
 
-		if ((flags &= DMdbTxnReadOnly) != 0)
+		if ((Flags &= DMdbTxnReadOnly) != 0)
 		{
 			if (!pLocksMemoryMap)
 			{
-				meta = env->f_PickMeta();
-				_pTransaction->mt_txnid = meta->mm_txnid.f_Load(NAtomic::gc_MemoryOrder_Relaxed);
-				_pTransaction->mt_u.reader = nullptr;
+				pMeta = pEnvironment->f_PickMeta();
+				_pTransaction->m_TransactionID = pMeta->m_TransactionID.f_Load(NAtomic::gc_MemoryOrder_Relaxed);
+				_pTransaction->m_pReader = nullptr;
 			}
 			else
 			{
-				CMdbReader *r = (env->me_flags & EDatabaseEnvironmentFlag_NoTls) ? _pTransaction->mt_u.reader : (CMdbReader *)pthread_getspecific(env->me_txkey);
-				if (r)
+				CMdbReader *pReader = (pEnvironment->m_Flags & EDatabaseEnvironmentFlag_NoTls) ? _pTransaction->m_pReader : (CMdbReader *)pthread_getspecific(pEnvironment->m_ThreadKey);
+				if (pReader)
 				{
 					if
 					(
-						r->m_OwningProcessID.f_Load(NAtomic::gc_MemoryOrder_Relaxed) != env->me_pid
-						|| r->m_BeginReadTransactionID.f_Load(NAtomic::gc_MemoryOrder_Relaxed) != (CTransactionID)-1
+						pReader->m_OwningProcessID.f_Load(NAtomic::gc_MemoryOrder_Relaxed) != pEnvironment->m_ProcessID
+						|| pReader->m_BeginReadTransactionID.f_Load(NAtomic::gc_MemoryOrder_Relaxed) != (CTransactionID)-1
 					)
 					{
 						DMibError("Invalid reuse of reader locktable slot");
@@ -797,137 +805,140 @@ namespace NMib::NDatabase
 				}
 				else
 				{
-					CProcessID pid = env->me_pid;
-					CThreadID tid = pthread_self();
-					CMdbMutexRef rmutex = env->me_rmutex;
+					CProcessID ProcessID = pEnvironment->m_ProcessID;
+					CThreadID ThreadID = pthread_self();
+					CMdbMutexRef pReaderMutex = pEnvironment->m_ReaderMutex;
 
-					if (!env->me_live_reader)
+					if (!pEnvironment->m_bLiveReader)
 					{
-						int rc = env->f_ReaderPid(EPidLockOp_Set, pid);
-						if (rc)
-							DMibError(NStr::fg_Format("Failed reader pid: {}", fg_StrError(rc)));
-						env->me_live_reader = 1;
+						int Result = pEnvironment->f_ReaderPid(EPidLockOp_Set, ProcessID);
+						if (Result)
+							DMibError(NStr::fg_Format("Failed reader pid: {}", fg_StrError(Result)));
+						pEnvironment->m_bLiveReader = 1;
 					}
 
 					{
-						int rc;
-						if (DLockMutex(rc, env, rmutex))
-							DMibError(NStr::fg_Format("Read mutex lock failed: {}", fg_StrError(rc)));
+						int Result;
+						if (DLockMutex(Result, pEnvironment, pReaderMutex))
+							DMibError(NStr::fg_Format("Read mutex lock failed: {}", fg_StrError(Result)));
 					}
 					auto Unlock = g_OnScopeExit / [&]()
 						{
-							DUnlockMutex(rmutex);
+							DUnlockMutex(pReaderMutex);
 						}
 					;
-					nr = pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Load(NAtomic::gc_MemoryOrder_Relaxed);
-					for (i = 0; i < nr; i++)
+					nReaders = pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Load(NAtomic::gc_MemoryOrder_Relaxed);
+					for (iIndex = 0; iIndex < nReaders; iIndex++)
 					{
-						if (pLocksMemoryMap->m_Readers[i].m_OwningProcessID.f_Load(NAtomic::gc_MemoryOrder_Acquire) == 0)
+						if (pLocksMemoryMap->m_Readers[iIndex].m_OwningProcessID.f_Load(NAtomic::gc_MemoryOrder_Acquire) == 0)
 							break;
 					}
-					if (i == env->m_MaxReaders)
+					if (iIndex == pEnvironment->m_MaxReaders)
 						DMibError("Readers full");
-					r = &pLocksMemoryMap->m_Readers[i];
+					pReader = &pLocksMemoryMap->m_Readers[iIndex];
 					/* Claim the reader slot, carefully since other code
 					 * uses the reader table un-mutexed: First reset the
 					 * slot, next publish it in m_TransactionBody.m_NumReaders.  After
 					 * that, it is safe for f_Close() to touch it.
 					 * When it will be closed, we can finally claim it.
 					 */
-					r->m_OwningProcessID.f_Store(0, NAtomic::gc_MemoryOrder_Relaxed);
-					r->m_BeginReadTransactionID.f_Store((CTransactionID)-1, NAtomic::gc_MemoryOrder_Relaxed);
-					r->m_OwningThreadID.f_Store(tid, NAtomic::gc_MemoryOrder_Relaxed);
-					if (i == nr)
-						pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Store(++nr, NAtomic::gc_MemoryOrder_Relaxed);
-					env->me_close_readers.f_Store(nr, NAtomic::gc_MemoryOrder_Relaxed);
-					r->m_OwningProcessID.f_Store(pid, NAtomic::gc_MemoryOrder_Release);
+					pReader->m_OwningProcessID.f_Store(0, NAtomic::gc_MemoryOrder_Relaxed);
+					pReader->m_BeginReadTransactionID.f_Store((CTransactionID)-1, NAtomic::gc_MemoryOrder_Relaxed);
+					pReader->m_OwningThreadID.f_Store(ThreadID, NAtomic::gc_MemoryOrder_Relaxed);
+					if (iIndex == nReaders)
+						pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Store(++nReaders, NAtomic::gc_MemoryOrder_Relaxed);
+					pEnvironment->m_nCloseReaders.f_Store(nReaders, NAtomic::gc_MemoryOrder_Relaxed);
+					pReader->m_OwningProcessID.f_Store(ProcessID, NAtomic::gc_MemoryOrder_Release);
 
-					new_notls = (env->me_flags & EDatabaseEnvironmentFlag_NoTls);
+					NewNoTlsFlag = (pEnvironment->m_Flags & EDatabaseEnvironmentFlag_NoTls);
 					{
-						int rc;
-						if (!new_notls && (rc = pthread_setspecific(env->me_txkey, r)))
+						int Result;
+						if (!NewNoTlsFlag && (Result = pthread_setspecific(pEnvironment->m_ThreadKey, pReader)))
 						{
-							r->m_OwningProcessID.f_Store(0, NAtomic::gc_MemoryOrder_Release);
-							DMibError(NStr::fg_Format("pthread_setspecific failed: {}", fg_StrError(rc)));
+							pReader->m_OwningProcessID.f_Store(0, NAtomic::gc_MemoryOrder_Release);
+							DMibError(NStr::fg_Format("pthread_setspecific failed: {}", fg_StrError(Result)));
 						}
 					}
 				}
 				do // LY: Retry on a race, ITS#7970.
-					r->m_BeginReadTransactionID.f_Store(pLocksMemoryMap->m_TransactionBody.m_TransactionID.f_Load(NAtomic::gc_MemoryOrder_Acquire), NAtomic::gc_MemoryOrder_Release);
-				while (r->m_BeginReadTransactionID.f_Load(NAtomic::gc_MemoryOrder_Acquire) != pLocksMemoryMap->m_TransactionBody.m_TransactionID.f_Load(NAtomic::gc_MemoryOrder_Acquire));
-				_pTransaction->mt_txnid = r->m_BeginReadTransactionID.f_Load(NAtomic::gc_MemoryOrder_Relaxed);
-				_pTransaction->mt_u.reader = r;
-				meta = env->me_metas[_pTransaction->mt_txnid & 1];
+					pReader->m_BeginReadTransactionID.f_Store(pLocksMemoryMap->m_TransactionBody.m_TransactionID.f_Load(NAtomic::gc_MemoryOrder_Acquire), NAtomic::gc_MemoryOrder_Release);
+				while
+				(
+					pReader->m_BeginReadTransactionID.f_Load(NAtomic::gc_MemoryOrder_Acquire) != pLocksMemoryMap->m_TransactionBody.m_TransactionID.f_Load(NAtomic::gc_MemoryOrder_Acquire)
+				);
+				_pTransaction->m_TransactionID = pReader->m_BeginReadTransactionID.f_Load(NAtomic::gc_MemoryOrder_Relaxed);
+				_pTransaction->m_pReader = pReader;
+				pMeta = pEnvironment->m_Metas[_pTransaction->m_TransactionID & 1];
 			}
 		}
 		else
 		{
-			/* Not yet touching _pTransaction == env->me_txn0, it may be active */
+			/* Not yet touching _pTransaction == pEnvironment->m_pPreallocatedTransaction, it may be active */
 			if (pLocksMemoryMap)
 			{
 				{
-					int rc;
-					if (DLockMutex(rc, env, env->me_wmutex))
-						DMibError(NStr::fg_Format("Write mutex lock failed: {}", fg_StrError(rc)));
-					env->m_LockedThreadID = NSys::fg_Thread_GetCurrentUID();
+					int Result;
+					if (DLockMutex(Result, pEnvironment, pEnvironment->m_WriterMutex))
+						DMibError(NStr::fg_Format("Write mutex lock failed: {}", fg_StrError(Result)));
+					pEnvironment->m_LockedThreadID = NSys::fg_Thread_GetCurrentUID();
 				}
-				_pTransaction->mt_txnid = pLocksMemoryMap->m_TransactionBody.m_TransactionID.f_Load(NAtomic::gc_MemoryOrder_Acquire);
-				meta = env->me_metas[_pTransaction->mt_txnid & 1];
+				_pTransaction->m_TransactionID = pLocksMemoryMap->m_TransactionBody.m_TransactionID.f_Load(NAtomic::gc_MemoryOrder_Acquire);
+				pMeta = pEnvironment->m_Metas[_pTransaction->m_TransactionID & 1];
 			}
 			else
 			{
-				meta = env->f_PickMeta();
-				_pTransaction->mt_txnid = meta->mm_txnid.f_Load(NAtomic::gc_MemoryOrder_Relaxed);
+				pMeta = pEnvironment->f_PickMeta();
+				_pTransaction->m_TransactionID = pMeta->m_TransactionID.f_Load(NAtomic::gc_MemoryOrder_Relaxed);
 			}
-			_pTransaction->mt_txnid++;
+			_pTransaction->m_TransactionID++;
 #if DMibDatabaseDebug
-			if (_pTransaction->mt_txnid == mdb_debug_start)
-				mdb_debug = 1;
+			if (_pTransaction->m_TransactionID == g_DebugStartTransactionID)
+				g_bDebug = 1;
 #endif
-			_pTransaction->mt_child = nullptr;
-			_pTransaction->mt_loose_pgs = nullptr;
-			_pTransaction->mt_loose_count = 0;
-			_pTransaction->mt_dirty_room = DMdbIdlUmMax;
-			_pTransaction->mt_u.dirty_list = env->me_dirty_list;
-			_pTransaction->mt_u.dirty_list[0].mid = 0;
-			_pTransaction->mt_free_pgs = env->me_free_pgs;
-			_pTransaction->mt_free_pgs[0] = 0;
-			_pTransaction->mt_spill_pgs = nullptr;
-			env->me_txn = _pTransaction;
-			memcpy(_pTransaction->mt_dbiseqs, env->me_dbiseqs, env->me_maxdbs * sizeof(uint32));
+			_pTransaction->m_pChild = nullptr;
+			_pTransaction->m_pLoosePages = nullptr;
+			_pTransaction->m_nLoosePages = 0;
+			_pTransaction->m_DirtyRoom = DMdbIdlUmMax;
+			_pTransaction->m_pDirtyList = pEnvironment->m_pDirtyList;
+			_pTransaction->m_pDirtyList[0].m_ID = 0;
+			_pTransaction->m_pFreePages = pEnvironment->m_pFreePages;
+			_pTransaction->m_pFreePages[0] = 0;
+			_pTransaction->m_pSpillPages = nullptr;
+			pEnvironment->m_pTransaction = _pTransaction;
+			memcpy(_pTransaction->m_pDatabaseSequences, pEnvironment->m_pDatabaseSequences, pEnvironment->m_MaxDatabases * sizeof(uint32));
 		}
 
 		/* Copy the DB info and flags */
-		memcpy(_pTransaction->mt_dbs, meta->mm_dbs, DCoreDbs * sizeof(CMdbDb));
+		memcpy(_pTransaction->m_pDatabases, pMeta->m_Databases, DCoreDbs * sizeof(CMdbDb));
 
 		/* Moved to here to avoid a data race in read TXNs */
-		_pTransaction->mt_next_pgno = meta->mm_last_pg + 1;
+		_pTransaction->m_NextPageNumber = pMeta->m_LastPageNumber + 1;
 #ifdef DMibDatabase_Always64BitSupport
-		_pTransaction->mt_last_pgno = _pTransaction->mt_next_pgno - 1;
+		_pTransaction->m_LastPageNumber = _pTransaction->m_NextPageNumber - 1;
 #endif
 
-		_pTransaction->mt_flags = flags;
+		_pTransaction->m_Flags = Flags;
 
 		/* Setup db info */
-		_pTransaction->mt_numdbs = env->me_numdbs;
-		for (i = DCoreDbs; i < _pTransaction->mt_numdbs; i++)
+		_pTransaction->m_nDatabases = pEnvironment->m_nDatabases;
+		for (iIndex = DCoreDbs; iIndex < _pTransaction->m_nDatabases; iIndex++)
 		{
-			x = env->me_dbflags[i];
-			_pTransaction->mt_dbs[i].md_flags = x & DPersistentFlags;
-			_pTransaction->mt_dbflags[i] = (x & DMdbValid) ? DDbValid | DDbUserValid | DDbStale : 0;
+			DatabaseFlags = pEnvironment->m_pDatabaseFlags[iIndex];
+			_pTransaction->m_pDatabases[iIndex].m_Flags = DatabaseFlags & DPersistentFlags;
+			_pTransaction->m_pDatabaseFlags[iIndex] = (DatabaseFlags & DMdbValid) ? DDbValid | DDbUserValid | DDbStale : 0;
 		}
-		_pTransaction->mt_dbflags[DMainDbi] = DDbValid | DDbUserValid;
-		_pTransaction->mt_dbflags[DFreeDbi] = DDbValid;
+		_pTransaction->m_pDatabaseFlags[DMainDbi] = DDbValid | DDbUserValid;
+		_pTransaction->m_pDatabaseFlags[DFreeDbi] = DDbValid;
 
 		auto Cleanup = g_OnScopeExit / [&]
 			{
-				NPrivate::fg_TxnEnd(_pTransaction, new_notls /*0 or DMdbEndSlot*/ | NPrivate::gc_MDB_END_FAIL_BEGIN);
+				NPrivate::fg_TxnEnd(_pTransaction, NewNoTlsFlag /*0 or DMdbEndSlot*/ | NPrivate::gc_MDB_END_FAIL_BEGIN);
 			}
 		;
 
-		if (env->me_flags & DMdbFatalError)
+		if (pEnvironment->m_Flags & DMdbFatalError)
 			DMibError("Database environment had fatal error, must shutdown!");
-		else if (env->me_maxpg < _pTransaction->mt_next_pgno)
+		else if (pEnvironment->m_nMaxPages < _pTransaction->m_NextPageNumber)
 			DMibError("Database size changed");
 		else
 			Cleanup.f_Clear();
@@ -936,36 +947,36 @@ namespace NMib::NDatabase
 	/** Export or close DBI handles opened in this txn. */
 	void NPrivate::fg_DbisUpdate(CMdbTxn *_pTransaction, int _bKeep)
 	{
-		int i;
-		CDatabaseSubID n = _pTransaction->mt_numdbs;
-		CMdbEnv *env = _pTransaction->mt_env;
-		unsigned char *tdbflags = _pTransaction->mt_dbflags;
+		int iDatabase;
+		CDatabaseSubID nDatabases = _pTransaction->m_nDatabases;
+		CMdbEnv *pEnvironment = _pTransaction->m_pEnvironment;
+		unsigned char *pDatabaseFlags = _pTransaction->m_pDatabaseFlags;
 
-		auto pStaticDatabasesInfos = env->m_StaticDasabaseInfo.f_GetArray();
-		for (i = n; --i >= DCoreDbs;)
+		auto pStaticDatabasesInfos = pEnvironment->m_StaticDasabaseInfo.f_GetArray();
+		for (iDatabase = nDatabases; --iDatabase >= DCoreDbs;)
 		{
-			if (tdbflags[i] & DDbNew)
+			if (pDatabaseFlags[iDatabase] & DDbNew)
 			{
 				if (_bKeep)
-					env->me_dbflags[i] = _pTransaction->mt_dbs[i].md_flags | DMdbValid;
+					pEnvironment->m_pDatabaseFlags[iDatabase] = _pTransaction->m_pDatabases[iDatabase].m_Flags | DMdbValid;
 				else
 				{
-					auto &StaticDatabaseInfo = pStaticDatabasesInfos[i];
-					char *ptr = (char *)StaticDatabaseInfo.m_DatabaseName.m_pData;
+					auto &StaticDatabaseInfo = pStaticDatabasesInfos[iDatabase];
+					char *pName = (char *)StaticDatabaseInfo.m_DatabaseName.m_pData;
 					umint Size = StaticDatabaseInfo.m_DatabaseName.m_Size;
-					if (ptr)
+					if (pName)
 					{
 						StaticDatabaseInfo.m_DatabaseName.m_pData = nullptr;
 						StaticDatabaseInfo.m_DatabaseName.m_Size = 0;
-						env->me_dbflags[i] = 0;
-						env->me_dbiseqs[i]++;
-						NMemory::fg_Free(ptr, Size + 1);
+						pEnvironment->m_pDatabaseFlags[iDatabase] = 0;
+						pEnvironment->m_pDatabaseSequences[iDatabase]++;
+						NMemory::fg_Free(pName, Size + 1);
 					}
 				}
 			}
 		}
-		if (_bKeep && env->me_numdbs < n)
-			env->me_numdbs = n;
+		if (_bKeep && pEnvironment->m_nDatabases < nDatabases)
+			pEnvironment->m_nDatabases = nDatabases;
 	}
 
 	/** End a transaction, except successful commit of a nested transaction.
@@ -975,9 +986,9 @@ namespace NMib::NDatabase
 	 */
 	void NPrivate::fg_TxnEnd(CMdbTxn *_pTransaction, unsigned _Mode)
 	{
-		CMdbEnv *env = _pTransaction->mt_env;
+		CMdbEnv *pEnvironment = _pTransaction->m_pEnvironment;
 #if DMibDatabaseDebug
-		static char const * const names[] = DMdbEndNames;
+		static char const * const s_EndNames[] = DMdbEndNames;
 #endif
 
 		/* Export or close DBI handles opened in this txn */
@@ -986,107 +997,107 @@ namespace NMib::NDatabase
 		DMibDatabaseTrace
 			(
 				"{} txn {}{} {} on mdbenv {}, root page {}"
-				, names[_Mode & DMdbEndOpmask]
-				, _pTransaction->mt_txnid
-				, (_pTransaction->mt_flags & DMdbTxnReadOnly) ? "r" : "w"
+				, s_EndNames[_Mode & DMdbEndOpmask]
+				, _pTransaction->m_TransactionID
+				, (_pTransaction->m_Flags & DMdbTxnReadOnly) ? "r" : "w"
 				, (void *)_pTransaction
-				, (void *)env
-				, _pTransaction->mt_dbs[DMainDbi].md_root
+				, (void *)pEnvironment
+				, _pTransaction->m_pDatabases[DMainDbi].m_RootPage
 			)
 		;
 
-		if (DFIsSet(_pTransaction->mt_flags, DMdbTxnReadOnly))
+		if (DFIsSet(_pTransaction->m_Flags, DMdbTxnReadOnly))
 		{
-			if (_pTransaction->mt_u.reader)
+			if (_pTransaction->m_pReader)
 			{
-				_pTransaction->mt_u.reader->m_BeginReadTransactionID.f_Store((CTransactionID)-1, NAtomic::gc_MemoryOrder_Release);
-				if (!(env->me_flags & EDatabaseEnvironmentFlag_NoTls))
-					_pTransaction->mt_u.reader = nullptr; // _pTransaction does not own reader
+				_pTransaction->m_pReader->m_BeginReadTransactionID.f_Store((CTransactionID)-1, NAtomic::gc_MemoryOrder_Release);
+				if (!(pEnvironment->m_Flags & EDatabaseEnvironmentFlag_NoTls))
+					_pTransaction->m_pReader = nullptr; // _pTransaction does not own reader
 				else if (_Mode & DMdbEndSlot)
 				{
-					_pTransaction->mt_u.reader->m_OwningProcessID.f_Store(0, NAtomic::gc_MemoryOrder_Release);
-					_pTransaction->mt_u.reader = nullptr;
+					_pTransaction->m_pReader->m_OwningProcessID.f_Store(0, NAtomic::gc_MemoryOrder_Release);
+					_pTransaction->m_pReader = nullptr;
 				} // else _pTransaction owns the slot until it does DMdbEndSlot
 			}
-			_pTransaction->mt_numdbs = 0; // prevent further DBI activity
-			_pTransaction->mt_flags |= DMdbTxnFinished;
+			_pTransaction->m_nDatabases = 0; // prevent further DBI activity
+			_pTransaction->m_Flags |= DMdbTxnFinished;
 		}
-		else if (!DFIsSet(_pTransaction->mt_flags, DMdbTxnFinished))
+		else if (!DFIsSet(_pTransaction->m_Flags, DMdbTxnFinished))
 		{
-			CPgno *pghead = env->me_pgstate.mf_pghead;
+			CPgno *pReclaimedPages = pEnvironment->m_PageState.m_pReclaimedPages;
 
 			if (!(_Mode & DMdbEndUpdate)) // !(already closed cursors)
 				fg_CursorsClose(_pTransaction, 0);
-			if (!(env->me_flags & EDatabaseEnvironmentFlag_WriteMap))
+			if (!(pEnvironment->m_Flags & EDatabaseEnvironmentFlag_WriteMap))
 				fg_DListFree(_pTransaction);
 
-			_pTransaction->mt_numdbs = 0;
-			_pTransaction->mt_flags = DMdbTxnFinished;
+			_pTransaction->m_nDatabases = 0;
+			_pTransaction->m_Flags = DMdbTxnFinished;
 
-			if (!_pTransaction->mt_parent)
+			if (!_pTransaction->m_pParent)
 			{
-				fg_MidlShrink(&_pTransaction->mt_free_pgs);
-				env->me_free_pgs = _pTransaction->mt_free_pgs;
-				/* me_pgstate: */
-				env->me_pgstate.mf_pghead = nullptr;
-				env->me_pgstate.mf_pglast = 0;
+				fg_MidlShrink(&_pTransaction->m_pFreePages);
+				pEnvironment->m_pFreePages = _pTransaction->m_pFreePages;
+				/* m_PageState: */
+				pEnvironment->m_PageState.m_pReclaimedPages = nullptr;
+				pEnvironment->m_PageState.m_LastRecordID = 0;
 
-				env->me_txn = nullptr;
-				_Mode = 0; // _pTransaction == env->me_txn0, do not free() it
+				pEnvironment->m_pTransaction = nullptr;
+				_Mode = 0; // _pTransaction == pEnvironment->m_pPreallocatedTransaction, do not free() it
 
 				/* The writer mutex was locked in f_TxnBegin. */
-				if (env->m_pLocksMemoryMap)
+				if (pEnvironment->m_pLocksMemoryMap)
 				{
-					DMibCheck(env->m_LockedThreadID == NSys::fg_Thread_GetCurrentUID())(env->m_LockedThreadID)(NSys::fg_Thread_GetCurrentUID());
-					DUnlockMutex(env->me_wmutex);
+					DMibCheck(pEnvironment->m_LockedThreadID == NSys::fg_Thread_GetCurrentUID())(pEnvironment->m_LockedThreadID)(NSys::fg_Thread_GetCurrentUID());
+					DUnlockMutex(pEnvironment->m_WriterMutex);
 				}
 			}
 			else
 			{
-				_pTransaction->mt_parent->mt_child = nullptr;
-				_pTransaction->mt_parent->mt_flags &= ~DMdbTxnHasChild;
-				env->me_pgstate = ((CMdbNTxn *)_pTransaction)->mnt_pgstate;
-				fg_MidlFree(_pTransaction->mt_free_pgs);
-				fg_MidlFree(_pTransaction->mt_spill_pgs);
-				NMemory::fg_Free(_pTransaction->mt_u.dirty_list, sizeof(CMdbId2) * DMdbIdlUmSize);
+				_pTransaction->m_pParent->m_pChild = nullptr;
+				_pTransaction->m_pParent->m_Flags &= ~DMdbTxnHasChild;
+				pEnvironment->m_PageState = ((CMdbNTxn *)_pTransaction)->m_PageState;
+				fg_MidlFree(_pTransaction->m_pFreePages);
+				fg_MidlFree(_pTransaction->m_pSpillPages);
+				NMemory::fg_Free(_pTransaction->m_pDirtyList, sizeof(CMdbId2) * DMdbIdlUmSize);
 			}
 
-			fg_MidlFree(pghead);
+			fg_MidlFree(pReclaimedPages);
 		}
 
 #ifdef DMibDatabase_Always64BitSupport
-		if (!_pTransaction->mt_parent)
+		if (!_pTransaction->m_pParent)
 		{
-			MDB_ID3L el = env->me_rpages, tl = _pTransaction->mt_rpages;
-			unsigned i, x, n = tl[0].mid;
-			pthread_mutex_lock(&env->me_rpmutex);
+			MDB_ID3L el = pEnvironment->m_pReadOnlyPages, tl = _pTransaction->m_pReadOnlyPages;
+			unsigned i, x, n = tl[0].m_ID;
+			pthread_mutex_lock(&pEnvironment->m_ReadOnlyPagesMutex);
 			for (i = 1; i <= n; i++)
 			{
-				if (tl[i].mid & (DMdbRpageChunk - 1))
+				if (tl[i].m_ID & (DMdbRpageChunk - 1))
 				{
 					/* tmp overflow pages that we didn't share in env */
-					munmap(tl[i].mptr, tl[i].mcnt * env->me_psize);
+					munmap(tl[i].m_pValue, tl[i].m_nPages * pEnvironment->m_PageSize);
 				}
 				else
 				{
-					x = fg_Mid3lSearch(el, tl[i].mid);
-					if (tl[i].mptr == el[x].mptr)
-						el[x].mref--;
+					x = fg_Mid3lSearch(el, tl[i].m_ID);
+					if (tl[i].m_pValue == el[x].m_pValue)
+						el[x].m_nReferences--;
 					else
 					{
 						/* another tmp overflow page */
-						munmap(tl[i].mptr, tl[i].mcnt * env->me_psize);
+						munmap(tl[i].m_pValue, tl[i].m_nPages * pEnvironment->m_PageSize);
 					}
 				}
 			}
-			pthread_mutex_unlock(&env->me_rpmutex);
-			tl[0].mid = 0;
+			pthread_mutex_unlock(&pEnvironment->m_ReadOnlyPagesMutex);
+			tl[0].m_ID = 0;
 			if (_Mode & DMdbEndFree)
 				NMemory::fg_Free(tl, DMdbTrpageSize * sizeof(MDB_ID3));
 		}
 #endif
 		if (_Mode & DMdbEndFree)
-			env->f_TxnFree(_pTransaction);
+			pEnvironment->f_TxnFree(_pTransaction);
 	}
 
 	/** Save the freelist as of this transaction to the freeDB.
@@ -1098,251 +1109,251 @@ namespace NMib::NDatabase
 	int NPrivate::fg_FreelistSave(CMdbTxn *_pTransaction)
 	{
 #ifndef DMibClangAnalyzerWorkaround
-		/* env->me_pgstate.mf_pghead[] can grow and shrink during this call.
-		 * env->me_pgstate.mf_pglast and _pTransaction->mt_free_pgs[] can only grow.
-		 * Page numbers cannot disappear from _pTransaction->mt_free_pgs[].
+		/* env->m_PageState.m_pReclaimedPages[] can grow and shrink during this call.
+		 * env->m_PageState.m_LastRecordID and _pTransaction->m_pFreePages[] can only grow.
+		 * Page numbers cannot disappear from _pTransaction->m_pFreePages[].
 		 */
-		CMdbCursor mc;
-		CMdbEnv *env = _pTransaction->mt_env;
-		int rc, maxfree_1pg = env->me_maxfree_1pg, more = 1;
-		CTransactionID pglast = 0, head_id = 0;
-		CPgno freecnt = 0, *free_pgs, *mop;
-		smint head_room = 0, total_room = 0, mop_len, clean_limit;
+		CMdbCursor Cursor;
+		CMdbEnv *pEnvironment = _pTransaction->m_pEnvironment;
+		int Result, nMaxFreePerPage = pEnvironment->m_nMaxFreePerPage, nRetriesLeft = 1;
+		CTransactionID LastHeadID = 0, HeadID = 0;
+		CPgno nFree = 0, *pFreePages, *pReclaimedPages;
+		smint HeadRoom = 0, TotalRoom = 0, nReclaimed, CleanLimit;
 
-		NPrivate::fg_CursorInit(&mc, _pTransaction, DFreeDbi, nullptr);
+		NPrivate::fg_CursorInit(&Cursor, _pTransaction, DFreeDbi, nullptr);
 
-		if (env->me_pgstate.mf_pghead)
+		if (pEnvironment->m_PageState.m_pReclaimedPages)
 		{
 			/* Make sure first page of freeDB is touched and on freelist */
-			rc = NPrivate::fg_PageSearch(&mc, nullptr, DMdbPsFirst | DMdbPsModify);
-			if (rc && rc != DMdbNotFound)
-				return rc;
+			Result = NPrivate::fg_PageSearch(&Cursor, nullptr, DMdbPsFirst | DMdbPsModify);
+			if (Result && Result != DMdbNotFound)
+				return Result;
 		}
 
-		if (!env->me_pgstate.mf_pghead && _pTransaction->mt_loose_pgs)
+		if (!pEnvironment->m_PageState.m_pReclaimedPages && _pTransaction->m_pLoosePages)
 		{
-			/* Put loose page numbers in mt_free_pgs, since
-			 * we may be unable to return them to me_pgstate.mf_pghead.
+			/* Put loose page numbers in m_pFreePages, since
+			 * we may be unable to return them to m_PageState.m_pReclaimedPages.
 			 */
-			CMdbPage *mp = _pTransaction->mt_loose_pgs;
-			CMdbId2 *dl = _pTransaction->mt_u.dirty_list;
-			unsigned x;
-			fg_MidlNeed(&_pTransaction->mt_free_pgs, _pTransaction->mt_loose_count);
+			CMdbPage *pPage = _pTransaction->m_pLoosePages;
+			CMdbId2 *pDirtyList = _pTransaction->m_pDirtyList;
+			unsigned iDirty;
+			fg_MidlNeed(&_pTransaction->m_pFreePages, _pTransaction->m_nLoosePages);
 
-			for (; mp; mp = DNextLoosePage(mp))
+			for (; pPage; pPage = DNextLoosePage(pPage))
 			{
-				fg_MidlXAppend(_pTransaction->mt_free_pgs, mp->mp_p.p_pgno);
+				fg_MidlXAppend(_pTransaction->m_pFreePages, pPage->m_PageNumber);
 				/* must also remove from dirty list */
-				if (_pTransaction->mt_flags & DMdbTxnWriteMap)
+				if (_pTransaction->m_Flags & DMdbTxnWriteMap)
 				{
-					for (x = 1; x <= dl[0].mid; x++)
+					for (iDirty = 1; iDirty <= pDirtyList[0].m_ID; iDirty++)
 					{
-						if (dl[x].mid == mp->mp_p.p_pgno)
+						if (pDirtyList[iDirty].m_ID == pPage->m_PageNumber)
 							break;
 					}
-					DMibCheck(x <= dl[0].mid);
+					DMibCheck(iDirty <= pDirtyList[0].m_ID);
 				}
 				else
 				{
-					x = fg_Mid2lSearch(dl, mp->mp_p.p_pgno);
-					DMibCheck(dl[x].mid == mp->mp_p.p_pgno);
-					env->f_DPageFree(mp);
+					iDirty = fg_Mid2lSearch(pDirtyList, pPage->m_PageNumber);
+					DMibCheck(pDirtyList[iDirty].m_ID == pPage->m_PageNumber);
+					pEnvironment->f_DPageFree(pPage);
 				}
-				dl[x].mptr = NULL;
+				pDirtyList[iDirty].m_pValue = NULL;
 			}
 			{
 				/* squash freed slots out of the dirty list */
-				unsigned y;
-				for (y = 1; dl[y].mptr && y <= dl[0].mid; y++);
-				if (y <= dl[0].mid)
+				unsigned iNext;
+				for (iNext = 1; pDirtyList[iNext].m_pValue && iNext <= pDirtyList[0].m_ID; iNext++);
+				if (iNext <= pDirtyList[0].m_ID)
 				{
-					for (x = y, y++;;)
+					for (iDirty = iNext, iNext++;;)
 					{
-						while (!dl[y].mptr && y <= dl[0].mid)
-							y++;
-						if (y > dl[0].mid)
+						while (!pDirtyList[iNext].m_pValue && iNext <= pDirtyList[0].m_ID)
+							iNext++;
+						if (iNext > pDirtyList[0].m_ID)
 							break;
-						dl[x++] = dl[y++];
+						pDirtyList[iDirty++] = pDirtyList[iNext++];
 					}
-					dl[0].mid = x - 1;
+					pDirtyList[0].m_ID = iDirty - 1;
 				}
 				else
 				{
 					/* all slots freed */
-					dl[0].mid = 0;
+					pDirtyList[0].m_ID = 0;
 				}
 			}
-			_pTransaction->mt_loose_pgs = nullptr;
-			_pTransaction->mt_loose_count = 0;
+			_pTransaction->m_pLoosePages = nullptr;
+			_pTransaction->m_nLoosePages = 0;
 		}
 
 		/* EDatabaseWriteFlag_ReserveSpace cancels meminit in ovpage NMemory::fg_Alloc (when no WRITEMAP) */
-		clean_limit = (env->me_flags & (EDatabaseEnvironmentFlag_NoMemoryInit | EDatabaseEnvironmentFlag_WriteMap)) ? SSIZE_MAX : maxfree_1pg;
+		CleanLimit = (pEnvironment->m_Flags & (EDatabaseEnvironmentFlag_NoMemoryInit | EDatabaseEnvironmentFlag_WriteMap)) ? SSIZE_MAX : nMaxFreePerPage;
 
 		for (;;)
 		{
 			/* Come back here after each Put() in case freelist changed */
-			CDatabaseValue key, data;
-			CPgno *pgs;
-			smint j;
+			CDatabaseValue Key, Data;
+			CPgno *pPages;
+			smint iClean;
 
 			/* If using records from freeDB which we have not yet
-			 * deleted, delete them and any we reserved for me_pgstate.mf_pghead.
+			 * deleted, delete them and any we reserved for m_PageState.m_pReclaimedPages.
 			 */
-			while (pglast < env->me_pgstate.mf_pglast)
+			while (LastHeadID < pEnvironment->m_PageState.m_LastRecordID)
 			{
-				rc = NPrivate::fg_CursorFirst(&mc, &key, nullptr);
-				if (rc)
-					return rc;
-				pglast = head_id = *(CTransactionID *)key.m_pData;
-				total_room = head_room = 0;
-				DMibCheck(pglast <= env->me_pgstate.mf_pglast);
-				rc = fg_CursorDel(&mc, EDatabaseWriteFlag_None);
-				if (rc)
-					return rc;
+				Result = NPrivate::fg_CursorFirst(&Cursor, &Key, nullptr);
+				if (Result)
+					return Result;
+				LastHeadID = HeadID = *(CTransactionID *)Key.m_pData;
+				TotalRoom = HeadRoom = 0;
+				DMibCheck(LastHeadID <= pEnvironment->m_PageState.m_LastRecordID);
+				Result = fg_CursorDel(&Cursor, EDatabaseWriteFlag_None);
+				if (Result)
+					return Result;
 			}
 
 			/* Save the IDL of pages freed by this txn, to a single record */
-			if (freecnt < _pTransaction->mt_free_pgs[0])
+			if (nFree < _pTransaction->m_pFreePages[0])
 			{
-				if (!freecnt)
+				if (!nFree)
 				{
 					/* Make sure last page of freeDB is touched and on freelist */
-					rc = NPrivate::fg_PageSearch(&mc, nullptr, DMdbPsLast | DMdbPsModify);
-					if (rc && rc != DMdbNotFound)
-						return rc;
+					Result = NPrivate::fg_PageSearch(&Cursor, nullptr, DMdbPsLast | DMdbPsModify);
+					if (Result && Result != DMdbNotFound)
+						return Result;
 				}
-				free_pgs = _pTransaction->mt_free_pgs;
+				pFreePages = _pTransaction->m_pFreePages;
 				/* Write to last page of freeDB */
-				key.m_Size = sizeof(_pTransaction->mt_txnid);
-				key.m_pData = (uint8 *)&_pTransaction->mt_txnid;
+				Key.m_Size = sizeof(_pTransaction->m_TransactionID);
+				Key.m_pData = (uint8 *)&_pTransaction->m_TransactionID;
 				do
 				{
-					freecnt = free_pgs[0];
-					data.m_Size = DMdbIdlSizeof(free_pgs);
-					rc = fg_CursorPut(&mc, &key, &data, EDatabaseWriteFlag_ReserveSpace);
-					if (rc)
-						return rc;
-					/* Retry if mt_free_pgs[] grew during the Put() */
-					free_pgs = _pTransaction->mt_free_pgs;
+					nFree = pFreePages[0];
+					Data.m_Size = DMdbIdlSizeof(pFreePages);
+					Result = fg_CursorPut(&Cursor, &Key, &Data, EDatabaseWriteFlag_ReserveSpace);
+					if (Result)
+						return Result;
+					/* Retry if m_pFreePages[] grew during the Put() */
+					pFreePages = _pTransaction->m_pFreePages;
 				}
-				while (freecnt < free_pgs[0]);
-				fg_MidlSort(free_pgs);
-				memcpy((ch8 *)data.m_pData, free_pgs, data.m_Size);
+				while (nFree < pFreePages[0]);
+				fg_MidlSort(pFreePages);
+				memcpy((ch8 *)Data.m_pData, pFreePages, Data.m_Size);
 #	if (DMibDatabaseDebug) > 1
 				{
-					uint32 i = free_pgs[0];
-					DMibDatabaseTrace("IDL write txn {} root {} num {}", _pTransaction->mt_txnid, _pTransaction->mt_dbs[DFreeDbi].md_root, i);
-					for (; i; i--)
-						DMibDatabaseTrace("IDL {}", free_pgs[i]);
+					uint32 iPage = pFreePages[0];
+					DMibDatabaseTrace("IDL write txn {} root {} num {}", _pTransaction->m_TransactionID, _pTransaction->m_pDatabases[DFreeDbi].m_RootPage, iPage);
+					for (; iPage; iPage--)
+						DMibDatabaseTrace("IDL {}", pFreePages[iPage]);
 				}
 #	endif
 				continue;
 			}
 
-			mop = env->me_pgstate.mf_pghead;
-			mop_len = (mop ? mop[0] : 0) + _pTransaction->mt_loose_count;
+			pReclaimedPages = pEnvironment->m_PageState.m_pReclaimedPages;
+			nReclaimed = (pReclaimedPages ? pReclaimedPages[0] : 0) + _pTransaction->m_nLoosePages;
 
-			/* Reserve records for me_pgstate.mf_pghead[]. Split it if multi-page,
+			/* Reserve records for m_PageState.m_pReclaimedPages[]. Split it if multi-page,
 			 * to avoid searching freeDB for a page range. Use keys in
-			 * range [1,me_pgstate.mf_pglast]: Smaller than txnid of oldest reader.
+			 * range [1,m_PageState.m_LastRecordID]: Smaller than txnid of oldest reader.
 			 */
-			if (total_room >= mop_len)
+			if (TotalRoom >= nReclaimed)
 			{
-				if (total_room == mop_len || --more < 0)
+				if (TotalRoom == nReclaimed || --nRetriesLeft < 0)
 					break;
 			}
-			else if (head_room >= maxfree_1pg && head_id > 1)
+			else if (HeadRoom >= nMaxFreePerPage && HeadID > 1)
 			{
 				/* Keep current record (overflow page), add a new one */
-				head_id--;
-				head_room = 0;
+				HeadID--;
+				HeadRoom = 0;
 			}
-			/* (Re)write {key = head_id, IDL length = head_room} */
-			total_room -= head_room;
-			head_room = mop_len - total_room;
-			if (head_room > maxfree_1pg && head_id > 1)
+			/* (Re)write {Key = HeadID, IDL length = HeadRoom} */
+			TotalRoom -= HeadRoom;
+			HeadRoom = nReclaimed - TotalRoom;
+			if (HeadRoom > nMaxFreePerPage && HeadID > 1)
 			{
-				/* Overflow multi-page for part of me_pgstate.mf_pghead */
-				head_room /= head_id; // amortize page sizes
-				head_room += maxfree_1pg - head_room % (maxfree_1pg + 1);
+				/* Overflow multi-page for part of m_PageState.m_pReclaimedPages */
+				HeadRoom /= HeadID; // amortize page sizes
+				HeadRoom += nMaxFreePerPage - HeadRoom % (nMaxFreePerPage + 1);
 			}
-			else if (head_room < 0)
+			else if (HeadRoom < 0)
 			{
 				/* Rare case, not bothering to delete this record */
-				head_room = 0;
+				HeadRoom = 0;
 			}
-			key.m_Size = sizeof(head_id);
-			key.m_pData = (uint8 *)&head_id;
-			data.m_Size = (head_room + 1) * sizeof(CPgno);
-			rc = fg_CursorPut(&mc, &key, &data, EDatabaseWriteFlag_ReserveSpace);
-			if (rc)
-				return rc;
+			Key.m_Size = sizeof(HeadID);
+			Key.m_pData = (uint8 *)&HeadID;
+			Data.m_Size = (HeadRoom + 1) * sizeof(CPgno);
+			Result = fg_CursorPut(&Cursor, &Key, &Data, EDatabaseWriteFlag_ReserveSpace);
+			if (Result)
+				return Result;
 			/* IDL is initially empty, zero out at least the length */
-			pgs = (CPgno *)data.m_pData;
-			j = head_room > clean_limit ? head_room : 0;
+			pPages = (CPgno *)Data.m_pData;
+			iClean = HeadRoom > CleanLimit ? HeadRoom : 0;
 			do
 			{
-				pgs[j] = 0;
+				pPages[iClean] = 0;
 			}
-			while (--j >= 0);
-			total_room += head_room;
+			while (--iClean >= 0);
+			TotalRoom += HeadRoom;
 		}
 
-		/* Return loose page numbers to me_pgstate.mf_pghead, though usually none are
-		 * left at this point.  The pages themselves remain in dirty_list.
+		/* Return loose page numbers to m_PageState.m_pReclaimedPages, though usually none are
+		 * left at this point.  The pages themselves remain in m_pDirtyList.
 		 */
-		if (_pTransaction->mt_loose_pgs)
+		if (_pTransaction->m_pLoosePages)
 		{
-			CMdbPage *mp = _pTransaction->mt_loose_pgs;
-			unsigned count = _pTransaction->mt_loose_count;
-			CMdbIdl loose;
+			CMdbPage *pPage = _pTransaction->m_pLoosePages;
+			unsigned nLoose = _pTransaction->m_nLoosePages;
+			CMdbIdl pLoose;
 			/* Room for loose pages + temp IDL with same */
-			fg_MidlNeed(&env->me_pgstate.mf_pghead, 2 * count + 1);
-			mop = env->me_pgstate.mf_pghead;
-			loose = mop + DMdbIdlAlloclen(mop) - count;
-			for (count = 0; mp; mp = DNextLoosePage(mp))
-				loose[++count] = mp->mp_p.p_pgno;
-			loose[0] = count;
-			fg_MidlSort(loose);
-			fg_MidlXMerge(mop, loose);
-			_pTransaction->mt_loose_pgs = nullptr;
-			_pTransaction->mt_loose_count = 0;
-			mop_len = mop[0];
+			fg_MidlNeed(&pEnvironment->m_PageState.m_pReclaimedPages, 2 * nLoose + 1);
+			pReclaimedPages = pEnvironment->m_PageState.m_pReclaimedPages;
+			pLoose = pReclaimedPages + DMdbIdlAlloclen(pReclaimedPages) - nLoose;
+			for (nLoose = 0; pPage; pPage = DNextLoosePage(pPage))
+				pLoose[++nLoose] = pPage->m_PageNumber;
+			pLoose[0] = nLoose;
+			fg_MidlSort(pLoose);
+			fg_MidlXMerge(pReclaimedPages, pLoose);
+			_pTransaction->m_pLoosePages = nullptr;
+			_pTransaction->m_nLoosePages = 0;
+			nReclaimed = pReclaimedPages[0];
 		}
 
-		/* Fill in the reserved me_pgstate.mf_pghead records */
-		rc = DMdbSuccess;
-		if (mop_len)
+		/* Fill in the reserved m_PageState.m_pReclaimedPages records */
+		Result = DMdbSuccess;
+		if (nReclaimed)
 		{
-			CDatabaseValue key, data;
+			CDatabaseValue Key, Data;
 
-			mop += mop_len;
-			rc = NPrivate::fg_CursorFirst(&mc, &key, &data);
-			for (; !rc; rc = NPrivate::fg_CursorNext(&mc, &key, &data, EDatabaseCursorGet_Next))
+			pReclaimedPages += nReclaimed;
+			Result = NPrivate::fg_CursorFirst(&Cursor, &Key, &Data);
+			for (; !Result; Result = NPrivate::fg_CursorNext(&Cursor, &Key, &Data, EDatabaseCursorGet_Next))
 			{
-				CTransactionID id = *(CTransactionID *)key.m_pData;
-				smint len = (smint)(data.m_Size / sizeof(CMdbId)) - 1;
-				CMdbId save;
+				CTransactionID RecordID = *(CTransactionID *)Key.m_pData;
+				smint nLength = (smint)(Data.m_Size / sizeof(CMdbId)) - 1;
+				CMdbId Saved;
 
-				DMibCheck(len >= 0 && id <= env->me_pgstate.mf_pglast);
-				key.m_pData = (uint8 *)&id;
-				if (len > mop_len)
+				DMibCheck(nLength >= 0 && RecordID <= pEnvironment->m_PageState.m_LastRecordID);
+				Key.m_pData = (uint8 *)&RecordID;
+				if (nLength > nReclaimed)
 				{
-					len = mop_len;
-					data.m_Size = (len + 1) * sizeof(CMdbId);
+					nLength = nReclaimed;
+					Data.m_Size = (nLength + 1) * sizeof(CMdbId);
 				}
-				mop -= len;
-				data.m_pData = (uint8 *)mop;
-				save = mop[0];
-				mop[0] = len;
-				rc = fg_CursorPut(&mc, &key, &data, EDatabaseWriteFlag_OverwriteAtCurrentCursorPos);
-				mop[0] = save;
-				if (rc || !(mop_len -= len))
+				pReclaimedPages -= nLength;
+				Data.m_pData = (uint8 *)pReclaimedPages;
+				Saved = pReclaimedPages[0];
+				pReclaimedPages[0] = nLength;
+				Result = fg_CursorPut(&Cursor, &Key, &Data, EDatabaseWriteFlag_OverwriteAtCurrentCursorPos);
+				pReclaimedPages[0] = Saved;
+				if (Result || !(nReclaimed -= nLength))
 					break;
 			}
 		}
-		return rc;
+		return Result;
 #else
 		return 0;
 #endif

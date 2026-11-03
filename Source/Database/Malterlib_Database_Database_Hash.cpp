@@ -74,15 +74,15 @@ namespace NMib::NDatabase::NPrivate
 	 */
 	CMdbHash fg_Hash(void const *_pData, size_t _nBytes)
 	{
-		unsigned char const *s = (unsigned char const *)_pData, *end = s + _nBytes;
-		CMdbHash hval = 0xcbf29ce484222325ULL;
+		unsigned char const *pByte = (unsigned char const *)_pData, *pEnd = pByte + _nBytes;
+		CMdbHash HashValue = 0xcbf29ce484222325ULL;
 		/*
 		 * FNV-1a hash each octet of the buffer
 		 */
-		while (s < end)
-			hval = (hval ^ *s++) * 0x100000001b3ULL;
+		while (pByte < pEnd)
+			HashValue = (HashValue ^ *pByte++) * 0x100000001b3ULL;
 		/* return our new hash value */
-		return hval;
+		return HashValue;
 	}
 
 	/** Hash the string and output the encoded hash.
@@ -95,31 +95,31 @@ namespace NMib::NDatabase::NPrivate
 	 */
 	namespace
 	{
-		char const mdb_a85[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&()*+-;<=>?@^_`{|}~";
+		char const g_Ascii85Digits[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&()*+-;<=>?@^_`{|}~";
 	}
 
 	void DMibDatabaseInfrequentSection fg_Pack85(unsigned long long _Value, char *o_pEncoded)
 	{
-		int i;
+		int iDigit;
 
-		for (i = 0; i < 10 && _Value; i++)
+		for (iDigit = 0; iDigit < 10 && _Value; iDigit++)
 		{
-			*o_pEncoded++ = mdb_a85[_Value % 85];
+			*o_pEncoded++ = g_Ascii85Digits[_Value % 85];
 			_Value /= 85;
 		}
 		*o_pEncoded = '\0';
 	}
 
-	/** Init #CMdbEnv.me_mutexname[] except the char which #DMutexName() will set.
+	/** Init #CMdbEnv.m_MutexName[] except the char which #DMutexName() will set.
 	 *	Changes to this code must be reflected in #DMdbLockFormat.
 	 */
 	void DMibDatabaseInfrequentSection fg_EnvMNameInit(CMdbEnv *_pEnvironment)
 	{
-		char *nm = _pEnvironment->me_mutexname;
-		strcpy(nm, DMutexNamePrefix);
-		fg_Pack85(_pEnvironment->m_pLocksMemoryMap->m_TransactionBody.mtb_mutexid, nm + sizeof(DMutexNamePrefix));
+		char *pMutexName = _pEnvironment->m_MutexName;
+		strcpy(pMutexName, DMutexNamePrefix);
+		fg_Pack85(_pEnvironment->m_pLocksMemoryMap->m_TransactionBody.m_MutexID, pMutexName + sizeof(DMutexNamePrefix));
 	}
 
-	/** Return env->me_mutexname after filling in ch ('r'/'w') for convenience */
+	/** Return env->m_MutexName after filling in ch ('r'/'w') for convenience */
 #endif
 }

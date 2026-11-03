@@ -28,8 +28,8 @@ namespace
 			// Add two rows to the result set
 			_Builder.f_SetDescription(Desc);
 
-			NContainer::CByteVector lBinData;
-			lBinData.f_Insert(100);
+			NContainer::CByteVector BinData;
+			BinData.f_Insert(100);
 
 			_Builder.f_AddRow()
 				.f_KeyPart(_Builder.f_AddKeyPartVariantValue(0, uint64(1)))
@@ -37,10 +37,10 @@ namespace
 				.f_Column("Hello")
 				.f_Column(nullptr)
 				.f_Column(fp64(1.0 / 3.0))
-				.f_Column(lBinData)
+				.f_Column(BinData)
 			;
 
-			lBinData[0] = 200;
+			BinData[0] = 200;
 
 			_Builder.f_AddRow()
 				.f_KeyPart(_Builder.f_AddKeyPartVariantValue(0, uint64(2)))
@@ -48,7 +48,7 @@ namespace
 				.f_Column(", World!")
 				.f_Column(nullptr)
 				.f_Column(fp64(2.0 / 3.0))
-				.f_Column(lBinData)
+				.f_Column(BinData)
 			;
 
 			// Add result set metadata.
@@ -111,12 +111,12 @@ namespace
 				Column2.f_AddValue(fp64(1.0 / 3.0));
 				Column2.f_AddValue(fp64(2.0 / 3.0));
 
-				NContainer::CByteVector lBinData;
-				lBinData.f_Insert(100);
+				NContainer::CByteVector BinData;
+				BinData.f_Insert(100);
 
-				Column3.f_AddValue(lBinData);
-				lBinData[0] = 200;
-				Column3.f_AddValue(lBinData);
+				Column3.f_AddValue(BinData);
+				BinData[0] = 200;
+				Column3.f_AddValue(BinData);
 			}
 
 			// Add result set metadata.
@@ -219,11 +219,11 @@ namespace
 					DMibTest(DMibExpr(nullptr) != DMibExpr(iRow.f_GetColumnValue<fp64>(2)));
 					DMibTest(DMibExpr(fp64(1.0 / 3.0)) == DMibExpr(*iRow.f_GetColumnValue<fp64>(2)));
 
-					NContainer::CByteVector lBinData;
-					lBinData.f_Insert(100);
+					NContainer::CByteVector BinData;
+					BinData.f_Insert(100);
 
 					DMibTest(DMibExpr(nullptr) != DMibExpr(iRow.f_GetColumnValue<NContainer::CByteVector>(3)));
-					DMibTest(DMibExpr(lBinData) == DMibExpr(*iRow.f_GetColumnValue<NContainer::CByteVector>(3)));
+					DMibTest(DMibExpr(BinData) == DMibExpr(*iRow.f_GetColumnValue<NContainer::CByteVector>(3)));
 				}
 
 				++iRow;
@@ -242,11 +242,11 @@ namespace
 					DMibTest(DMibExpr(nullptr) != DMibExpr(iRow.f_GetColumnValue<fp64>(2)));
 					DMibTest(DMibExpr(fp64(2.0 / 3.0)) == DMibExpr(*iRow.f_GetColumnValue<fp64>(2)));
 
-					NContainer::CByteVector lBinData;
-					lBinData.f_Insert(200);
+					NContainer::CByteVector BinData;
+					BinData.f_Insert(200);
 
 					DMibTest(DMibExpr(nullptr) != DMibExpr(iRow.f_GetColumnValue<NContainer::CByteVector>(3)));
-					DMibTest(DMibExpr(lBinData) == DMibExpr(*iRow.f_GetColumnValue<NContainer::CByteVector>(3)));
+					DMibTest(DMibExpr(BinData) == DMibExpr(*iRow.f_GetColumnValue<NContainer::CByteVector>(3)));
 				}
 
 				++iRow;
@@ -313,10 +313,10 @@ namespace
 					DMibTest(DMibExpr(true) == DMibExpr((bool)iColumn));
 					DMibTest(DMibExpr(nullptr) != DMibExpr(iColumn.f_Get<NContainer::CByteVector>()));
 
-					NContainer::CByteVector lBinData;
-					lBinData.f_Insert(100);
+					NContainer::CByteVector BinData;
+					BinData.f_Insert(100);
 
-					DMibTest(DMibExpr(lBinData) == DMibExpr(*iColumn.f_Get<NContainer::CByteVector>()));
+					DMibTest(DMibExpr(BinData) == DMibExpr(*iColumn.f_Get<NContainer::CByteVector>()));
 				}
 
 				++iColumn;

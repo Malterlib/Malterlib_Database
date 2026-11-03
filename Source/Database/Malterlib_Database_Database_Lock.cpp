@@ -50,37 +50,37 @@ namespace NMib::NDatabase
 	int CDatabaseEnvironment_Internal::f_ReaderPid(EPidLockOp _Operation, CProcessID _ProcessID)
 	{
 #if !(DMdbPidLock)		/* Currently the same as defined(DPlatformFamily_Windows) */
-		int ret = 0;
-		HANDLE h;
+		int Result = 0;
+		HANDLE Process;
 		if (_Operation == EPidLockOp_Check)
 		{
-			h = OpenProcess(me_pidquery, FALSE, _ProcessID);
+			Process = OpenProcess(m_ProcessIDQuery, FALSE, _ProcessID);
 			/* No documented "no such process" code, but other program use this: */
-			if (!h)
+			if (!Process)
 				return DErrCode() != ERROR_INVALID_PARAMETER;
 			/* A process exists until all handles to it close. Has it exited? */
-			ret = WaitForSingleObject(h, 0) != 0;
-			CloseHandle(h);
+			Result = WaitForSingleObject(Process, 0) != 0;
+			CloseHandle(Process);
 		}
-		return ret;
+		return Result;
 #else
 		for (;;)
 		{
-			int rc;
-			struct flock lock_info;
-			memset(&lock_info, 0, sizeof(lock_info));
-			lock_info.l_type = F_WRLCK;
-			lock_info.l_whence = SEEK_SET;
-			lock_info.l_start = _ProcessID;
-			lock_info.l_len = 1;
-			if ((rc = fcntl(me_lfd, _Operation, &lock_info)) == 0)
+			int Result;
+			struct flock LockInfo;
+			memset(&LockInfo, 0, sizeof(LockInfo));
+			LockInfo.l_type = F_WRLCK;
+			LockInfo.l_whence = SEEK_SET;
+			LockInfo.l_start = _ProcessID;
+			LockInfo.l_len = 1;
+			if ((Result = fcntl(m_LockFileHandle, _Operation, &LockInfo)) == 0)
 			{
-				if (_Operation == F_GETLK && lock_info.l_type != F_UNLCK)
-					rc = -1;
+				if (_Operation == F_GETLK && LockInfo.l_type != F_UNLCK)
+					Result = -1;
 			}
-			else if ((rc = DErrCode()) == EINTR)
+			else if ((Result = DErrCode()) == EINTR)
 				continue;
-			return rc;
+			return Result;
 		}
 #endif
 	}
@@ -91,23 +91,23 @@ namespace NMib::NDatabase
 	int DMibDatabaseInfrequentSection NPrivate::fg_PidInsert(CProcessID *_pProcessIDs, CProcessID _ProcessID)
 	{
 		/* binary search of _ProcessID in list */
-		unsigned base = 0;
-		unsigned cursor = 1;
-		int val = 0;
-		unsigned n = _pProcessIDs[0];
+		unsigned iBase = 0;
+		unsigned iCursor = 1;
+		int Compare = 0;
+		unsigned nRemaining = _pProcessIDs[0];
 
-		while (0 < n)
+		while (0 < nRemaining)
 		{
-			unsigned pivot = n >> 1;
-			cursor = base + pivot + 1;
-			val = _ProcessID - _pProcessIDs[cursor];
+			unsigned nHalf = nRemaining >> 1;
+			iCursor = iBase + nHalf + 1;
+			Compare = _ProcessID - _pProcessIDs[iCursor];
 
-			if (val < 0)
-				n = pivot;
-			else if (val > 0)
+			if (Compare < 0)
+				nRemaining = nHalf;
+			else if (Compare > 0)
 			{
-				base = cursor;
-				n -= pivot + 1;
+				iBase = iCursor;
+				nRemaining -= nHalf + 1;
 			}
 			else
 			{
@@ -116,12 +116,12 @@ namespace NMib::NDatabase
 			}
 		}
 
-		if (val > 0)
-			++cursor;
+		if (Compare > 0)
+			++iCursor;
 		_pProcessIDs[0]++;
-		for (n = _pProcessIDs[0]; n > cursor; n--)
-			_pProcessIDs[n] = _pProcessIDs[n - 1];
-		_pProcessIDs[n] = _ProcessID;
+		for (nRemaining = _pProcessIDs[0]; nRemaining > iCursor; nRemaining--)
+			_pProcessIDs[nRemaining] = _pProcessIDs[nRemaining - 1];
+		_pProcessIDs[nRemaining] = _ProcessID;
 		return 0;
 	}
 
@@ -130,59 +130,59 @@ namespace NMib::NDatabase
 	void DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_ReaderCheck0(bool _bReadLock, umint *_pDead)
 	{
 		using namespace NPrivate;
-		CMdbMutexRef rmutex = _bReadLock ? nullptr : me_rmutex;
-		uint32 i, j, rdrs;
-		CMdbReader *mr;
-		CProcessID *pids, pid;
+		CMdbMutexRef pReaderMutex = _bReadLock ? nullptr : m_ReaderMutex;
+		uint32 iReader, iSameProcess, nReaders;
+		CMdbReader *pReaders;
+		CProcessID *pProcessIDs, ProcessID;
 		umint nDead = 0;
 
-		rdrs = m_pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Load(NAtomic::gc_MemoryOrder_Relaxed);
-		pids = (CProcessID *)NMemory::fg_Alloc((rdrs + 1) * sizeof(CProcessID));
+		nReaders = m_pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Load(NAtomic::gc_MemoryOrder_Relaxed);
+		pProcessIDs = (CProcessID *)NMemory::fg_Alloc((nReaders + 1) * sizeof(CProcessID));
 		auto Cleanup = g_OnScopeExit / [&]
 			{
-				NMemory::fg_Free(pids, (rdrs + 1) * sizeof(CProcessID));
+				NMemory::fg_Free(pProcessIDs, (nReaders + 1) * sizeof(CProcessID));
 			}
 		;
-		pids[0] = 0;
-		mr = m_pLocksMemoryMap->m_Readers;
-		for (i = 0; i < rdrs; i++)
+		pProcessIDs[0] = 0;
+		pReaders = m_pLocksMemoryMap->m_Readers;
+		for (iReader = 0; iReader < nReaders; iReader++)
 		{
-			pid = mr[i].m_OwningProcessID.f_Load(NAtomic::gc_MemoryOrder_Relaxed);
-			if (pid && pid != me_pid)
+			ProcessID = pReaders[iReader].m_OwningProcessID.f_Load(NAtomic::gc_MemoryOrder_Relaxed);
+			if (ProcessID && ProcessID != m_ProcessID)
 			{
-				if (fg_PidInsert(pids, pid) == 0)
+				if (fg_PidInsert(pProcessIDs, ProcessID) == 0)
 				{
-					if (!f_ReaderPid(EPidLockOp_Check, pid))
+					if (!f_ReaderPid(EPidLockOp_Check, ProcessID))
 					{
 						/* Stale reader found */
-						j = i;
-						if (rmutex)
+						iSameProcess = iReader;
+						if (pReaderMutex)
 						{
-							int rc;
-							if ((rc = DLockMutex0(rmutex)) != 0)
+							int Result;
+							if ((Result = DLockMutex0(pReaderMutex)) != 0)
 							{
-								if ((rc = f_MutexFailed(rmutex, rc)))
-									DMibError(NStr::fg_Format("Failed to lock mutex: {}", fg_StrError(rc)));
-								rdrs = 0; // the above checked all readers
+								if ((Result = f_MutexFailed(pReaderMutex, Result)))
+									DMibError(NStr::fg_Format("Failed to lock mutex: {}", fg_StrError(Result)));
+								nReaders = 0; // the above checked all readers
 							}
 							else
 							{
 								/* Recheck, a new process may have reused pid */
-								if (f_ReaderPid(EPidLockOp_Check, pid))
-									j = rdrs;
+								if (f_ReaderPid(EPidLockOp_Check, ProcessID))
+									iSameProcess = nReaders;
 							}
 						}
-						for (; j < rdrs; j++)
+						for (; iSameProcess < nReaders; iSameProcess++)
 						{
-							if (mr[j].m_OwningProcessID.f_Load(NAtomic::gc_MemoryOrder_Acquire) == pid)
+							if (pReaders[iSameProcess].m_OwningProcessID.f_Load(NAtomic::gc_MemoryOrder_Acquire) == ProcessID)
 							{
-								DMibDatabaseTrace("clear stale reader pid {} txn {}", (unsigned)pid, fg_RemoveQualifiers(mr[j].m_BeginReadTransactionID.f_Load()));
-								mr[j].m_OwningProcessID.f_Store(0, NAtomic::gc_MemoryOrder_Release);
+								DMibDatabaseTrace("clear stale reader pid {} txn {}", (unsigned)ProcessID, fg_RemoveQualifiers(pReaders[iSameProcess].m_BeginReadTransactionID.f_Load()));
+								pReaders[iSameProcess].m_OwningProcessID.f_Store(0, NAtomic::gc_MemoryOrder_Release);
 								nDead++;
 							}
 						}
-						if (rmutex)
-							DUnlockMutex(rmutex);
+						if (pReaderMutex)
+							DUnlockMutex(pReaderMutex);
 					}
 				}
 			}
@@ -218,24 +218,24 @@ namespace NMib::NDatabase
 #	endif
 
 		bool bReadLock;
-		CMdbMeta *meta;
+		CMdbMeta *pMeta;
 		if (_Result == DMdbOwnerdead)
 		{
 			/* We own the mutex. Clean up after dead previous owner. */
 			_Result = DMdbSuccess;
-			bReadLock = (_pMutex == me_rmutex);
+			bReadLock = (_pMutex == m_ReaderMutex);
 			if (!bReadLock)
 			{
 				/* Keep m_TransactionBody.m_TransactionID updated, otherwise next writer can
 				 * overwrite data which latest meta page refers to.
 				 */
-				meta = f_PickMeta();
-				m_pLocksMemoryMap->m_TransactionBody.m_TransactionID.f_Store(meta->mm_txnid.f_Load(NAtomic::gc_MemoryOrder_Relaxed), NAtomic::gc_MemoryOrder_Release);
+				pMeta = f_PickMeta();
+				m_pLocksMemoryMap->m_TransactionBody.m_TransactionID.f_Store(pMeta->m_TransactionID.f_Load(NAtomic::gc_MemoryOrder_Relaxed), NAtomic::gc_MemoryOrder_Release);
 				/* env is hosed if the dead thread was ours */
-				if (me_txn)
+				if (m_pTransaction)
 				{
-					me_flags |= DMdbFatalError;
-					me_txn = nullptr;
+					m_Flags |= DMdbFatalError;
+					m_pTransaction = nullptr;
 					_Result = DMdbPanic;
 				}
 			}
@@ -273,9 +273,9 @@ namespace NMib::NDatabase
 	 * @return 0 on success, non-zero on failure.
 	 */
 #ifdef DPlatformFamily_Windows
-	SECURITY_DESCRIPTOR NPrivate::mdb_null_sd;
-	SECURITY_ATTRIBUTES NPrivate::mdb_all_sa;
-	int NPrivate::mdb_sec_inited;
+	SECURITY_DESCRIPTOR NPrivate::g_NullSecurityDescriptor;
+	SECURITY_ATTRIBUTES NPrivate::g_AllSecurityAttributes;
+	int NPrivate::g_bSecurityInitialized;
 #endif
 
 	void DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_SetupLocks(NStr::CStr const &_LockPath, int _Mode, int *_pExclusive)
@@ -286,36 +286,36 @@ namespace NMib::NDatabase
 #	define DMdbErrcodeRofs	EROFS
 #endif
 #ifdef DMdbUseSysvSem
-		int semid;
-		union semun semu;
+		int SemaphoreID;
+		union semun SemaphoreUnion;
 #endif
-		off_t size, rsize;
-		int error_location = 0;
+		off_t Size, ReaderTableSize;
+		int ErrorLocation = 0;
 
 		NStr::CStr LockPath = f_GetFileName(_LockPath, EMdbFOpenType_Locks);
 		{
-			int rc = f_FOpen(_LockPath, EMdbFOpenType_Locks, _Mode, &me_lfd);
-			if (rc)
+			int Result = f_FOpen(_LockPath, EMdbFOpenType_Locks, _Mode, &m_LockFileHandle);
+			if (Result)
 			{
 				/* Omit lockfile if read-only env on read-only filesystem */
-				if (rc == DMdbErrcodeRofs && (me_flags & EDatabaseEnvironmentFlag_ReadOnly))
+				if (Result == DMdbErrcodeRofs && (m_Flags & EDatabaseEnvironmentFlag_ReadOnly))
 					return;
 
-				DMibError(NStr::fg_Format("Error opening lock file: {}", fg_StrError(rc)));
+				DMibError(NStr::fg_Format("Error opening lock file: {}", fg_StrError(Result)));
 			}
 		}
 
-		if (!(me_flags & EDatabaseEnvironmentFlag_NoTls))
+		if (!(m_Flags & EDatabaseEnvironmentFlag_NoTls))
 		{
-			int rc = pthread_key_create(&me_txkey, fg_EnvReaderDest);
-			if (rc)
-				DMibError(NStr::fg_Format("Error creating pthread key: {}", fg_StrError(rc)));
-			me_flags |= DMdbEnvTxkey;
+			int Result = pthread_key_create(&m_ThreadKey, fg_EnvReaderDest);
+			if (Result)
+				DMibError(NStr::fg_Format("Error creating pthread key: {}", fg_StrError(Result)));
+			m_Flags |= DMdbEnvTxkey;
 #ifdef DPlatformFamily_Windows
 			/* Windows TLS callbacks need help finding their TLS info. */
-			if (mdb_tls_nkeys >= DMaxTlsKeys)
+			if (g_nTlsKeys >= DMaxTlsKeys)
 				DMibError(NStr::fg_Format("Out of tls keys: {}", fg_StrError(DMdbTlsFull)));
-			mdb_tls_keys[mdb_tls_nkeys++] = me_txkey;
+			g_TlsKeys[g_nTlsKeys++] = m_ThreadKey;
 #endif
 		}
 
@@ -323,127 +323,127 @@ namespace NMib::NDatabase
 		 * nobody is using the lock region and we should initialize it.
 		 */
 		{
-			int rc = f_ExclLock(_pExclusive);
-			if (rc)
-				DMibError(NStr::fg_Format("Failed to get exclusive lock: {}", fg_StrError(rc)));
+			int Result = f_ExclLock(_pExclusive);
+			if (Result)
+				DMibError(NStr::fg_Format("Failed to get exclusive lock: {}", fg_StrError(Result)));
 		}
 
 #ifdef DPlatformFamily_Windows
-		size = GetFileSize(me_lfd, nullptr);
+		Size = GetFileSize(m_LockFileHandle, nullptr);
 #else
-		size = lseek(me_lfd, 0, SEEK_END);
-		if (size == -1)
+		Size = lseek(m_LockFileHandle, 0, SEEK_END);
+		if (Size == -1)
 		{
-			error_location = 1;
+			ErrorLocation = 1;
 			goto fail_errno;
 		}
 #endif
-		rsize = (m_MaxReaders - 1) * sizeof(CMdbReader) + sizeof(CLocksMemoryMap);
-		if (size < rsize && *_pExclusive > 0)
+		ReaderTableSize = (m_MaxReaders - 1) * sizeof(CMdbReader) + sizeof(CLocksMemoryMap);
+		if (Size < ReaderTableSize && *_pExclusive > 0)
 		{
 #ifdef DPlatformFamily_Windows
-			if (SetFilePointer(me_lfd, rsize, nullptr, FILE_BEGIN) != (DWORD)rsize || !SetEndOfFile(me_lfd))
+			if (SetFilePointer(m_LockFileHandle, ReaderTableSize, nullptr, FILE_BEGIN) != (DWORD)ReaderTableSize || !SetEndOfFile(m_LockFileHandle))
 			{
-				error_location = 2;
+				ErrorLocation = 2;
 				goto fail_errno;
 			}
 #else
-			if (ftruncate(me_lfd, rsize) != 0)
+			if (ftruncate(m_LockFileHandle, ReaderTableSize) != 0)
 			{
-				error_location = 3;
+				ErrorLocation = 3;
 				goto fail_errno;
 			}
 #endif
 		}
 		else
 		{
-			rsize = size;
-			size = rsize - sizeof(CLocksMemoryMap);
-			m_MaxReaders = size/sizeof(CMdbReader) + 1;
+			ReaderTableSize = Size;
+			Size = ReaderTableSize - sizeof(CLocksMemoryMap);
+			m_MaxReaders = Size/sizeof(CMdbReader) + 1;
 		}
 		{
 #ifdef DPlatformFamily_Windows
-			HANDLE mh;
-			mh = CreateFileMapping(me_lfd, nullptr, PAGE_READWRITE, 0, 0, nullptr);
-			if (!mh)
+			HANDLE FileMapping;
+			FileMapping = CreateFileMapping(m_LockFileHandle, nullptr, PAGE_READWRITE, 0, 0, nullptr);
+			if (!FileMapping)
 			{
-				error_location = 4;
+				ErrorLocation = 4;
 				goto fail_errno;
 			}
-			m_pLocksMemoryMap = (NPrivate::CLocksMemoryMap *)MapViewOfFileEx(mh, FILE_MAP_WRITE, 0, 0, rsize, nullptr);
-			CloseHandle(mh);
+			m_pLocksMemoryMap = (NPrivate::CLocksMemoryMap *)MapViewOfFileEx(FileMapping, FILE_MAP_WRITE, 0, 0, ReaderTableSize, nullptr);
+			CloseHandle(FileMapping);
 			if (!m_pLocksMemoryMap)
 			{
-				error_location = 5;
+				ErrorLocation = 5;
 				goto fail_errno;
 			}
 #else
-			void *m = mmap(nullptr, rsize, PROT_READ | PROT_WRITE, MAP_SHARED, me_lfd, 0);
-			if (m == MAP_FAILED)
+			void *pMap = mmap(nullptr, ReaderTableSize, PROT_READ | PROT_WRITE, MAP_SHARED, m_LockFileHandle, 0);
+			if (pMap == MAP_FAILED)
 			{
-				error_location = 6;
+				ErrorLocation = 6;
 				goto fail_errno;
 			}
-			m_pLocksMemoryMap = (CLocksMemoryMap *)m;
+			m_pLocksMemoryMap = (CLocksMemoryMap *)pMap;
 #endif
 		}
 
 		if (*_pExclusive > 0)
 		{
 #ifdef DPlatformFamily_Windows
-			BY_HANDLE_FILE_INFORMATION stbuf;
+			BY_HANDLE_FILE_INFORMATION Stat;
 			struct
 			{
-				DWORD volume;
-				DWORD nhigh;
-				DWORD nlow;
-			} idbuf;
+				DWORD m_Volume;
+				DWORD m_IndexHigh;
+				DWORD m_IndexLow;
+			} FileID;
 
-			if (!mdb_sec_inited)
+			if (!g_bSecurityInitialized)
 			{
-				InitializeSecurityDescriptor(&mdb_null_sd, SECURITY_DESCRIPTOR_REVISION);
-				SetSecurityDescriptorDacl(&mdb_null_sd, TRUE, 0, FALSE);
-				mdb_all_sa.nLength = sizeof(SECURITY_ATTRIBUTES);
-				mdb_all_sa.bInheritHandle = FALSE;
-				mdb_all_sa.lpSecurityDescriptor = &mdb_null_sd;
-				mdb_sec_inited = 1;
+				InitializeSecurityDescriptor(&g_NullSecurityDescriptor, SECURITY_DESCRIPTOR_REVISION);
+				SetSecurityDescriptorDacl(&g_NullSecurityDescriptor, TRUE, 0, FALSE);
+				g_AllSecurityAttributes.nLength = sizeof(SECURITY_ATTRIBUTES);
+				g_AllSecurityAttributes.bInheritHandle = FALSE;
+				g_AllSecurityAttributes.lpSecurityDescriptor = &g_NullSecurityDescriptor;
+				g_bSecurityInitialized = 1;
 			}
-			if (!GetFileInformationByHandle(me_lfd, &stbuf))
+			if (!GetFileInformationByHandle(m_LockFileHandle, &Stat))
 			{
-				error_location = 7;
+				ErrorLocation = 7;
 				goto fail_errno;
 			}
-			idbuf.volume = stbuf.dwVolumeSerialNumber;
-			idbuf.nhigh = stbuf.nFileIndexHigh;
-			idbuf.nlow = stbuf.nFileIndexLow;
-			m_pLocksMemoryMap->m_TransactionBody.mtb_mutexid = fg_Hash(&idbuf, sizeof(idbuf));
+			FileID.m_Volume = Stat.dwVolumeSerialNumber;
+			FileID.m_IndexHigh = Stat.nFileIndexHigh;
+			FileID.m_IndexLow = Stat.nFileIndexLow;
+			m_pLocksMemoryMap->m_TransactionBody.m_MutexID = fg_Hash(&FileID, sizeof(FileID));
 			fg_EnvMNameInit(this);
-			me_rmutex = CreateMutexExA(&mdb_all_sa, DMutexName(this, 'r'), 0, SYNCHRONIZE);
-			if (!me_rmutex)
+			m_ReaderMutex = CreateMutexExA(&g_AllSecurityAttributes, DMutexName(this, 'r'), 0, SYNCHRONIZE);
+			if (!m_ReaderMutex)
 			{
-				if (!!(me_flags & EDatabaseEnvironmentFlag_AllowOneProcessLocking) && GetLastError() == ERROR_ACCESS_DENIED)
-					me_rmutex = CreateMutexExA(&mdb_all_sa, nullptr, 0, SYNCHRONIZE);
+				if (!!(m_Flags & EDatabaseEnvironmentFlag_AllowOneProcessLocking) && GetLastError() == ERROR_ACCESS_DENIED)
+					m_ReaderMutex = CreateMutexExA(&g_AllSecurityAttributes, nullptr, 0, SYNCHRONIZE);
 
-				if (!me_rmutex)
+				if (!m_ReaderMutex)
 				{
-					error_location = 8;
+					ErrorLocation = 8;
 					goto fail_errno;
 				}
 			}
-			me_wmutex = CreateMutexExA(&mdb_all_sa, DMutexName(this, 'w'), 0, SYNCHRONIZE);
-			if (!me_wmutex)
+			m_WriterMutex = CreateMutexExA(&g_AllSecurityAttributes, DMutexName(this, 'w'), 0, SYNCHRONIZE);
+			if (!m_WriterMutex)
 			{
-				if (!!(me_flags & EDatabaseEnvironmentFlag_AllowOneProcessLocking) && GetLastError() == ERROR_ACCESS_DENIED)
-					me_wmutex = CreateMutexExA(&mdb_all_sa, nullptr, 0, SYNCHRONIZE);
+				if (!!(m_Flags & EDatabaseEnvironmentFlag_AllowOneProcessLocking) && GetLastError() == ERROR_ACCESS_DENIED)
+					m_WriterMutex = CreateMutexExA(&g_AllSecurityAttributes, nullptr, 0, SYNCHRONIZE);
 
-				if (!me_wmutex)
+				if (!m_WriterMutex)
 				{
-					error_location = 9;
+					ErrorLocation = 9;
 					goto fail_errno;
 				}
 			}
 #elif defined(MDB_USE_POSIX_SEM)
-			struct stat stbuf;
+			struct stat Stat;
 			struct
 			{
 				dev_t dev;
@@ -453,15 +453,15 @@ namespace NMib::NDatabase
 #	if defined(__NetBSD__)
 #		define	DMdbShortSemnames	1	/* limited to 14 chars */
 #	endif
-			if (fstat(me_lfd, &stbuf))
+			if (fstat(m_LockFileHandle, &Stat))
 			{
-				error_location = 10;
+				ErrorLocation = 10;
 				goto fail_errno;
 			}
 			memset(&idbuf, 0, sizeof(idbuf));
-			idbuf.dev = stbuf.st_dev;
-			idbuf.ino = stbuf.st_ino;
-			m_pLocksMemoryMap->m_TransactionBody.mtb_mutexid = fg_Hash(&idbuf, sizeof(idbuf))
+			idbuf.dev = Stat.st_dev;
+			idbuf.ino = Stat.st_ino;
+			m_pLocksMemoryMap->m_TransactionBody.m_MutexID = fg_Hash(&idbuf, sizeof(idbuf))
 #	ifdef DMdbShortSemnames
 				/* Max 9 base85-digits.  We truncate here instead of in
 				 * fg_EnvMNameInit() to keep the latter portable.
@@ -475,219 +475,213 @@ namespace NMib::NDatabase
 			 */
 			sem_unlink(DMutexName(this, 'r'));
 			sem_unlink(DMutexName(this, 'w'));
-			me_rmutex = sem_open(DMutexName(this, 'r'), O_CREAT | O_EXCL, _Mode, 1);
-			if (me_rmutex == SEM_FAILED)
+			m_ReaderMutex = sem_open(DMutexName(this, 'r'), O_CREAT | O_EXCL, _Mode, 1);
+			if (m_ReaderMutex == SEM_FAILED)
 			{
-				error_location = 11;
+				ErrorLocation = 11;
 				goto fail_errno;
 			}
-			me_wmutex = sem_open(DMutexName(this, 'w'), O_CREAT | O_EXCL, _Mode, 1);
-			if (me_wmutex == SEM_FAILED)
+			m_WriterMutex = sem_open(DMutexName(this, 'w'), O_CREAT | O_EXCL, _Mode, 1);
+			if (m_WriterMutex == SEM_FAILED)
 			{
-				error_location = 12;
+				ErrorLocation = 12;
 				goto fail_errno;
 			}
 #elif defined(DMdbUseSysvSem)
-			unsigned short vals[2] = {1, 1};
+			unsigned short Values[2] = {1, 1};
 			// ftok has big chance of collision, use hash of same data instead to create key.
 			// (key_t) (id << 24 | (st.st_dev & 0xff) << 16 | (st.st_ino & 0xffff));
 			/*
 			key_t key = ftok(LockPath.f_GetStr(), 'M');
 			if (key == -1)
 			{
-				error_location = 13;
+				ErrorLocation = 13;
 				goto fail_errno;
 			}
 			*/
 
-			struct stat stbuf;
-			if (fstat(me_lfd, &stbuf))
+			struct stat Stat;
+			if (fstat(m_LockFileHandle, &Stat))
 			{
-				error_location = 22;
+				ErrorLocation = 22;
 				goto fail_errno;
 			}
 
 			NCryptography::CHash_SHA256 Hash;
 			Hash.f_AddData("MalterlibDB", 11);
-			Hash.f_AddData(&stbuf.st_dev, sizeof(stbuf.st_dev));
-			Hash.f_AddData(&stbuf.st_ino, sizeof(stbuf.st_ino));
+			Hash.f_AddData(&Stat.st_dev, sizeof(Stat.st_dev));
+			Hash.f_AddData(&Stat.st_ino, sizeof(Stat.st_ino));
 
-			key_t key = Hash.f_GetDigest().f_FoldToInt<key_t>();
+			key_t Key = Hash.f_GetDigest().f_FoldToInt<key_t>();
 
-			if (key == IPC_PRIVATE) // Collision with IPC private
+			if (Key == IPC_PRIVATE) // Collision with IPC private
 			{
-				error_location = 23;
+				ErrorLocation = 23;
 				errno = EINVAL;
 				goto fail_errno;
 			}
 
-			semid = semget(key, 2, (_Mode & 0777) | IPC_CREAT);
-			if (semid < 0)
+			SemaphoreID = semget(Key, 2, (_Mode & 0777) | IPC_CREAT);
+			if (SemaphoreID < 0)
 			{
-				error_location = 14;
+				ErrorLocation = 14;
 				goto fail_errno;
 			}
-			semu.array = vals;
-			if (semctl(semid, 0, SETALL, semu) < 0)
+			SemaphoreUnion.array = Values;
+			if (semctl(SemaphoreID, 0, SETALL, SemaphoreUnion) < 0)
 			{
-				error_location = 15;
+				ErrorLocation = 15;
 				goto fail_errno;
 			}
-			m_pLocksMemoryMap->m_TransactionBody.mtb_semid = semid;
-			m_pLocksMemoryMap->m_TransactionBody.mtb_rlocked = 0;
+			m_pLocksMemoryMap->m_TransactionBody.m_SemaphoreID = SemaphoreID;
+			m_pLocksMemoryMap->m_TransactionBody.m_ReaderLock = 0;
 			m_pLocksMemoryMap->m_WriteLock = 0;
 #else	/* DMdbUsePosixMutex: */
-			pthread_mutexattr_t mattr;
+			pthread_mutexattr_t MutexAttributes;
 
 			/* Solaris needs this before initing a robust mutex.  Otherwise
 			 * it may skip the init and return EBUSY "seems someone already
 			 * inited" or EINVAL "it was inited differently".
 			 */
-			memset(m_pLocksMemoryMap->m_TransactionBody.mtb_rmutex, 0, sizeof(*m_pLocksMemoryMap->m_TransactionBody.mtb_rmutex));
+			memset(m_pLocksMemoryMap->m_TransactionBody.m_ReaderTableMutex, 0, sizeof(*m_pLocksMemoryMap->m_TransactionBody.m_ReaderTableMutex));
 			memset(m_pLocksMemoryMap->m_WriteLock, 0, sizeof(*m_pLocksMemoryMap->m_WriteLock));
 
-			int rc;
-			if ((rc = pthread_mutexattr_init(&mattr)) != 0)
-				DMibError(NStr::fg_Format("Error initializing mutex attributes: {}", fg_StrError(rc)));
-			rc = pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
+			int Result;
+			if ((Result = pthread_mutexattr_init(&MutexAttributes)) != 0)
+				DMibError(NStr::fg_Format("Error initializing mutex attributes: {}", fg_StrError(Result)));
+			Result = pthread_mutexattr_setpshared(&MutexAttributes, PTHREAD_PROCESS_SHARED);
 #	ifdef DMdbRobustSupported
-			if (!rc)
-				rc = pthread_mutexattr_setrobust(&mattr, PTHREAD_MUTEX_ROBUST);
+			if (!Result)
+				Result = pthread_mutexattr_setrobust(&MutexAttributes, PTHREAD_MUTEX_ROBUST);
 #	endif
-			if (!rc)
-				rc = pthread_mutex_init(m_pLocksMemoryMap->m_TransactionBody.mtb_rmutex, &mattr);
-			if (!rc)
-				rc = pthread_mutex_init(m_pLocksMemoryMap->m_WriteLock, &mattr);
-			pthread_mutexattr_destroy(&mattr);
-			if (rc)
-				DMibError(NStr::fg_Format("Error initializing mutex: {}", fg_StrError(rc)));
+			if (!Result)
+				Result = pthread_mutex_init(m_pLocksMemoryMap->m_TransactionBody.m_ReaderTableMutex, &MutexAttributes);
+			if (!Result)
+				Result = pthread_mutex_init(m_pLocksMemoryMap->m_WriteLock, &MutexAttributes);
+			pthread_mutexattr_destroy(&MutexAttributes);
+			if (Result)
+				DMibError(NStr::fg_Format("Error initializing mutex: {}", fg_StrError(Result)));
 #endif	/* DPlatformFamily_Windows || ... */
 
-			m_pLocksMemoryMap->m_TransactionBody.mtb_magic = DMdbMagic;
-			m_pLocksMemoryMap->m_TransactionBody.mtb_format = DMdbLockFormat;
+			m_pLocksMemoryMap->m_TransactionBody.m_Magic = DMdbMagic;
+			m_pLocksMemoryMap->m_TransactionBody.m_Format = DMdbLockFormat;
 			m_pLocksMemoryMap->m_TransactionBody.m_TransactionID.f_Store(0, NAtomic::gc_MemoryOrder_Release);
 			m_pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Store(0, NAtomic::gc_MemoryOrder_Release);
 		}
 		else
 		{
 #ifdef DMdbUseSysvSem
-			struct semid_ds buf;
+			struct semid_ds SemaphoreInfo;
 #endif
-			if (m_pLocksMemoryMap->m_TransactionBody.mtb_magic != DMdbMagic)
+			if (m_pLocksMemoryMap->m_TransactionBody.m_Magic != DMdbMagic)
 				DMibError("Lock region has invalid magic");
 
-			if (m_pLocksMemoryMap->m_TransactionBody.mtb_format != DMdbLockFormat)
-			{
-				DMibError
-					(
-						NStr::fg_Format("Lock region has format+version 0x{nfh,sf0,sj8}, expected 0x{nfh,sf0,sj8}", m_pLocksMemoryMap->m_TransactionBody.mtb_format, uint32(DMdbLockFormat))
-					)
-				;
-			}
+			if (m_pLocksMemoryMap->m_TransactionBody.m_Format != DMdbLockFormat)
+				DMibError(NStr::fg_Format("Lock region has format+version 0x{nfh,sf0,sj8}, expected 0x{nfh,sf0,sj8}", m_pLocksMemoryMap->m_TransactionBody.m_Format, uint32(DMdbLockFormat)));
 
 			{
-				int rc = DErrCode();
-				if (rc && rc != EACCES && rc != EAGAIN)
-					DMibError(NStr::fg_Format("Error setting up locks (non-exclusive): {}", fg_StrError(rc)));
+				int Result = DErrCode();
+				if (Result && Result != EACCES && Result != EAGAIN)
+					DMibError(NStr::fg_Format("Error setting up locks (non-exclusive): {}", fg_StrError(Result)));
 			}
 #ifdef DPlatformFamily_Windows
 			fg_EnvMNameInit(this);
-			me_rmutex = OpenMutexA(SYNCHRONIZE, FALSE, DMutexName(this, 'r'));
-			if (!me_rmutex)
+			m_ReaderMutex = OpenMutexA(SYNCHRONIZE, FALSE, DMutexName(this, 'r'));
+			if (!m_ReaderMutex)
 			{
-				error_location = 16;
+				ErrorLocation = 16;
 				goto fail_errno;
 			}
-			me_wmutex = OpenMutexA(SYNCHRONIZE, FALSE, DMutexName(this, 'w'));
-			if (!me_wmutex)
+			m_WriterMutex = OpenMutexA(SYNCHRONIZE, FALSE, DMutexName(this, 'w'));
+			if (!m_WriterMutex)
 			{
-				error_location = 17;
+				ErrorLocation = 17;
 				goto fail_errno;
 			}
 #elif defined(MDB_USE_POSIX_SEM)
 			fg_EnvMNameInit(this);
-			me_rmutex = sem_open(DMutexName(this, 'r'), 0);
-			if (me_rmutex == SEM_FAILED)
+			m_ReaderMutex = sem_open(DMutexName(this, 'r'), 0);
+			if (m_ReaderMutex == SEM_FAILED)
 			{
-				error_location = 18;
+				ErrorLocation = 18;
 				goto fail_errno;
 			}
-			me_wmutex = sem_open(DMutexName(this, 'w'), 0);
-			if (me_wmutex == SEM_FAILED)
+			m_WriterMutex = sem_open(DMutexName(this, 'w'), 0);
+			if (m_WriterMutex == SEM_FAILED)
 			{
-				error_location = 19;
+				ErrorLocation = 19;
 				goto fail_errno;
 			}
 #elif defined(DMdbUseSysvSem)
-			semid = m_pLocksMemoryMap->m_TransactionBody.mtb_semid;
-			semu.buf = &buf;
+			SemaphoreID = m_pLocksMemoryMap->m_TransactionBody.m_SemaphoreID;
+			SemaphoreUnion.buf = &SemaphoreInfo;
 			/* check for read access */
-			if (semctl(semid, 0, IPC_STAT, semu) < 0)
+			if (semctl(SemaphoreID, 0, IPC_STAT, SemaphoreUnion) < 0)
 			{
-				error_location = 20;
+				ErrorLocation = 20;
 				goto fail_errno;
 			}
 			/* check for write access */
-			if (semctl(semid, 0, IPC_SET, semu) < 0)
+			if (semctl(SemaphoreID, 0, IPC_SET, SemaphoreUnion) < 0)
 			{
-				error_location = 21;
+				ErrorLocation = 21;
 				goto fail_errno;
 			}
 #endif
 		}
 #ifdef DMdbUseSysvSem
-		me_rmutex->semid = semid;
-		me_wmutex->semid = semid;
-		me_rmutex->semnum = 0;
-		me_wmutex->semnum = 1;
-		me_rmutex->locked = &m_pLocksMemoryMap->m_TransactionBody.mtb_rlocked;
-		me_wmutex->locked = &m_pLocksMemoryMap->m_WriteLock;
+		m_ReaderMutex->m_SemaphoreID = SemaphoreID;
+		m_WriterMutex->m_SemaphoreID = SemaphoreID;
+		m_ReaderMutex->m_SemaphoreNumber = 0;
+		m_WriterMutex->m_SemaphoreNumber = 1;
+		m_ReaderMutex->m_pLocked = &m_pLocksMemoryMap->m_TransactionBody.m_ReaderLock;
+		m_WriterMutex->m_pLocked = &m_pLocksMemoryMap->m_WriteLock;
 #endif
 
 		return;
 
 	fail_errno:
 		{
-			int rc = DErrCode();
-			DMibError(NStr::fg_Format("Error setting up locks ({}): {}", error_location, fg_StrErrorSystem(rc)));
+			int Result = DErrCode();
+			DMibError(NStr::fg_Format("Error setting up locks ({}): {}", ErrorLocation, fg_StrErrorSystem(Result)));
 		}
 	}
 
 	/** Downgrade the exclusive lock on the region back to shared */
 	int DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_ShareLocks(int *_pExclusive)
 	{
-		int rc = 0;
+		int Result = 0;
 
 #ifdef DPlatformFamily_Windows
 		{
-			OVERLAPPED ov;
+			OVERLAPPED Overlapped;
 			/* First acquire a shared lock. The Unlock will
 			 * then release the existing exclusive lock.
 			 */
-			memset(&ov, 0, sizeof(ov));
-			if (!LockFileEx(me_lfd, 0, 0, 1, 0, &ov))
-				rc = DErrCode();
+			memset(&Overlapped, 0, sizeof(Overlapped));
+			if (!LockFileEx(m_LockFileHandle, 0, 0, 1, 0, &Overlapped))
+				Result = DErrCode();
 			else
 			{
-				UnlockFile(me_lfd, 0, 0, 1, 0);
+				UnlockFile(m_LockFileHandle, 0, 0, 1, 0);
 				*_pExclusive = 0;
 			}
 		}
 #else
 		{
-			struct flock lock_info;
+			struct flock LockInfo;
 			/* The shared lock replaces the existing lock */
-			memset((void *)&lock_info, 0, sizeof(lock_info));
-			lock_info.l_type = F_RDLCK;
-			lock_info.l_whence = SEEK_SET;
-			lock_info.l_start = 0;
-			lock_info.l_len = 1;
-			while ((rc = fcntl(me_lfd, F_SETLK, &lock_info)) && (rc = DErrCode()) == EINTR);
-			*_pExclusive = rc ? -1 : 0; // error may mean we lost the lock
+			memset((void *)&LockInfo, 0, sizeof(LockInfo));
+			LockInfo.l_type = F_RDLCK;
+			LockInfo.l_whence = SEEK_SET;
+			LockInfo.l_start = 0;
+			LockInfo.l_len = 1;
+			while ((Result = fcntl(m_LockFileHandle, F_SETLK, &LockInfo)) && (Result = DErrCode()) == EINTR);
+			*_pExclusive = Result ? -1 : 0; // error may mean we lost the lock
 		}
 #endif
 
-		return rc;
+		return Result;
 	}
 
 	/** Try to get exclusive lock, otherwise shared.
@@ -695,40 +689,40 @@ namespace NMib::NDatabase
 	 */
 	int DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_ExclLock(int *_pExclusive)
 	{
-		int rc = 0;
+		int Result = 0;
 #ifdef DPlatformFamily_Windows
-		if (LockFile(me_lfd, 0, 0, 1, 0))
+		if (LockFile(m_LockFileHandle, 0, 0, 1, 0))
 			*_pExclusive = 1;
 		else
 		{
-			OVERLAPPED ov;
-			memset(&ov, 0, sizeof(ov));
-			if (LockFileEx(me_lfd, 0, 0, 1, 0, &ov))
+			OVERLAPPED Overlapped;
+			memset(&Overlapped, 0, sizeof(Overlapped));
+			if (LockFileEx(m_LockFileHandle, 0, 0, 1, 0, &Overlapped))
 				*_pExclusive = 0;
 			else
-				rc = DErrCode();
+				Result = DErrCode();
 		}
 #else
-		struct flock lock_info;
-		memset((void *)&lock_info, 0, sizeof(lock_info));
-		lock_info.l_type = F_WRLCK;
-		lock_info.l_whence = SEEK_SET;
-		lock_info.l_start = 0;
-		lock_info.l_len = 1;
-		while ((rc = fcntl(me_lfd, F_SETLK, &lock_info)) && (rc = DErrCode()) == EINTR);
-		if (!rc)
+		struct flock LockInfo;
+		memset((void *)&LockInfo, 0, sizeof(LockInfo));
+		LockInfo.l_type = F_WRLCK;
+		LockInfo.l_whence = SEEK_SET;
+		LockInfo.l_start = 0;
+		LockInfo.l_len = 1;
+		while ((Result = fcntl(m_LockFileHandle, F_SETLK, &LockInfo)) && (Result = DErrCode()) == EINTR);
+		if (!Result)
 			*_pExclusive = 1;
 		else
 #	ifndef DMdbUsePosixMutex
 		if (*_pExclusive < 0) // always true when DMdbUsePosixMutex
 #	endif
 		{
-			lock_info.l_type = F_RDLCK;
-			while ((rc = fcntl(me_lfd, F_SETLKW, &lock_info)) && (rc = DErrCode()) == EINTR);
-			if (rc == 0)
+			LockInfo.l_type = F_RDLCK;
+			while ((Result = fcntl(m_LockFileHandle, F_SETLKW, &LockInfo)) && (Result = DErrCode()) == EINTR);
+			if (Result == 0)
 				*_pExclusive = 0;
 		}
 #endif
-		return rc;
+		return Result;
 	}
 }

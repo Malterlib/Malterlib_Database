@@ -111,133 +111,139 @@ namespace NMib::NDatabase
 	CDatabaseSub CDatabaseTransactionCommon::fp_OpenDatabase(char const *_pName, EDatabaseSubFlag _Flags, CDatabaseSubProperties const &_Properties)
 	{
 		using namespace NPrivate;
-		CDatabaseValue key, data;
-		CDatabaseSubID i;
-		CMdbCursor mc;
-		CMdbDb dummy;
-		int dbflag, exact;
-		uint32 unused = 0, seq;
-		umint len;
+		CDatabaseValue Key, Data;
+		CDatabaseSubID iDatabase;
+		CMdbCursor Cursor;
+		CMdbDb DummyDatabase;
+		int DatabaseFlag, bExact;
+		uint32 iUnusedSlot = 0, Sequence;
+		umint NameLength;
 
 		if (_Flags & ~DValidFlags)
 			DMibError("Invalid flags specified");
 
-		auto txn = mp_pTransaction.f_Get();
+		auto pTransaction = mp_pTransaction.f_Get();
 
-		txn->f_CheckBlocked();
+		pTransaction->f_CheckBlocked();
 
 		/* main DB? */
 		if (!_pName)
 		{
 			if (_Flags & DPersistentFlags)
 			{
-				uint16 f2 = _Flags & DPersistentFlags;
+				uint16 PersistentFlags = _Flags & DPersistentFlags;
 				/* make sure flag changes get committed */
-				if ((txn->mt_dbs[DMainDbi].md_flags | f2) != txn->mt_dbs[DMainDbi].md_flags)
+				if ((pTransaction->m_pDatabases[DMainDbi].m_Flags | PersistentFlags) != pTransaction->m_pDatabases[DMainDbi].m_Flags)
 				{
-					txn->mt_dbs[DMainDbi].md_flags |= f2;
-					txn->mt_flags |= DMdbTxnDirty;
+					pTransaction->m_pDatabases[DMainDbi].m_Flags |= PersistentFlags;
+					pTransaction->m_Flags |= DMdbTxnDirty;
 				}
 			}
-			fg_DefaultCmp(txn, DMainDbi);
+			fg_DefaultCmp(pTransaction, DMainDbi);
 			return DMainDbi;
 		}
 
-		if (txn->mt_dbxs[DMainDbi].m_fKeyCompare.f_IsEmpty())
-			fg_DefaultCmp(txn, DMainDbi);
+		if (pTransaction->m_pDatabaseInfos[DMainDbi].m_fKeyCompare.f_IsEmpty())
+			fg_DefaultCmp(pTransaction, DMainDbi);
 
 		/* Is the DB already open? */
-		len = strlen(_pName);
-		for (i = DCoreDbs; i < txn->mt_numdbs; i++)
+		NameLength = strlen(_pName);
+		for (iDatabase = DCoreDbs; iDatabase < pTransaction->m_nDatabases; iDatabase++)
 		{
-			if (!txn->mt_dbxs[i].m_DatabaseName.m_Size)
+			if (!pTransaction->m_pDatabaseInfos[iDatabase].m_DatabaseName.m_Size)
 			{
 				/* Remember this free slot */
-				if (!unused)
-					unused = i;
+				if (!iUnusedSlot)
+					iUnusedSlot = iDatabase;
 				continue;
 			}
-			if (len == txn->mt_dbxs[i].m_DatabaseName.m_Size && !strncmp(_pName, (char const *)txn->mt_dbxs[i].m_DatabaseName.m_pData, len))
-				return i;
+			if
+			(
+				NameLength == pTransaction->m_pDatabaseInfos[iDatabase].m_DatabaseName.m_Size
+				&& !strncmp(_pName, (char const *)pTransaction->m_pDatabaseInfos[iDatabase].m_DatabaseName.m_pData, NameLength)
+			)
+			{
+				return iDatabase;
+			}
 		}
 
 		/* If no free slot and max hit, fail */
-		if (!unused && txn->mt_numdbs >= txn->mt_env->me_maxdbs)
+		if (!iUnusedSlot && pTransaction->m_nDatabases >= pTransaction->m_pEnvironment->m_MaxDatabases)
 			DMibError("Out of database IDs");
 
 		/* Cannot mix named databases with some mainDB flags */
-		if (txn->mt_dbs[DMainDbi].md_flags & (EDatabaseSubFlag_SortedDuplicates | EDatabaseSubFlag_IntegerKeys))
+		if (pTransaction->m_pDatabases[DMainDbi].m_Flags & (EDatabaseSubFlag_SortedDuplicates | EDatabaseSubFlag_IntegerKeys))
 		{
 			if (_Flags & EDatabaseSubFlag_Create)
 				DMibError(NStr::fg_Format("Database '{}' not found", _pName));
-			else if (txn->mt_dbs[DMainDbi].md_flags & (EDatabaseSubFlag_SortedDuplicates))
+			else if (pTransaction->m_pDatabases[DMainDbi].m_Flags & (EDatabaseSubFlag_SortedDuplicates))
 				DMibError("Named databases not supported when main database is dupsort");
-			else if (txn->mt_dbs[DMainDbi].md_flags & (EDatabaseSubFlag_IntegerKeys))
+			else if (pTransaction->m_pDatabases[DMainDbi].m_Flags & (EDatabaseSubFlag_IntegerKeys))
 				DMibError("Named databases not supported when main database is integer key");
 		}
 
 		/* Find the DB info */
-		dbflag = DDbNew | DDbValid | DDbUserValid;
-		exact = 0;
-		key.m_Size = len;
-		key.m_pData = (uint8 *)_pName;
-		fg_CursorInit(&mc, txn, DMainDbi, nullptr);
-		int rc = fg_CursorSet(&mc, &key, &data, EDatabaseCursorGet_Set, &exact);
-		if (rc == DMdbSuccess)
+		DatabaseFlag = DDbNew | DDbValid | DDbUserValid;
+		bExact = 0;
+		Key.m_Size = NameLength;
+		Key.m_pData = (uint8 *)_pName;
+		fg_CursorInit(&Cursor, pTransaction, DMainDbi, nullptr);
+		int Result = fg_CursorSet(&Cursor, &Key, &Data, EDatabaseCursorGet_Set, &bExact);
+		if (Result == DMdbSuccess)
 		{
 			/* make sure this is actually a DB */
-			CMdbNode *node = DNodePtr(mc.mc_pg[mc.mc_top], mc.mc_ki[mc.mc_top]);
-			if ((node->mn_flags & (DFDupData | DFSubData)) != DFSubData)
+			CMdbNode *pNode = DNodePtr(Cursor.m_Pages[Cursor.m_iTop], Cursor.m_NodeIndices[Cursor.m_iTop]);
+			if ((pNode->m_Flags & (DFDupData | DFSubData)) != DFSubData)
 				DMibError("Named record is not a database");
 		}
-		else if (!(rc == DMdbNotFound && (_Flags & EDatabaseSubFlag_Create)))
-			DMibError(NStr::fg_Format("Error looking for database record: {}", NPrivate::fg_StrError(rc)));
+		else if (!(Result == DMdbNotFound && (_Flags & EDatabaseSubFlag_Create)))
+			DMibError(NStr::fg_Format("Error looking for database record: {}", NPrivate::fg_StrError(Result)));
 
 		/* Done here so we cannot fail after creating a new DB */
-		char *namedup;
+		char *pNameCopy;
 		umint NameLen = NStr::fg_StrLen(_pName);
 		{
-			namedup = (char *)NMemory::fg_Alloc(NameLen + 1);
-			NStr::fg_StrCopy(namedup, _pName, NameLen + 1);
+			pNameCopy = (char *)NMemory::fg_Alloc(NameLen + 1);
+			NStr::fg_StrCopy(pNameCopy, _pName, NameLen + 1);
 		}
 		auto Cleanup = g_OnScopeExit / [&]
 			{
-				NMemory::fg_Free(namedup, NameLen + 1);
+				NMemory::fg_Free(pNameCopy, NameLen + 1);
 			}
 		;
 
-		if (rc)
+		if (Result)
 		{
 			/* DMdbNotFound and EDatabaseSubFlag_Create: Create new DB */
-			data.m_Size = sizeof(CMdbDb);
-			data.m_pData = (uint8 *)&dummy;
-			memset(&dummy, 0, sizeof(dummy));
-			dummy.md_root = DPInvalid;
-			dummy.md_flags = _Flags & DPersistentFlags;
-			rc = fg_CursorPut(&mc, &key, &data, (EDatabaseWriteFlag)DFSubData);
-			if (rc)
-				DMibError(NStr::fg_Format("Error creating database record: {}", NPrivate::fg_StrError(rc)));
-			dbflag |= DDbDirty;
+			Data.m_Size = sizeof(CMdbDb);
+			Data.m_pData = (uint8 *)&DummyDatabase;
+			memset(&DummyDatabase, 0, sizeof(DummyDatabase));
+			DummyDatabase.m_RootPage = DPInvalid;
+			DummyDatabase.m_Flags = _Flags & DPersistentFlags;
+			Result = fg_CursorPut(&Cursor, &Key, &Data, (EDatabaseWriteFlag)DFSubData);
+			if (Result)
+				DMibError(NStr::fg_Format("Error creating database record: {}", NPrivate::fg_StrError(Result)));
+			DatabaseFlag |= DDbDirty;
 		}
 
 		{
 			/* Got info, register DBI in this txn */
-			uint32 slot = unused ? unused : txn->mt_numdbs;
-			txn->mt_dbxs[slot].m_DatabaseName.m_pData = (uint8 *)namedup;
+			uint32 iSlot = iUnusedSlot ? iUnusedSlot : pTransaction->m_nDatabases;
+			pTransaction->m_pDatabaseInfos[iSlot].m_DatabaseName.m_pData = (uint8 *)pNameCopy;
 			Cleanup.f_Clear();
-			txn->mt_dbxs[slot].m_DatabaseName.m_Size = len;
-			txn->mt_dbflags[slot] = dbflag;
-			/* txn-> and env-> are the same in read txns, use
+			pTransaction->m_pDatabaseInfos[iSlot].m_DatabaseName.m_Size = NameLength;
+			pTransaction->m_pDatabaseFlags[iSlot] = DatabaseFlag;
+			/* pTransaction-> and env-> are the same in read txns, use
 			 * tmp variable to avoid undefined assignment
 			 */
-			seq = ++txn->mt_env->me_dbiseqs[slot];
-			txn->mt_dbiseqs[slot] = seq;
+			Sequence = ++pTransaction->m_pEnvironment->m_pDatabaseSequences[iSlot];
+			pTransaction->m_pDatabaseSequences[iSlot] = Sequence;
 
-			memcpy(&txn->mt_dbs[slot], data.m_pData, sizeof(CMdbDb));
-			fg_DefaultCmp(txn, slot);
-			if (!unused)
-				txn->mt_numdbs++;
-			return slot;
+			memcpy(&pTransaction->m_pDatabases[iSlot], Data.m_pData, sizeof(CMdbDb));
+			fg_DefaultCmp(pTransaction, iSlot);
+			if (!iUnusedSlot)
+				pTransaction->m_nDatabases++;
+			return iSlot;
 		}
 	}
 
@@ -310,12 +316,12 @@ namespace NMib::NDatabase
 
 		f_CheckBlocked();
 
-		if (mt_dbflags[_DatabaseID] & DDbStale)
+		if (m_pDatabaseFlags[_DatabaseID] & DDbStale)
 		{
-			CMdbCursor mc;
-			CMdbXCursor mx;
+			CMdbCursor Cursor;
+			CMdbXCursor XCursor;
 			/* Stale, must read the DB's root. cursor_init does it for us. */
-			fg_CursorInit(&mc, this, _DatabaseID, &mx);
+			fg_CursorInit(&Cursor, this, _DatabaseID, &XCursor);
 		}
 	}
 
@@ -335,19 +341,19 @@ namespace NMib::NDatabase
 	{
 		f_PrepareStatisticsQuery(_DatabaseID);
 
-		return mt_env->f_DatabaseStatistics(&mt_dbs[_DatabaseID]);
+		return m_pEnvironment->f_DatabaseStatistics(&m_pDatabases[_DatabaseID]);
 	}
 
 	CDatabaseSizeStatistics DMibDatabaseInfrequentSection CDatabaseTransactionCommon::CInternal::f_SizeStatistics(CDatabaseSubID _DatabaseID)
 	{
 		f_PrepareStatisticsQuery(_DatabaseID);
 
-		return mt_env->f_SizeStatistics(&mt_dbs[_DatabaseID]);
+		return m_pEnvironment->f_SizeStatistics(&m_pDatabases[_DatabaseID]);
 	}
 
 	CDatabaseEnvironmentInfo DMibDatabaseInfrequentSection CDatabaseTransactionCommon::CInternal::f_EnvironmentInfo()
 	{
-		return mt_env->f_EnvironmentInfo();
+		return m_pEnvironment->f_EnvironmentInfo();
 	}
 
 	/** @brief Retrieve the DB flags for a database handle.
@@ -362,7 +368,7 @@ namespace NMib::NDatabase
 		/* We could return the flags for the DFreeDbi too but what's the point? */
 		if (!DTxnDbiExist(this, _DatabaseID, DDbUserValid))
 			DMibError("Database does not exists");
-		return mt_dbs[_DatabaseID].md_flags & DPersistentFlags;
+		return m_pDatabases[_DatabaseID].m_Flags & DPersistentFlags;
 	}
 
 	/** @brief Close a database handle. Normally unnecessary. Use with care:
@@ -384,7 +390,7 @@ namespace NMib::NDatabase
 	void CDatabaseEnvironment::fp_CloseDatabase(CDatabaseSubID _DatabaseID)
 	{
 		auto &Environment = *mp_pEnvironment;
-		if (_DatabaseID < DCoreDbs || _DatabaseID >= Environment.me_maxdbs)
+		if (_DatabaseID < DCoreDbs || _DatabaseID >= Environment.m_MaxDatabases)
 			return;
 		auto &StaticDatabaseInfo = Environment.m_StaticDasabaseInfo[_DatabaseID];
 		char *pNamePointer = (char *)StaticDatabaseInfo.m_DatabaseName.m_pData;
@@ -394,8 +400,8 @@ namespace NMib::NDatabase
 		{
 			StaticDatabaseInfo.m_DatabaseName.m_pData = nullptr;
 			StaticDatabaseInfo.m_DatabaseName.m_Size = 0;
-			Environment.me_dbflags[_DatabaseID] = 0;
-			Environment.me_dbiseqs[_DatabaseID]++;
+			Environment.m_pDatabaseFlags[_DatabaseID] = 0;
+			Environment.m_pDatabaseSequences[_DatabaseID]++;
 			NMemory::fg_Free(pNamePointer, NameSize + 1);
 		}
 	}
@@ -412,61 +418,61 @@ namespace NMib::NDatabase
 	void CDatabaseTransactionCommon::CInternal::f_DropDatabase(CDatabaseSubID _DatabaseID, bool _bDelete)
 	{
 		using namespace NPrivate;
-		CMdbCursor *mc, *m2;
+		CMdbCursor *pCursor, *pOther;
 
 		if (!DTxnDbiExist(this, _DatabaseID, DDbUserValid))
 			DMibError("Database does not exists");
 
-		if (DFIsSet(mt_flags, DMdbTxnReadOnly))
+		if (DFIsSet(m_Flags, DMdbTxnReadOnly))
 			DMibError("Cannot drop database with read only transaction");
 
 		if (DTxnDbiChanged(this, _DatabaseID))
 			DMibError("Stale write transaction");
 
-		mc = f_Cursor(_DatabaseID);
+		pCursor = f_Cursor(_DatabaseID);
 
 		auto Cleanup = g_OnScopeExit / [&]()
 			{
-				fg_CursorClose(mc);
+				fg_CursorClose(pCursor);
 			}
 		;
 
 		{
-			int rc = fg_Drop0(mc, mc->mc_db->md_flags & EDatabaseSubFlag_SortedDuplicates);
+			int Result = fg_Drop0(pCursor, pCursor->m_pDatabase->m_Flags & EDatabaseSubFlag_SortedDuplicates);
 			/* Invalidate the dropped DB's cursors */
-			for (m2 = mt_cursors[_DatabaseID]; m2; m2 = m2->mc_next)
-				m2->mc_flags &= ~(DCInitialized | DCEof);
-			if (rc)
-				DMibError(NStr::fg_Format("Error dropping database: {}", fg_StrError(rc)));
+			for (pOther = m_pCursors[_DatabaseID]; pOther; pOther = pOther->m_pNext)
+				pOther->m_Flags &= ~(DCInitialized | DCEof);
+			if (Result)
+				DMibError(NStr::fg_Format("Error dropping database: {}", fg_StrError(Result)));
 		}
 
 		/* Can't delete the main DB */
 		if (_bDelete && _DatabaseID >= DCoreDbs)
 		{
-			int rc = fg_Del0(this, DMainDbi, &mc->mc_dbx->m_DatabaseName, nullptr, (EDatabaseWriteFlag)DFSubData);
-			if (!rc)
+			int Result = fg_Del0(this, DMainDbi, &pCursor->m_pDatabaseInfo->m_DatabaseName, nullptr, (EDatabaseWriteFlag)DFSubData);
+			if (!Result)
 			{
-				mt_dbflags[_DatabaseID] = DDbStale;
-				mt_env->f_DbiClose(_DatabaseID);
+				m_pDatabaseFlags[_DatabaseID] = DDbStale;
+				m_pEnvironment->f_DbiClose(_DatabaseID);
 			}
 			else
 			{
-				mt_flags |= DMdbTxnError;
-				DMibError(NStr::fg_Format("Error deleting database: {}", fg_StrError(rc)));
+				m_Flags |= DMdbTxnError;
+				DMibError(NStr::fg_Format("Error deleting database: {}", fg_StrError(Result)));
 			}
 		}
 		else
 		{
 			/* reset the DB record, mark it dirty */
-			mt_dbflags[_DatabaseID] |= DDbDirty;
-			mt_dbs[_DatabaseID].md_depth = 0;
-			mt_dbs[_DatabaseID].md_branch_pages = 0;
-			mt_dbs[_DatabaseID].md_leaf_pages = 0;
-			mt_dbs[_DatabaseID].md_overflow_pages = 0;
-			mt_dbs[_DatabaseID].md_entries = 0;
-			mt_dbs[_DatabaseID].md_root = DPInvalid;
+			m_pDatabaseFlags[_DatabaseID] |= DDbDirty;
+			m_pDatabases[_DatabaseID].m_Depth = 0;
+			m_pDatabases[_DatabaseID].m_nBranchPages = 0;
+			m_pDatabases[_DatabaseID].m_nLeafPages = 0;
+			m_pDatabases[_DatabaseID].m_nOverflowPages = 0;
+			m_pDatabases[_DatabaseID].m_nEntries = 0;
+			m_pDatabases[_DatabaseID].m_RootPage = DPInvalid;
 
-			mt_flags |= DMdbTxnDirty;
+			m_Flags |= DMdbTxnDirty;
 		}
 	}
 
@@ -494,7 +500,7 @@ namespace NMib::NDatabase
 		if (!DTxnDbiExist(this, _DatabaseID, DDbUserValid))
 			DMibError("Database does not exists");
 
-		mt_dbxs[_DatabaseID].m_fKeyCompare = fg_Move(_fCompare);
+		m_pDatabaseInfos[_DatabaseID].m_fKeyCompare = fg_Move(_fCompare);
 	}
 
 	/** @brief Set a custom data comparison function for a #EDatabaseSubFlag_SortedDuplicates database.
@@ -523,6 +529,6 @@ namespace NMib::NDatabase
 		if (!DTxnDbiExist(this, _DatabaseID, DDbUserValid))
 			DMibError("Database does not exists");
 
-		mt_dbxs[_DatabaseID].m_fDataCompare = fg_Move(_fCompare);
+		m_pDatabaseInfos[_DatabaseID].m_fDataCompare = fg_Move(_fCompare);
 	}
 }

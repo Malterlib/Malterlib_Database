@@ -73,8 +73,8 @@ namespace NMib::NDatabase
 				if (_nBytes <= 1024)
 				{
 					uint8 Buffer[1024];
-					for (umint i = 0; i < _nBytes; ++i)
-						Buffer[i] = ~pSource[i];
+					for (umint iByte = 0; iByte < _nBytes; ++iByte)
+						Buffer[iByte] = ~pSource[iByte];
 
 					mp_pStream->f_FeedBytes(Buffer, _nBytes);
 				}
@@ -83,8 +83,8 @@ namespace NMib::NDatabase
 					NContainer::CByteVector Buffer;
 					Buffer.f_SetLen(_nBytes);
 					auto pDestination = Buffer.f_GetArray();
-					for (umint i = 0; i < _nBytes; ++i)
-						pDestination[i] = ~pSource[i];
+					for (umint iByte = 0; iByte < _nBytes; ++iByte)
+						pDestination[iByte] = ~pSource[iByte];
 
 					mp_pStream->f_FeedBytes(pDestination, _nBytes);
 				}
@@ -97,8 +97,8 @@ namespace NMib::NDatabase
 				{
 					uint8 Buffer[1024];
 					mp_pStream->f_ConsumeBytes(Buffer, _nBytes);
-					for (umint i = 0; i < _nBytes; ++i)
-						pDestination[i] = ~Buffer[i];
+					for (umint iByte = 0; iByte < _nBytes; ++iByte)
+						pDestination[iByte] = ~Buffer[iByte];
 				}
 				else
 				{
@@ -107,8 +107,8 @@ namespace NMib::NDatabase
 					auto pSource = Buffer.f_GetArray();
 					mp_pStream->f_ConsumeBytes(pSource, _nBytes);
 
-					for (umint i = 0; i < _nBytes; ++i)
-						pDestination[i] = ~pSource[i];
+					for (umint iByte = 0; iByte < _nBytes; ++iByte)
+						pDestination[iByte] = ~pSource[iByte];
 				}
 			}
 

@@ -128,7 +128,7 @@ namespace NMib::NDatabase
 		CDatabaseValue Key = _Key;
 		CDatabaseValue Value = _Value;
 		auto Flags = (_bAppend ? EDatabaseWriteFlag_Append : EDatabaseWriteFlag_None) | EDatabaseWriteFlag_NoOverwrite;
-		if (Transaction.mt_dbs[mp_DatabaseID].md_flags & EDatabaseSubFlag_SortedDuplicates)
+		if (Transaction.m_pDatabases[mp_DatabaseID].m_Flags & EDatabaseSubFlag_SortedDuplicates)
 			Flags |= EDatabaseWriteFlag_NoDuplicateData;
 		Transaction.f_Put(mp_DatabaseID, &Key, &Value, Flags);
 	}

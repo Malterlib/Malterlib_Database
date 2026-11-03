@@ -44,13 +44,13 @@ namespace NMib::NDatabase
 	 */
 	void NPrivate::fg_EnvReaderDest(void *_pReader)
 	{
-		CMdbReader *reader = (CMdbReader *)_pReader;
+		CMdbReader *pReader = (CMdbReader *)_pReader;
 
 #ifndef DPlatformFamily_Windows
-		if (reader->m_OwningProcessID.f_Load(NAtomic::gc_MemoryOrder_Acquire) == getpid()) // catch pthread_exit() in child process
+		if (pReader->m_OwningProcessID.f_Load(NAtomic::gc_MemoryOrder_Acquire) == getpid()) // catch pthread_exit() in child process
 #endif
 			/* We omit the mutex, so do this atomically (i.e. skip mr_txnid) */
-			reader->m_OwningProcessID.f_Store(0, NAtomic::gc_MemoryOrder_Release);
+			pReader->m_OwningProcessID.f_Store(0, NAtomic::gc_MemoryOrder_Release);
 	}
 
 #ifdef DPlatformFamily_Windows
@@ -59,24 +59,24 @@ namespace NMib::NDatabase
 	 *	to 1088 keys. Let's assume nobody opens more than 64 environments
 	 *	in a single process, for now. They can override this if needed.
 	 */
-	pthread_key_t NPrivate::mdb_tls_keys[DMaxTlsKeys];
-	int NPrivate::mdb_tls_nkeys = 0;
+	pthread_key_t NPrivate::g_TlsKeys[DMaxTlsKeys];
+	int NPrivate::g_nTlsKeys = 0;
 
 	namespace
 	{
 		void NTAPI fg_TlsCallback(PVOID _pModule, DWORD _Reason, PVOID _pReserved)
 		{
-			int i;
+			int iTlsKey;
 			switch (_Reason)
 			{
 			case DLL_PROCESS_ATTACH: break;
 			case DLL_THREAD_ATTACH: break;
 			case DLL_THREAD_DETACH:
-				for (i = 0; i < NPrivate::mdb_tls_nkeys; i++)
+				for (iTlsKey = 0; iTlsKey < NPrivate::g_nTlsKeys; iTlsKey++)
 				{
-					NPrivate::CMdbReader *r = (NPrivate::CMdbReader *)pthread_getspecific(NPrivate::mdb_tls_keys[i]);
-					if (r)
-						fg_EnvReaderDest(r);
+					NPrivate::CMdbReader *pReader = (NPrivate::CMdbReader *)pthread_getspecific(NPrivate::g_TlsKeys[iTlsKey]);
+					if (pReader)
+						fg_EnvReaderDest(pReader);
 				}
 				break;
 			case DLL_PROCESS_DETACH: break;

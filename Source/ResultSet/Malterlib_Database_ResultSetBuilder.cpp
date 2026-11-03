@@ -215,7 +215,7 @@ namespace NMib::NDatabase
 
 	void CResultSetBuilder::f_SetDescription(CResultSetDescription const &_Desc)
 	{
-		f_SetDescription(_Desc.m_lKeyPartTypes, _Desc.m_lKeyPartSubTypes, _Desc.m_lColumnTypes, _Desc.m_lColumnSubTypes);
+		f_SetDescription(_Desc.m_KeyPartTypes, _Desc.m_KeyPartSubTypes, _Desc.m_ColumnTypes, _Desc.m_ColumnSubTypes);
 	}
 
 	void CResultSetBuilder::f_AddMetadata(uint32 _ID, CResultMetadata &&_Data)
@@ -245,34 +245,34 @@ namespace NMib::NDatabase
 		{
 		case EResultDataType_CStr:
 			{
-				auto &lValues = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_CStr>();
+				auto &Values = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_CStr>();
 
-				lValues.f_Insert(_Value.f_Get<EResultDataType_CStr>());
-				iIndex = lValues.f_GetLen() - 1;
+				Values.f_Insert(_Value.f_Get<EResultDataType_CStr>());
+				iIndex = Values.f_GetLen() - 1;
 				break;
 			}
 		case EResultDataType_fp64:
 			{
-				auto &lValues = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_fp64>();
+				auto &Values = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_fp64>();
 
-				lValues.f_Insert(_Value.f_Get<EResultDataType_fp64>());
-				iIndex = lValues.f_GetLen() - 1;
+				Values.f_Insert(_Value.f_Get<EResultDataType_fp64>());
+				iIndex = Values.f_GetLen() - 1;
 				break;
 			}
 		case EResultDataType_uint64:
 			{
-				auto &lValues = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_uint64>();
+				auto &Values = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_uint64>();
 
-				lValues.f_Insert(_Value.f_Get<EResultDataType_uint64>());
-				iIndex = lValues.f_GetLen() - 1;
+				Values.f_Insert(_Value.f_Get<EResultDataType_uint64>());
+				iIndex = Values.f_GetLen() - 1;
 				break;
 			}
 		case EResultDataType_Binary:
 			{
-				auto &lValues = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_Binary>();
+				auto &Values = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_Binary>();
 
-				lValues.f_Insert(_Value.f_Get<EResultDataType_Binary>());
-				iIndex = lValues.f_GetLen() - 1;
+				Values.f_Insert(_Value.f_Get<EResultDataType_Binary>());
+				iIndex = Values.f_GetLen() - 1;
 				break;
 			}
 
@@ -290,40 +290,40 @@ namespace NMib::NDatabase
 		{
 		case EResultDataType_CStr:
 			{
-				auto &lValues = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_CStr>();
+				auto &Values = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_CStr>();
 
-				lValues.f_Clear();
+				Values.f_Clear();
 				for (auto const &CurValue : _Values)
-					lValues.f_Insert(CurValue.f_Get<EResultDataType_CStr>());
+					Values.f_Insert(CurValue.f_Get<EResultDataType_CStr>());
 				break;
 			}
 		case EResultDataType_fp64:
 			{
-				auto &lValues = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_fp64>();
+				auto &Values = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_fp64>();
 
-				lValues.f_Clear();
+				Values.f_Clear();
 				for (auto const &CurValue : _Values)
-					lValues.f_Insert(CurValue.f_Get<EResultDataType_fp64>());
+					Values.f_Insert(CurValue.f_Get<EResultDataType_fp64>());
 
 				break;
 			}
 		case EResultDataType_uint64:
 			{
-				auto &lValues = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_uint64>();
+				auto &Values = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_uint64>();
 
-				lValues.f_Clear();
+				Values.f_Clear();
 				for (auto const &CurValue : _Values)
-					lValues.f_Insert(CurValue.f_Get<EResultDataType_uint64>());
+					Values.f_Insert(CurValue.f_Get<EResultDataType_uint64>());
 
 				break;
 			}
 		case EResultDataType_Binary:
 			{
-				auto &lValues = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_Binary>();
+				auto &Values = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_Binary>();
 
-				lValues.f_Clear();
+				Values.f_Clear();
 				for (auto const &CurValue : _Values)
-					lValues.f_Insert(CurValue.f_Get<EResultDataType_Binary>());
+					Values.f_Insert(CurValue.f_Get<EResultDataType_Binary>());
 
 				break;
 			}

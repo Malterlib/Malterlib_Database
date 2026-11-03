@@ -70,9 +70,9 @@ namespace NMib::NDatabase
 		DMibRequire(_pData);
 
 		using namespace NPrivate;
-		CMdbCursor mc;
-		CMdbXCursor mx;
-		int exact = 0;
+		CMdbCursor Cursor;
+		CMdbXCursor XCursor;
+		int bExact = 0;
 		DKBuf;
 
 		DMibDatabaseTrace("===> get db {} key [{}]", _DatabaseID, DKey(_pKey));
@@ -82,20 +82,20 @@ namespace NMib::NDatabase
 
 		f_CheckBlocked();
 
-		fg_CursorInit(&mc, this, _DatabaseID, &mx);
+		fg_CursorInit(&Cursor, this, _DatabaseID, &XCursor);
 		{
-			int rc = fg_CursorSet(&mc, _pKey, _pData, EDatabaseCursorGet_Set, &exact);
-			if (rc)
+			int Result = fg_CursorSet(&Cursor, _pKey, _pData, EDatabaseCursorGet_Set, &bExact);
+			if (Result)
 			{
-				if (rc == DMdbNotFound)
+				if (Result == DMdbNotFound)
 					return false;
-				DMibError(NStr::fg_Format("Error setting data: {}", fg_StrError(rc)));
+				DMibError(NStr::fg_Format("Error setting data: {}", fg_StrError(Result)));
 			}
 		}
 		/* unref all the pages when DMibDatabase_Always64BitSupport - caller must copy the data
 		 * before doing anything else
 		 */
-		DMdbCursorUnref(&mc, 1);
+		DMdbCursorUnref(&Cursor, 1);
 		return true;
 	}
 
@@ -150,7 +150,7 @@ namespace NMib::NDatabase
 	{
 		DMibRequire(_pKey);
 		DMibRequire(_pData);
-		DMibRequire(!mt_env->f_IsInsideMemoryMap(_pKey->m_pData) && !mt_env->f_IsInsideMemoryMap(_pData->m_pData))
+		DMibRequire(!m_pEnvironment->f_IsInsideMemoryMap(_pKey->m_pData) && !m_pEnvironment->f_IsInsideMemoryMap(_pData->m_pData))
 			("You cannot use a value from the database in a database write. The database can change the value while writing, corrupting the database.")
 		;
 		using namespace NPrivate;
@@ -177,19 +177,19 @@ namespace NMib::NDatabase
 
 		f_CheckBlocked();
 
-		if (mt_flags & (DMdbTxnReadOnly))
+		if (m_Flags & (DMdbTxnReadOnly))
 			DMibError("Trying to write to read only transaction");
 
-		CMdbCursor mc;
-		CMdbXCursor mx;
+		CMdbCursor Cursor;
+		CMdbXCursor XCursor;
 
-		fg_CursorInit(&mc, this, _DatabaseID, &mx);
-		mc.mc_next = mt_cursors[_DatabaseID];
-		mt_cursors[_DatabaseID] = &mc;
-		int rc = fg_CursorPut(&mc, _pKey, _pData, _WriteFlags);
-		mt_cursors[_DatabaseID] = mc.mc_next;
-		if (rc)
-			DMibError(NStr::fg_Format("Error putting data: {}", fg_StrError(rc)));
+		fg_CursorInit(&Cursor, this, _DatabaseID, &XCursor);
+		Cursor.m_pNext = m_pCursors[_DatabaseID];
+		m_pCursors[_DatabaseID] = &Cursor;
+		int Result = fg_CursorPut(&Cursor, _pKey, _pData, _WriteFlags);
+		m_pCursors[_DatabaseID] = Cursor.m_pNext;
+		if (Result)
+			DMibError(NStr::fg_Format("Error putting data: {}", fg_StrError(Result)));
 	}
 
 	/** @brief Delete items from a database.
@@ -224,18 +224,18 @@ namespace NMib::NDatabase
 
 		f_CheckBlocked();
 
-		if (mt_flags & (DMdbTxnReadOnly))
+		if (m_Flags & (DMdbTxnReadOnly))
 			DMibError("Trying to write to read only transaction");
 
-		if (!DFIsSet(mt_dbs[_DatabaseID].md_flags, EDatabaseSubFlag_SortedDuplicates))
+		if (!DFIsSet(m_pDatabases[_DatabaseID].m_Flags, EDatabaseSubFlag_SortedDuplicates))
 		{
 			/* must ignore any data */
 			_pData = nullptr;
 		}
 
-		int rc = fg_Del0(this, _DatabaseID, _pKey, _pData, EDatabaseWriteFlag_None);
-		if (rc)
-			DMibError(NStr::fg_Format("Error deleting: {}", fg_StrError(rc)));
+		int Result = fg_Del0(this, _DatabaseID, _pKey, _pData, EDatabaseWriteFlag_None);
+		if (Result)
+			DMibError(NStr::fg_Format("Error deleting: {}", fg_StrError(Result)));
 	}
 
 	/** @brief Compare two data items according to a particular database.
@@ -250,7 +250,7 @@ namespace NMib::NDatabase
 	 */
 	int CDatabaseTransactionCommon::CInternal::f_KeyCompare(CDatabaseSubID _DatabaseID, CDatabaseValue const *_pLeft, CDatabaseValue const *_pRight)
 	{
-		return mt_dbxs[_DatabaseID].m_fKeyCompare(*_pLeft, *_pRight);
+		return m_pDatabaseInfos[_DatabaseID].m_fKeyCompare(*_pLeft, *_pRight);
 	}
 
 	/** @brief Compare two data items according to a particular database.
@@ -265,9 +265,9 @@ namespace NMib::NDatabase
 	 */
 	int CDatabaseTransactionCommon::CInternal::f_DataCompare(CDatabaseSubID _DatabaseID, CDatabaseValue const *_pLeft, CDatabaseValue const *_pRight)
 	{
-		FDatabaseCompare const &DataCompare = mt_dbxs[_DatabaseID].m_fDataCompare;
+		FDatabaseCompare const &DataCompare = m_pDatabaseInfos[_DatabaseID].m_fDataCompare;
 #if DMibPPtrBits > 32 || defined(DMibDatabase_Always64BitSupport)
-		if (_pLeft->m_Size == sizeof(CDatabaseOffset) && DataCompare == NPrivate::g_mdb_cmp_int)
+		if (_pLeft->m_Size == sizeof(CDatabaseOffset) && DataCompare == NPrivate::g_fCompareInt)
 			return NPrivate::g_mdb_cmp_clong(*_pLeft, *_pRight);
 #endif
 		return DataCompare(*_pLeft, *_pRight);
@@ -279,32 +279,32 @@ namespace NMib::NDatabase
 
 	int NPrivate::fg_Del0(CMdbTxn *_pTransaction, CDatabaseSubID _DatabaseID, CDatabaseValue const *_pKey, CDatabaseValue const *_pData, EDatabaseWriteFlag _Flags)
 	{
-		CMdbCursor mc;
-		CMdbXCursor mx;
-		EDatabaseCursorGet op;
-		CDatabaseValue rdata, *xdata;
-		int rc, exact = 0;
+		CMdbCursor Cursor;
+		CMdbXCursor XCursor;
+		EDatabaseCursorGet Operation;
+		CDatabaseValue DataCopy, *pMatchData;
+		int Result, bExact = 0;
 		DKBuf;
 
 		DMibDatabaseTrace("====> delete db {} key [{}]", _DatabaseID, DKey(_pKey));
 
-		fg_CursorInit(&mc, _pTransaction, _DatabaseID, &mx);
+		fg_CursorInit(&Cursor, _pTransaction, _DatabaseID, &XCursor);
 
 		if (_pData)
 		{
-			op = EDatabaseCursorGet_GetBoth;
-			rdata = *_pData;
-			xdata = &rdata;
+			Operation = EDatabaseCursorGet_GetBoth;
+			DataCopy = *_pData;
+			pMatchData = &DataCopy;
 		}
 		else
 		{
-			op = EDatabaseCursorGet_Set;
-			xdata = nullptr;
+			Operation = EDatabaseCursorGet_Set;
+			pMatchData = nullptr;
 			_Flags |= EDatabaseWriteFlag_NoDuplicateData;
 		}
 		auto Key = *_pKey;
-		rc = fg_CursorSet(&mc, &Key, xdata, op, &exact);
-		if (rc == 0)
+		Result = fg_CursorSet(&Cursor, &Key, pMatchData, Operation, &bExact);
+		if (Result == 0)
 		{
 			/* let fg_PageSplit know about this cursor if needed:
 			 * delete will trigger a rebalance; if it needs to move
@@ -314,11 +314,11 @@ namespace NMib::NDatabase
 			 * run out of space, triggering a split. We need this
 			 * cursor to be consistent until the end of the rebalance.
 			 */
-			mc.mc_next = _pTransaction->mt_cursors[_DatabaseID];
-			_pTransaction->mt_cursors[_DatabaseID] = &mc;
-			rc = fg_CursorDel(&mc, _Flags);
-			_pTransaction->mt_cursors[_DatabaseID] = mc.mc_next;
+			Cursor.m_pNext = _pTransaction->m_pCursors[_DatabaseID];
+			_pTransaction->m_pCursors[_DatabaseID] = &Cursor;
+			Result = fg_CursorDel(&Cursor, _Flags);
+			_pTransaction->m_pCursors[_DatabaseID] = Cursor.m_pNext;
 		}
-		return rc;
+		return Result;
 	}
 }

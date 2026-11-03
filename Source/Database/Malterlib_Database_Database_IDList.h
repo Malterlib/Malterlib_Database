@@ -69,9 +69,9 @@ namespace NMib::NDatabase::NPrivate
 	/** Append ID to IDL. The IDL must be big enough. */
 	inline_always void fg_MidlXAppend(CMdbIdl _pIDs, CMdbId _ID)
 	{
-		CMdbId *xidl = _pIDs;
-		CMdbId xlen = ++xidl[0];
-		xidl[xlen] = _ID;
+		CMdbId *pIDs = _pIDs;
+		CMdbId nIDs = ++pIDs[0];
+		pIDs[nIDs] = _ID;
 	}
 
 	/** Search for an ID in an IDL.
@@ -142,21 +142,21 @@ namespace NMib::NDatabase::NPrivate
 	 */
 	struct CMdbId2
 	{
-		CMdbId mid; ///< The ID
-		void *mptr; ///< The pointer
+		CMdbId m_ID;    ///< The ID
+		void *m_pValue; ///< The pointer
 	};
 
 	/** An ID2L is an ID2 List, a sorted array of ID2s.
-	 * The first element's \b mid member is a count of how many actual
-	 * elements are in the array. The \b mptr member of the first element is unused.
-	 * The array is sorted in ascending order by \b mid.
+	 * The first element's \b m_ID member is a count of how many actual
+	 * elements are in the array. The \b m_pValue member of the first element is unused.
+	 * The array is sorted in ascending order by \b m_ID.
 	 */
 	typedef CMdbId2 *CMdbId2L;
 
 	/** Search for an ID in an ID2L.
 	 * @param[in] _pIDs	The ID2L to search.
 	 * @param[in] _ID	The ID to search for.
-	 * @return	The index of the first ID2 whose \b mid member is greater than or equal to \b _ID.
+	 * @return	The index of the first ID2 whose \b m_ID member is greater than or equal to \b _ID.
 	 */
 	unsigned fg_Mid2lSearch(CMdbId2L _pIDs, CMdbId _ID);
 
@@ -177,10 +177,10 @@ namespace NMib::NDatabase::NPrivate
 #ifdef DMibDatabase_Always64BitSupport
 	struct MDB_ID3
 	{
-		CMdbId mid;  ///< The ID
-		void *mptr;  ///< The pointer
-		uint32 mcnt; ///< Number of pages
-		uint32 mref; ///< Refcounter
+		CMdbId m_ID;          ///< The ID
+		void *m_pValue;       ///< The pointer
+		uint32 m_nPages;      ///< Number of pages
+		uint32 m_nReferences; ///< Refcounter
 	};
 
 	typedef MDB_ID3 *MDB_ID3L;

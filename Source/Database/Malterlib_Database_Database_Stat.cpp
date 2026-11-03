@@ -48,12 +48,12 @@ namespace NMib::NDatabase
 	CDatabaseStatistics DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_DatabaseStatistics(CMdbDb *_pDatabase)
 	{
 		CDatabaseStatistics Stats;
-		Stats.m_PageSize = me_psize;
-		Stats.m_BTreeDepth = _pDatabase->md_depth;
-		Stats.m_nBranchPages = _pDatabase->md_branch_pages;
-		Stats.m_nLeafPages = _pDatabase->md_leaf_pages;
-		Stats.m_nOverflowPages = _pDatabase->md_overflow_pages;
-		Stats.m_nDataItems = _pDatabase->md_entries;
+		Stats.m_PageSize = m_PageSize;
+		Stats.m_BTreeDepth = _pDatabase->m_Depth;
+		Stats.m_nBranchPages = _pDatabase->m_nBranchPages;
+		Stats.m_nLeafPages = _pDatabase->m_nLeafPages;
+		Stats.m_nOverflowPages = _pDatabase->m_nOverflowPages;
+		Stats.m_nDataItems = _pDatabase->m_nEntries;
 
 		return Stats;
 	}
@@ -61,9 +61,9 @@ namespace NMib::NDatabase
 	CDatabaseSizeStatistics DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_SizeStatistics(CMdbDb *_pDatabase)
 	{
 		CDatabaseSizeStatistics Stats;
-		Stats.m_UsedBytes = (_pDatabase->md_branch_pages + _pDatabase->md_leaf_pages + _pDatabase->md_overflow_pages) * me_psize;
+		Stats.m_UsedBytes = (_pDatabase->m_nBranchPages + _pDatabase->m_nLeafPages + _pDatabase->m_nOverflowPages) * m_PageSize;
 		Stats.m_MapSize = m_MapSize;
-		Stats.m_PageSize = me_psize;
+		Stats.m_PageSize = m_PageSize;
 
 		return Stats;
 	}
@@ -71,13 +71,13 @@ namespace NMib::NDatabase
 	CDatabaseEnvironmentInfo CDatabaseEnvironment_Internal::f_EnvironmentInfo()
 	{
 		using namespace NPrivate;
-		CMdbMeta *meta;
+		CMdbMeta *pMeta;
 		CDatabaseEnvironmentInfo Info;
 
-		meta = f_PickMeta();
-		Info.m_pMapAddress = meta->mm_address;
-		Info.m_LastPageID = meta->mm_last_pg;
-		Info.m_LastCommittedTransactionID = meta->mm_txnid.f_Load(NAtomic::gc_MemoryOrder_Relaxed);
+		pMeta = f_PickMeta();
+		Info.m_pMapAddress = pMeta->m_pAddress;
+		Info.m_LastPageID = pMeta->m_LastPageNumber;
+		Info.m_LastCommittedTransactionID = pMeta->m_TransactionID.f_Load(NAtomic::gc_MemoryOrder_Relaxed);
 
 		Info.m_MapSize = m_MapSize;
 		Info.m_MaxReaders = m_MaxReaders;

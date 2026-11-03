@@ -95,7 +95,7 @@ namespace NMib::NDatabase
 	{
 		DMibRequire(_pKey);
 		DMibRequire(_pData);
-		DMibRequire(!mc_txn->mt_env->f_IsInsideMemoryMap(_pKey->m_pData) && !mc_txn->mt_env->f_IsInsideMemoryMap(_pData->m_pData))
+		DMibRequire(!m_pTransaction->m_pEnvironment->f_IsInsideMemoryMap(_pKey->m_pData) && !m_pTransaction->m_pEnvironment->f_IsInsideMemoryMap(_pData->m_pData))
 			("You cannot use a value from the database in a database write. The database can change the value while writing, corrupting the database.")
 		;
 
@@ -118,12 +118,12 @@ namespace NMib::NDatabase
 			DMibError("Invalid flags");
 		}
 
-		if (mc_txn->mt_flags & (DMdbTxnReadOnly))
+		if (m_pTransaction->m_Flags & (DMdbTxnReadOnly))
 			DMibError("Trying to write to read only transaction");
 
-		int rc = fg_CursorPut(this, _pKey, _pData, _WriteFlags);
-		if (rc)
-			DMibError(NStr::fg_Format("Error putting data: {}", fg_StrError(rc)));
+		int Result = fg_CursorPut(this, _pKey, _pData, _WriteFlags);
+		if (Result)
+			DMibError(NStr::fg_Format("Error putting data: {}", fg_StrError(Result)));
 	}
 
 	void CDatabaseCursorCommon::CInternal::f_Delete(EDatabaseWriteFlag _WriteFlags)
@@ -133,12 +133,12 @@ namespace NMib::NDatabase
 		if (_WriteFlags & ~(EDatabaseWriteFlag_NoDuplicateData))
 			DMibError("Invalid flags");
 
-		if (mc_txn->mt_flags & (DMdbTxnReadOnly))
+		if (m_pTransaction->m_Flags & (DMdbTxnReadOnly))
 			DMibError("Trying to delete in read only transaction");
 
-		int rc = fg_CursorDel(this, _WriteFlags);
-		if (rc)
-			DMibError(NStr::fg_Format("Error deleting data: {}", fg_StrError(rc)));
+		int Result = fg_CursorDel(this, _WriteFlags);
+		if (Result)
+			DMibError(NStr::fg_Format("Error deleting data: {}", fg_StrError(Result)));
 	}
 
 	CDatabaseOffset CDatabaseCursorCommon::CInternal::f_CountDuplicates()
@@ -146,9 +146,9 @@ namespace NMib::NDatabase
 		using namespace NPrivate;
 
 		CDatabaseOffset Ret;
-		int rc = fg_CursorCount(this, &Ret);
-		if (rc)
-			DMibError(NStr::fg_Format("Error counting duplicates: {}", fg_StrError(rc)));
+		int Result = fg_CursorCount(this, &Ret);
+		if (Result)
+			DMibError(NStr::fg_Format("Error counting duplicates: {}", fg_StrError(Result)));
 		return Ret;
 	}
 
@@ -572,36 +572,36 @@ namespace NMib::NDatabase
 	{
 		using namespace NPrivate;
 
-		CMdbCursor *mc;
-		umint size = sizeof(CMdbCursor);
+		CMdbCursor *pCursor;
+		umint Size = sizeof(CMdbCursor);
 
 		if (!DTxnDbiExist(this, _DatabaseID, DDbValid))
 			DMibError("Database does not exists");
 
 		f_CheckBlocked();
 
-		if (_DatabaseID == DFreeDbi && !DFIsSet(mt_flags, DMdbTxnReadOnly))
+		if (_DatabaseID == DFreeDbi && !DFIsSet(m_Flags, DMdbTxnReadOnly))
 			DMibError("Cannot open free database as read/write");
 
-		if (mt_dbs[_DatabaseID].md_flags & EDatabaseSubFlag_SortedDuplicates)
-			size += sizeof(CMdbXCursor);
+		if (m_pDatabases[_DatabaseID].m_Flags & EDatabaseSubFlag_SortedDuplicates)
+			Size += sizeof(CMdbXCursor);
 
-		mc = (CMdbCursor *)NMemory::fg_Alloc(size);
+		pCursor = (CMdbCursor *)NMemory::fg_Alloc(Size);
 		auto Cleanup = g_OnScopeExit / [&]()
 			{
-				fg_CursorClose(mc);
+				fg_CursorClose(pCursor);
 			}
 		;
-		fg_CursorInit(mc, this, _DatabaseID, (CMdbXCursor *)(mc + 1));
-		if (mt_cursors)
+		fg_CursorInit(pCursor, this, _DatabaseID, (CMdbXCursor *)(pCursor + 1));
+		if (m_pCursors)
 		{
-			mc->mc_next = mt_cursors[_DatabaseID];
-			mt_cursors[_DatabaseID] = mc;
-			mc->mc_flags |= DCUntrack;
+			pCursor->m_pNext = m_pCursors[_DatabaseID];
+			m_pCursors[_DatabaseID] = pCursor;
+			pCursor->m_Flags |= DCUntrack;
 		}
 
 		Cleanup.f_Clear();
-		return mc;
+		return pCursor;
 	}
 }
 
@@ -617,22 +617,22 @@ namespace NMib::NDatabase::NPrivate
 	{
 		if (_pCursor)
 			DMdbCursorUnref(_pCursor, 0);
-		if (_pCursor && !_pCursor->mc_backup)
+		if (_pCursor && !_pCursor->m_pBackup)
 		{
 			/* Remove from txn, if tracked.
 			 * A read-only txn (!DCUntrack) may have been freed already,
 			 * so do not peek inside it.  Only write txns track cursors.
 			 */
-			if ((_pCursor->mc_flags & DCUntrack) && _pCursor->mc_txn->mt_cursors)
+			if ((_pCursor->m_Flags & DCUntrack) && _pCursor->m_pTransaction->m_pCursors)
 			{
-				CMdbCursor **prev = &_pCursor->mc_txn->mt_cursors[_pCursor->mc_dbi];
-				while (*prev && *prev != _pCursor)
-					prev = &(*prev)->mc_next;
-				if (*prev == _pCursor)
-					*prev = _pCursor->mc_next;
+				CMdbCursor **pPrevious = &_pCursor->m_pTransaction->m_pCursors[_pCursor->m_DatabaseID];
+				while (*pPrevious && *pPrevious != _pCursor)
+					pPrevious = &(*pPrevious)->m_pNext;
+				if (*pPrevious == _pCursor)
+					*pPrevious = _pCursor->m_pNext;
 			}
 			umint Size = sizeof(CMdbCursor);
-			if (_pCursor->mc_xcursor)
+			if (_pCursor->m_pXCursor)
 				Size += sizeof(CMdbXCursor);
 
 			NMemory::fg_Free(_pCursor, Size);
@@ -662,46 +662,46 @@ namespace NMib::NDatabase::NPrivate
 	{
 		using namespace NPrivate;
 
-		int rc;
-		int exact = 0;
-		int (*mfunc)(CMdbCursor *_pCursor, CDatabaseValue *_pKey, CDatabaseValue *_pData);
+		int Result;
+		int bExact = 0;
+		int (*fMove)(CMdbCursor *_pCursor, CDatabaseValue *_pKey, CDatabaseValue *_pData);
 
 		if (_pCursor == nullptr)
 			return EINVAL;
 
-		_pCursor->mc_txn->f_CheckBlocked();
+		_pCursor->m_pTransaction->f_CheckBlocked();
 
 		switch (_Operation)
 		{
 		case EDatabaseCursorGet_GetCurrent:
-			if (!(_pCursor->mc_flags & DCInitialized))
-				rc = EINVAL;
+			if (!(_pCursor->m_Flags & DCInitialized))
+				Result = EINVAL;
 			else
 			{
-				CMdbPage *mp = _pCursor->mc_pg[_pCursor->mc_top];
-				int nkeys = DNumKeys(mp);
-				if (!nkeys || _pCursor->mc_ki[_pCursor->mc_top] >= nkeys)
+				CMdbPage *pPage = _pCursor->m_Pages[_pCursor->m_iTop];
+				int nKeys = DNumKeys(pPage);
+				if (!nKeys || _pCursor->m_NodeIndices[_pCursor->m_iTop] >= nKeys)
 				{
-					_pCursor->mc_ki[_pCursor->mc_top] = nkeys;
-					rc = DMdbNotFound;
+					_pCursor->m_NodeIndices[_pCursor->m_iTop] = nKeys;
+					Result = DMdbNotFound;
 					break;
 				}
-				rc = DMdbSuccess;
-				if (DIsLeaf2(mp))
+				Result = DMdbSuccess;
+				if (DIsLeaf2(pPage))
 				{
-					_pKey->m_Size = _pCursor->mc_db->md_pad;
-					_pKey->m_pData = DLeaf2Key(mp, _pCursor->mc_ki[_pCursor->mc_top], _pKey->m_Size);
+					_pKey->m_Size = _pCursor->m_pDatabase->m_Pad;
+					_pKey->m_pData = DLeaf2Key(pPage, _pCursor->m_NodeIndices[_pCursor->m_iTop], _pKey->m_Size);
 				}
 				else
 				{
-					CMdbNode *leaf = DNodePtr(mp, _pCursor->mc_ki[_pCursor->mc_top]);
-					DMdbGetKey(leaf, _pKey);
+					CMdbNode *pLeaf = DNodePtr(pPage, _pCursor->m_NodeIndices[_pCursor->m_iTop]);
+					DMdbGetKey(pLeaf, _pKey);
 					if (_pData)
 					{
-						if (DFIsSet(leaf->mn_flags, DFDupData))
-							rc = fg_CursorGet(&_pCursor->mc_xcursor->mx_cursor, _pData, nullptr, EDatabaseCursorGet_GetCurrent);
+						if (DFIsSet(pLeaf->m_Flags, DFDupData))
+							Result = fg_CursorGet(&_pCursor->m_pXCursor->m_Cursor, _pData, nullptr, EDatabaseCursorGet_GetCurrent);
 						else
-							rc = fg_NodeRead(_pCursor, leaf, _pData);
+							Result = fg_NodeRead(_pCursor, pLeaf, _pData);
 					}
 				}
 			}
@@ -710,12 +710,12 @@ namespace NMib::NDatabase::NPrivate
 		case EDatabaseCursorGet_GetBothRange:
 			if (_pData == nullptr)
 			{
-				rc = EINVAL;
+				Result = EINVAL;
 				break;
 			}
-			if (_pCursor->mc_xcursor == nullptr)
+			if (_pCursor->m_pXCursor == nullptr)
 			{
-				rc = DMdbIncompatible;
+				Result = DMdbIncompatible;
 				break;
 			}
 			/* FALLTHRU */
@@ -723,139 +723,139 @@ namespace NMib::NDatabase::NPrivate
 		case EDatabaseCursorGet_SetKey:
 		case EDatabaseCursorGet_SetRange:
 			if (_pKey == nullptr)
-				rc = EINVAL;
+				Result = EINVAL;
 			else
-				rc = fg_CursorSet(_pCursor, _pKey, _pData, _Operation, _Operation == EDatabaseCursorGet_SetRange ? nullptr : &exact);
+				Result = fg_CursorSet(_pCursor, _pKey, _pData, _Operation, _Operation == EDatabaseCursorGet_SetRange ? nullptr : &bExact);
 			break;
 		case EDatabaseCursorGet_GetMultiple:
-			if (_pData == nullptr || !(_pCursor->mc_flags & DCInitialized))
+			if (_pData == nullptr || !(_pCursor->m_Flags & DCInitialized))
 			{
-				rc = EINVAL;
+				Result = EINVAL;
 				break;
 			}
-			if (!(_pCursor->mc_db->md_flags & EDatabaseSubFlag_SortedDuplicatesFixedSize))
+			if (!(_pCursor->m_pDatabase->m_Flags & EDatabaseSubFlag_SortedDuplicatesFixedSize))
 			{
-				rc = DMdbIncompatible;
+				Result = DMdbIncompatible;
 				break;
 			}
-			rc = DMdbSuccess;
-			if (!(_pCursor->mc_xcursor->mx_cursor.mc_flags & DCInitialized) || (_pCursor->mc_xcursor->mx_cursor.mc_flags & DCEof))
+			Result = DMdbSuccess;
+			if (!(_pCursor->m_pXCursor->m_Cursor.m_Flags & DCInitialized) || (_pCursor->m_pXCursor->m_Cursor.m_Flags & DCEof))
 				break;
 			goto fetchm;
 		case EDatabaseCursorGet_NextMultiple:
 			if (_pData == nullptr)
 			{
-				rc = EINVAL;
+				Result = EINVAL;
 				break;
 			}
-			if (!(_pCursor->mc_db->md_flags & EDatabaseSubFlag_SortedDuplicatesFixedSize))
+			if (!(_pCursor->m_pDatabase->m_Flags & EDatabaseSubFlag_SortedDuplicatesFixedSize))
 			{
-				rc = DMdbIncompatible;
+				Result = DMdbIncompatible;
 				break;
 			}
-			rc = fg_CursorNext(_pCursor, _pKey, _pData, EDatabaseCursorGet_NextDup);
-			if (rc == DMdbSuccess)
+			Result = fg_CursorNext(_pCursor, _pKey, _pData, EDatabaseCursorGet_NextDup);
+			if (Result == DMdbSuccess)
 			{
-				if (_pCursor->mc_xcursor->mx_cursor.mc_flags & DCInitialized)
+				if (_pCursor->m_pXCursor->m_Cursor.m_Flags & DCInitialized)
 				{
-					CMdbCursor *mx;
+					CMdbCursor *pSubCursor;
 				fetchm:
-					mx = &_pCursor->mc_xcursor->mx_cursor;
-					_pData->m_Size = DNumKeys(mx->mc_pg[mx->mc_top]) * mx->mc_db->md_pad;
-					_pData->m_pData = DMetaData(mx->mc_pg[mx->mc_top]);
-					mx->mc_ki[mx->mc_top] = DNumKeys(mx->mc_pg[mx->mc_top]) - 1;
+					pSubCursor = &_pCursor->m_pXCursor->m_Cursor;
+					_pData->m_Size = DNumKeys(pSubCursor->m_Pages[pSubCursor->m_iTop]) * pSubCursor->m_pDatabase->m_Pad;
+					_pData->m_pData = DMetaData(pSubCursor->m_Pages[pSubCursor->m_iTop]);
+					pSubCursor->m_NodeIndices[pSubCursor->m_iTop] = DNumKeys(pSubCursor->m_Pages[pSubCursor->m_iTop]) - 1;
 				}
 				else
-					rc = DMdbNotFound;
+					Result = DMdbNotFound;
 			}
 			break;
 		case EDatabaseCursorGet_PrevMultiple:
 			if (_pData == nullptr)
 			{
-				rc = EINVAL;
+				Result = EINVAL;
 				break;
 			}
-			if (!(_pCursor->mc_db->md_flags & EDatabaseSubFlag_SortedDuplicatesFixedSize))
+			if (!(_pCursor->m_pDatabase->m_Flags & EDatabaseSubFlag_SortedDuplicatesFixedSize))
 			{
-				rc = DMdbIncompatible;
+				Result = DMdbIncompatible;
 				break;
 			}
-			if (!(_pCursor->mc_flags & DCInitialized))
-				rc = fg_CursorLast(_pCursor, _pKey, _pData);
+			if (!(_pCursor->m_Flags & DCInitialized))
+				Result = fg_CursorLast(_pCursor, _pKey, _pData);
 			else
-				rc = DMdbSuccess;
-			if (rc == DMdbSuccess)
+				Result = DMdbSuccess;
+			if (Result == DMdbSuccess)
 			{
-				CMdbCursor *mx = &_pCursor->mc_xcursor->mx_cursor;
-				if (mx->mc_flags & DCInitialized)
+				CMdbCursor *pSubCursor = &_pCursor->m_pXCursor->m_Cursor;
+				if (pSubCursor->m_Flags & DCInitialized)
 				{
-					rc = fg_CursorSibling(mx, 0);
-					if (rc == DMdbSuccess)
+					Result = fg_CursorSibling(pSubCursor, 0);
+					if (Result == DMdbSuccess)
 						goto fetchm;
 				}
 				else
-					rc = DMdbNotFound;
+					Result = DMdbNotFound;
 			}
 			break;
 		case EDatabaseCursorGet_Next:
 		case EDatabaseCursorGet_NextDup:
 		case EDatabaseCursorGet_NextNoDup:
-			rc = fg_CursorNext(_pCursor, _pKey, _pData, _Operation);
+			Result = fg_CursorNext(_pCursor, _pKey, _pData, _Operation);
 			break;
 		case EDatabaseCursorGet_Prev:
 		case EDatabaseCursorGet_PrevDup:
 		case EDatabaseCursorGet_PrevNoDup:
-			rc = fg_CursorPrev(_pCursor, _pKey, _pData, _Operation);
+			Result = fg_CursorPrev(_pCursor, _pKey, _pData, _Operation);
 			break;
-		case EDatabaseCursorGet_First: rc = fg_CursorFirst(_pCursor, _pKey, _pData); break;
-		case EDatabaseCursorGet_FirstDup: mfunc = fg_CursorFirst;
+		case EDatabaseCursorGet_First: Result = fg_CursorFirst(_pCursor, _pKey, _pData); break;
+		case EDatabaseCursorGet_FirstDup: fMove = fg_CursorFirst;
 		mmove:
-			if (_pData == nullptr || !(_pCursor->mc_flags & DCInitialized))
+			if (_pData == nullptr || !(_pCursor->m_Flags & DCInitialized))
 			{
-				rc = EINVAL;
+				Result = EINVAL;
 				break;
 			}
-			if (_pCursor->mc_xcursor == nullptr)
+			if (_pCursor->m_pXCursor == nullptr)
 			{
-				rc = DMdbIncompatible;
+				Result = DMdbIncompatible;
 				break;
 			}
-			if (_pCursor->mc_ki[_pCursor->mc_top] >= DNumKeys(_pCursor->mc_pg[_pCursor->mc_top]))
+			if (_pCursor->m_NodeIndices[_pCursor->m_iTop] >= DNumKeys(_pCursor->m_Pages[_pCursor->m_iTop]))
 			{
-				_pCursor->mc_ki[_pCursor->mc_top] = DNumKeys(_pCursor->mc_pg[_pCursor->mc_top]);
-				rc = DMdbNotFound;
+				_pCursor->m_NodeIndices[_pCursor->m_iTop] = DNumKeys(_pCursor->m_Pages[_pCursor->m_iTop]);
+				Result = DMdbNotFound;
 				break;
 			}
 			{
-				CMdbNode *leaf = DNodePtr(_pCursor->mc_pg[_pCursor->mc_top], _pCursor->mc_ki[_pCursor->mc_top]);
-				if (!DFIsSet(leaf->mn_flags, DFDupData))
+				CMdbNode *pLeaf = DNodePtr(_pCursor->m_Pages[_pCursor->m_iTop], _pCursor->m_NodeIndices[_pCursor->m_iTop]);
+				if (!DFIsSet(pLeaf->m_Flags, DFDupData))
 				{
-					DMdbGetKey(leaf, _pKey);
-					rc = fg_NodeRead(_pCursor, leaf, _pData);
+					DMdbGetKey(pLeaf, _pKey);
+					Result = fg_NodeRead(_pCursor, pLeaf, _pData);
 					break;
 				}
 			}
-			if (!(_pCursor->mc_xcursor->mx_cursor.mc_flags & DCInitialized))
+			if (!(_pCursor->m_pXCursor->m_Cursor.m_Flags & DCInitialized))
 			{
-				rc = EINVAL;
+				Result = EINVAL;
 				break;
 			}
-			rc = mfunc(&_pCursor->mc_xcursor->mx_cursor, _pData, nullptr);
+			Result = fMove(&_pCursor->m_pXCursor->m_Cursor, _pData, nullptr);
 			break;
-		case EDatabaseCursorGet_Last: rc = fg_CursorLast(_pCursor, _pKey, _pData); break;
+		case EDatabaseCursorGet_Last: Result = fg_CursorLast(_pCursor, _pKey, _pData); break;
 		case EDatabaseCursorGet_LastDup:
-			mfunc = fg_CursorLast;
+			fMove = fg_CursorLast;
 			goto mmove;
 		default:
 			DMibDatabaseTrace("Unhandled/unimplemented cursor operation {}", _Operation);
-			rc = EINVAL;
+			Result = EINVAL;
 			break;
 		}
 
-		if (_pCursor->mc_flags & DCDel)
-			_pCursor->mc_flags ^= DCDel;
+		if (_pCursor->m_Flags & DCDel)
+			_pCursor->m_Flags ^= DCDel;
 
-		return rc;
+		return Result;
 	}
 
 	/** @brief Store by cursor.
@@ -919,439 +919,445 @@ namespace NMib::NDatabase::NPrivate
 	 */
 	int fg_CursorPut(CMdbCursor *_pCursor, CDatabaseValue *_pKey, CDatabaseValue *_pData, EDatabaseWriteFlag _Flags)
 	{
-		uint32 flags = _Flags;
+		uint32 Flags = _Flags;
 		using namespace NPrivate;
-		CMdbEnv *env;
-		CMdbNode *leaf = nullptr;
-		CMdbPage *fp, *mp, *sub_root = nullptr;
-		uint16 fp_flags;
-		CDatabaseValue xdata, *rdata, dkey, olddata;
-		CMdbDb dummy;
-		int do_sub = 0, insert_key, insert_data;
-		uint32 mcount = 0, dcount = 0, nospill;
-		umint nsize;
-		int rc, rc2;
-		uint32 nflags;
+		CMdbEnv *pEnvironment;
+		CMdbNode *pLeaf = nullptr;
+		CMdbPage *pSubPage, *pPage, *pSubRoot = nullptr;
+		uint16 SubPageFlags;
+		CDatabaseValue NodeData, *pNodeData, DuplicateKey, OldData;
+		CMdbDb DummyDatabase;
+		int bDoSub = 0, bInsertKey, bInsertData;
+		uint32 nPutItems = 0, nDataItems = 0, bNoSpill;
+		umint NodeSize;
+		int Result, Result2;
+		uint32 NodeFlags;
 		DKBuf;
 
 		if (_pCursor == nullptr || _pKey == nullptr)
 			return EINVAL;
 
-		env = _pCursor->mc_txn->mt_env;
+		pEnvironment = _pCursor->m_pTransaction->m_pEnvironment;
 
 		/* Check this first so counter will always be zero on any
 		 * early failures.
 		 */
-		if (flags & EDatabaseWriteFlag_BatchDuplicateData)
+		if (Flags & EDatabaseWriteFlag_BatchDuplicateData)
 		{
-			dcount = _pData[1].m_Size;
+			nDataItems = _pData[1].m_Size;
 			_pData[1].m_Size = 0;
-			if (!DFIsSet(_pCursor->mc_db->md_flags, EDatabaseSubFlag_SortedDuplicatesFixedSize))
+			if (!DFIsSet(_pCursor->m_pDatabase->m_Flags, EDatabaseSubFlag_SortedDuplicatesFixedSize))
 				return DMdbIncompatible;
 		}
 
-		nospill = flags & DMdbNoSpill;
-		flags &= ~DMdbNoSpill;
+		bNoSpill = Flags & DMdbNoSpill;
+		Flags &= ~DMdbNoSpill;
 
-		_pCursor->mc_txn->f_CheckBlocked();
+		_pCursor->m_pTransaction->f_CheckBlocked();
 
-		if (_pCursor->mc_txn->mt_flags & (DMdbTxnReadOnly))
+		if (_pCursor->m_pTransaction->m_Flags & (DMdbTxnReadOnly))
 			return EACCES;
 
-		if (_pKey->m_Size - 1 >= DEnvMaxkey(env))
+		if (_pKey->m_Size - 1 >= DEnvMaxkey(pEnvironment))
 			return DMdbBadValsize;
 
 #if SIZE_MAX > DMaxDataSize
-		if (_pData->m_Size > ((_pCursor->mc_db->md_flags & EDatabaseSubFlag_SortedDuplicates) ? DEnvMaxkey(env) : DMaxDataSize))
+		if (_pData->m_Size > ((_pCursor->m_pDatabase->m_Flags & EDatabaseSubFlag_SortedDuplicates) ? DEnvMaxkey(pEnvironment) : DMaxDataSize))
 			return DMdbBadValsize;
 #else
-		if ((_pCursor->mc_db->md_flags & EDatabaseSubFlag_SortedDuplicates) && _pData->m_Size > DEnvMaxkey(env))
+		if ((_pCursor->m_pDatabase->m_Flags & EDatabaseSubFlag_SortedDuplicates) && _pData->m_Size > DEnvMaxkey(pEnvironment))
 			return DMdbBadValsize;
 #endif
 
 		DMibDatabaseTrace("==> put db {} key [{}], size {}, data size {}", DDbi(_pCursor), DKey(_pKey), _pKey ? _pKey->m_Size : 0, _pData->m_Size);
 
-		dkey.m_Size = 0;
+		DuplicateKey.m_Size = 0;
 
-		if (flags & EDatabaseWriteFlag_OverwriteAtCurrentCursorPos)
+		if (Flags & EDatabaseWriteFlag_OverwriteAtCurrentCursorPos)
 		{
-			if (!(_pCursor->mc_flags & DCInitialized))
+			if (!(_pCursor->m_Flags & DCInitialized))
 				return EINVAL;
-			rc = DMdbSuccess;
+			Result = DMdbSuccess;
 		}
-		else if (_pCursor->mc_db->md_root == DPInvalid)
+		else if (_pCursor->m_pDatabase->m_RootPage == DPInvalid)
 		{
 			/* new database, cursor has nothing to point to */
-			_pCursor->mc_snum = 0;
-			_pCursor->mc_top = 0;
-			_pCursor->mc_flags &= ~DCInitialized;
-			rc = DMdbNoRoot;
+			_pCursor->m_nPages = 0;
+			_pCursor->m_iTop = 0;
+			_pCursor->m_Flags &= ~DCInitialized;
+			Result = DMdbNoRoot;
 		}
 		else
 		{
-			int exact = 0;
-			CDatabaseValue d2;
-			if (flags & EDatabaseWriteFlag_Append)
+			int bExact = 0;
+			CDatabaseValue LastData;
+			if (Flags & EDatabaseWriteFlag_Append)
 			{
-				CDatabaseValue k2;
-				rc = fg_CursorLast(_pCursor, &k2, &d2);
-				if (rc == 0)
+				CDatabaseValue LastKey;
+				Result = fg_CursorLast(_pCursor, &LastKey, &LastData);
+				if (Result == 0)
 				{
-					rc = _pCursor->mc_dbx->m_fKeyCompare(*_pKey, k2);
-					if (rc > 0)
+					Result = _pCursor->m_pDatabaseInfo->m_fKeyCompare(*_pKey, LastKey);
+					if (Result > 0)
 					{
-						rc = DMdbNotFound;
-						_pCursor->mc_ki[_pCursor->mc_top]++;
+						Result = DMdbNotFound;
+						_pCursor->m_NodeIndices[_pCursor->m_iTop]++;
 					}
 					else
 					{
 						/* new key is <= last key */
-						rc = DMdbKeyExist;
+						Result = DMdbKeyExist;
 					}
 				}
 			}
 			else
-				rc = fg_CursorSet(_pCursor, _pKey, &d2, EDatabaseCursorGet_Set, &exact);
-			if ((flags & EDatabaseWriteFlag_NoOverwrite) && rc == 0)
+				Result = fg_CursorSet(_pCursor, _pKey, &LastData, EDatabaseCursorGet_Set, &bExact);
+			if ((Flags & EDatabaseWriteFlag_NoOverwrite) && Result == 0)
 			{
 				DMibDatabaseTrace("duplicate key [{}]", DKey(_pKey));
-				*_pData = d2;
+				*_pData = LastData;
 				return DMdbKeyExist;
 			}
-			if (rc && rc != DMdbNotFound)
-				return rc;
+			if (Result && Result != DMdbNotFound)
+				return Result;
 		}
 
-		if (_pCursor->mc_flags & DCDel)
-			_pCursor->mc_flags ^= DCDel;
+		if (_pCursor->m_Flags & DCDel)
+			_pCursor->m_Flags ^= DCDel;
 
 		/* Cursor is positioned, check for room in the dirty list */
-		if (!nospill)
+		if (!bNoSpill)
 		{
-			if (flags & EDatabaseWriteFlag_BatchDuplicateData)
+			if (Flags & EDatabaseWriteFlag_BatchDuplicateData)
 			{
-				rdata = &xdata;
-				xdata.m_Size = _pData->m_Size * dcount;
+				pNodeData = &NodeData;
+				NodeData.m_Size = _pData->m_Size * nDataItems;
 			}
 			else
-				rdata = _pData;
-			if ((rc2 = fg_PageSpill(_pCursor, _pKey, rdata)))
-				return rc2;
+				pNodeData = _pData;
+			if ((Result2 = fg_PageSpill(_pCursor, _pKey, pNodeData)))
+				return Result2;
 		}
 
-		if (rc == DMdbNoRoot)
+		if (Result == DMdbNoRoot)
 		{
-			CMdbPage *np;
+			CMdbPage *pNewPage;
 			/* new database, write a root leaf page */
 			DPuts("allocating new root leaf page");
-			if ((rc2 = fg_PageNew(_pCursor, DPLeaf, 1, &np)))
-				return rc2;
-			fg_CursorPush(_pCursor, np);
-			_pCursor->mc_db->md_root = np->mp_p.p_pgno;
-			_pCursor->mc_db->md_depth++;
-			*_pCursor->mc_dbflag |= DDbDirty;
-			if ((_pCursor->mc_db->md_flags & (EDatabaseSubFlag_SortedDuplicates | EDatabaseSubFlag_SortedDuplicatesFixedSize)) == EDatabaseSubFlag_SortedDuplicatesFixedSize)
-				np->mp_flags |= DPLeaf2;
-			_pCursor->mc_flags |= DCInitialized;
+			if ((Result2 = fg_PageNew(_pCursor, DPLeaf, 1, &pNewPage)))
+				return Result2;
+			fg_CursorPush(_pCursor, pNewPage);
+			_pCursor->m_pDatabase->m_RootPage = pNewPage->m_PageNumber;
+			_pCursor->m_pDatabase->m_Depth++;
+			*_pCursor->m_pDatabaseFlag |= DDbDirty;
+			if ((_pCursor->m_pDatabase->m_Flags & (EDatabaseSubFlag_SortedDuplicates | EDatabaseSubFlag_SortedDuplicatesFixedSize)) == EDatabaseSubFlag_SortedDuplicatesFixedSize)
+				pNewPage->m_Flags |= DPLeaf2;
+			_pCursor->m_Flags |= DCInitialized;
 		}
 		else
 		{
 			/* make sure all cursor pages are writable */
-			rc2 = fg_CursorTouch(_pCursor);
-			if (rc2)
-				return rc2;
+			Result2 = fg_CursorTouch(_pCursor);
+			if (Result2)
+				return Result2;
 		}
 
-		unsigned offset = 0;
+		unsigned Growth = 0;
 
-		insert_key = insert_data = rc;
-		if (insert_key)
+		bInsertKey = bInsertData = Result;
+		if (bInsertKey)
 		{
 			/* The key does not exist */
-			DMibDatabaseTrace("inserting key at index {}", _pCursor->mc_ki[_pCursor->mc_top]);
-			if ((_pCursor->mc_db->md_flags & EDatabaseSubFlag_SortedDuplicates) && DLeafSize(_pKey, _pData) > env->me_nodemax)
+			DMibDatabaseTrace("inserting key at index {}", _pCursor->m_NodeIndices[_pCursor->m_iTop]);
+			if ((_pCursor->m_pDatabase->m_Flags & EDatabaseSubFlag_SortedDuplicates) && DLeafSize(_pKey, _pData) > pEnvironment->m_MaxNodeSize)
 			{
 				/* Too big for a node, insert in sub-DB.  Set up an empty
 				 * "old sub-page" for prep_subDB to expand to a full page.
 				 */
-				fp_flags = DPLeaf | DPDirty;
-				fp = (CMdbPage *)env->me_pbuf;
-				fp->mp_pad = _pData->m_Size; // used if EDatabaseSubFlag_SortedDuplicatesFixedSize
-				fp->mp_lower = fp->mp_upper = (DPageHeaderSize - DPageBase);
-				olddata.m_Size = DPageHeaderSize;
+				SubPageFlags = DPLeaf | DPDirty;
+				pSubPage = (CMdbPage *)pEnvironment->m_pScratchBuffer;
+				pSubPage->m_Pad = _pData->m_Size; // used if EDatabaseSubFlag_SortedDuplicatesFixedSize
+				pSubPage->m_FreeSpace.m_Lower = pSubPage->m_FreeSpace.m_Upper = (DPageHeaderSize - DPageBase);
+				OldData.m_Size = DPageHeaderSize;
 				goto prep_subDB;
 			}
 		}
 		else
 		{
 			/* there's only a key anyway, so this is a no-op */
-			if (DIsLeaf2(_pCursor->mc_pg[_pCursor->mc_top]))
+			if (DIsLeaf2(_pCursor->m_Pages[_pCursor->m_iTop]))
 			{
 				{
-					uint8 *ptr;
-					uint32 ksize = _pCursor->mc_db->md_pad;
-					if (_pKey->m_Size != ksize)
+					uint8 *pLeaf2Key;
+					uint32 KeySize = _pCursor->m_pDatabase->m_Pad;
+					if (_pKey->m_Size != KeySize)
 						return DMdbBadValsize;
-					ptr = DLeaf2Key(_pCursor->mc_pg[_pCursor->mc_top], _pCursor->mc_ki[_pCursor->mc_top], ksize);
-					memcpy(ptr, _pKey->m_pData, ksize);
+					pLeaf2Key = DLeaf2Key(_pCursor->m_Pages[_pCursor->m_iTop], _pCursor->m_NodeIndices[_pCursor->m_iTop], KeySize);
+					memcpy(pLeaf2Key, _pKey->m_pData, KeySize);
 				}
 			fix_parent:
 				/* if overwriting slot 0 of leaf, need to
 				 * update branch key if there is a parent page
 				 */
-				if (_pCursor->mc_top && !_pCursor->mc_ki[_pCursor->mc_top])
+				if (_pCursor->m_iTop && !_pCursor->m_NodeIndices[_pCursor->m_iTop])
 				{
-					unsigned short dtop = 1;
-					_pCursor->mc_top--;
+					unsigned short TopDelta = 1;
+					_pCursor->m_iTop--;
 					/* slot 0 is always an empty key, find real slot */
-					while (_pCursor->mc_top && !_pCursor->mc_ki[_pCursor->mc_top])
+					while (_pCursor->m_iTop && !_pCursor->m_NodeIndices[_pCursor->m_iTop])
 					{
-						_pCursor->mc_top--;
-						dtop++;
+						_pCursor->m_iTop--;
+						TopDelta++;
 					}
-					if (_pCursor->mc_ki[_pCursor->mc_top])
-						rc2 = fg_UpdateKey(_pCursor, _pKey);
+					if (_pCursor->m_NodeIndices[_pCursor->m_iTop])
+						Result2 = fg_UpdateKey(_pCursor, _pKey);
 					else
-						rc2 = DMdbSuccess;
-					_pCursor->mc_top += dtop;
-					if (rc2)
-						return rc2;
+						Result2 = DMdbSuccess;
+					_pCursor->m_iTop += TopDelta;
+					if (Result2)
+						return Result2;
 				}
 				return DMdbSuccess;
 			}
 
 		more:
-			leaf = DNodePtr(_pCursor->mc_pg[_pCursor->mc_top], _pCursor->mc_ki[_pCursor->mc_top]);
-			olddata.m_Size = DNodeDataSize(leaf);
-			olddata.m_pData = DNodeData(leaf);
+			pLeaf = DNodePtr(_pCursor->m_Pages[_pCursor->m_iTop], _pCursor->m_NodeIndices[_pCursor->m_iTop]);
+			OldData.m_Size = DNodeDataSize(pLeaf);
+			OldData.m_pData = DNodeData(pLeaf);
 
 			/* DB has dups? */
-			if (DFIsSet(_pCursor->mc_db->md_flags, EDatabaseSubFlag_SortedDuplicates))
+			if (DFIsSet(_pCursor->m_pDatabase->m_Flags, EDatabaseSubFlag_SortedDuplicates))
 			{
 				/* Prepare (sub-)page/sub-DB to accept the new item,
-				 * if needed.  fp: old sub-page or a header faking
-				 * it.  mp: new (sub-)page.  offset: growth in page
-				 * size.  xdata: node data with new page or DB.
+				 * if needed.  pSubPage: old sub-page or a header faking
+				 * it.  pPage: new (sub-)page.  offset: growth in page
+				 * size.  NodeData: node data with new page or DB.
 				 */
-				unsigned i;
-				mp = fp = (CMdbPage *)(xdata.m_pData = (uint8 *)env->me_pbuf);
-				mp->mp_p.p_pgno = _pCursor->mc_pg[_pCursor->mc_top]->mp_p.p_pgno;
+				unsigned iNode;
+				pPage = pSubPage = (CMdbPage *)(NodeData.m_pData = (uint8 *)pEnvironment->m_pScratchBuffer);
+				pPage->m_PageNumber = _pCursor->m_Pages[_pCursor->m_iTop]->m_PageNumber;
 
 				/* Was a single item before, must convert now */
-				if (!DFIsSet(leaf->mn_flags, DFDupData))
+				if (!DFIsSet(pLeaf->m_Flags, DFDupData))
 				{
 					FDatabaseCompare *pDataCompare = nullptr;
 					/* Just overwrite the current item */
-					if (flags == EDatabaseWriteFlag_OverwriteAtCurrentCursorPos)
+					if (Flags == EDatabaseWriteFlag_OverwriteAtCurrentCursorPos)
 						goto current;
-					pDataCompare = &(_pCursor->mc_dbx->m_fDataCompare);
-					if (DNeedCmpClong(*pDataCompare, olddata.m_Size))
+					pDataCompare = &(_pCursor->m_pDatabaseInfo->m_fDataCompare);
+					if (DNeedCmpClong(*pDataCompare, OldData.m_Size))
 						pDataCompare = &g_mdb_cmp_clong;
 					/* does data match? */
-					if (!(*pDataCompare)(*_pData, olddata))
+					if (!(*pDataCompare)(*_pData, OldData))
 					{
-						if (flags & (EDatabaseWriteFlag_NoDuplicateData | EDatabaseWriteFlag_AppendDuplicateData))
+						if (Flags & (EDatabaseWriteFlag_NoDuplicateData | EDatabaseWriteFlag_AppendDuplicateData))
 							return DMdbKeyExist;
 						/* overwrite it */
 						goto current;
 					}
 
 					/* Back up original data item */
-					dkey.m_Size = olddata.m_Size;
-					dkey.m_pData = (uint8 *)memcpy(fp + 1, olddata.m_pData, olddata.m_Size);
+					DuplicateKey.m_Size = OldData.m_Size;
+					DuplicateKey.m_pData = (uint8 *)memcpy(pSubPage + 1, OldData.m_pData, OldData.m_Size);
 
 					/* Make sub-page header for the dup items, with dummy body */
-					fp->mp_flags = DPLeaf | DPDirty | DPSubp;
-					fp->mp_lower = (DPageHeaderSize - DPageBase);
-					xdata.m_Size = DPageHeaderSize + dkey.m_Size + _pData->m_Size;
-					if (_pCursor->mc_db->md_flags & EDatabaseSubFlag_SortedDuplicatesFixedSize)
+					pSubPage->m_Flags = DPLeaf | DPDirty | DPSubp;
+					pSubPage->m_FreeSpace.m_Lower = (DPageHeaderSize - DPageBase);
+					NodeData.m_Size = DPageHeaderSize + DuplicateKey.m_Size + _pData->m_Size;
+					if (_pCursor->m_pDatabase->m_Flags & EDatabaseSubFlag_SortedDuplicatesFixedSize)
 					{
-						fp->mp_flags |= DPLeaf2;
-						fp->mp_pad = _pData->m_Size;
-						xdata.m_Size += 2 * _pData->m_Size; // leave space for 2 more
+						pSubPage->m_Flags |= DPLeaf2;
+						pSubPage->m_Pad = _pData->m_Size;
+						NodeData.m_Size += 2 * _pData->m_Size; // leave space for 2 more
 					}
 					else
-						xdata.m_Size += 2 * (sizeof(CIndx) + DNodeSize) + (dkey.m_Size & 1) + (_pData->m_Size & 1);
-					fp->mp_upper = xdata.m_Size - DPageBase;
-					olddata.m_Size = xdata.m_Size; // pretend olddata is fp
+						NodeData.m_Size += 2 * (sizeof(CIndx) + DNodeSize) + (DuplicateKey.m_Size & 1) + (_pData->m_Size & 1);
+					pSubPage->m_FreeSpace.m_Upper = NodeData.m_Size - DPageBase;
+					OldData.m_Size = NodeData.m_Size; // pretend OldData is pSubPage
 				}
-				else if (leaf->mn_flags & DFSubData)
+				else if (pLeaf->m_Flags & DFSubData)
 				{
 					/* Data is on sub-DB, just store it */
-					flags |= DFDupData | DFSubData;
+					Flags |= DFDupData | DFSubData;
 					goto put_sub;
 				}
 				else
 				{
 					/* Data is on sub-page */
-					fp = (CMdbPage *)olddata.m_pData;
-					switch (flags)
+					pSubPage = (CMdbPage *)OldData.m_pData;
+					switch (Flags)
 					{
 					default:
-						if (!(_pCursor->mc_db->md_flags & EDatabaseSubFlag_SortedDuplicatesFixedSize))
+						if (!(_pCursor->m_pDatabase->m_Flags & EDatabaseSubFlag_SortedDuplicatesFixedSize))
 						{
-							offset = DEven(DNodeSize + sizeof(CIndx) + _pData->m_Size);
+							Growth = DEven(DNodeSize + sizeof(CIndx) + _pData->m_Size);
 							break;
 						}
-						offset = fp->mp_pad;
-						if (DSizeLeft(fp) < offset)
+						Growth = pSubPage->m_Pad;
+						if (DSizeLeft(pSubPage) < Growth)
 						{
-							offset *= 4; // space for 4 more
+							Growth *= 4; // space for 4 more
 							break;
 						}
 						/* FALLTHRU: Big enough EDatabaseSubFlag_SortedDuplicatesFixedSize sub-page */
 					case EDatabaseWriteFlag_OverwriteAtCurrentCursorPos:
-						fp->mp_flags |= DPDirty;
-						DCopyPgno(fp->mp_p.p_pgno, mp->mp_p.p_pgno);
-						_pCursor->mc_xcursor->mx_cursor.mc_pg[0] = fp;
-						flags |= DFDupData;
+						pSubPage->m_Flags |= DPDirty;
+						DCopyPgno(pSubPage->m_PageNumber, pPage->m_PageNumber);
+						_pCursor->m_pXCursor->m_Cursor.m_Pages[0] = pSubPage;
+						Flags |= DFDupData;
 						goto put_sub;
 					}
-					xdata.m_Size = olddata.m_Size + offset;
+					NodeData.m_Size = OldData.m_Size + Growth;
 				}
 
-				fp_flags = fp->mp_flags;
-				if (DNodeSize + DNodeKeySize(leaf) + xdata.m_Size > env->me_nodemax)
+				SubPageFlags = pSubPage->m_Flags;
+				if (DNodeSize + DNodeKeySize(pLeaf) + NodeData.m_Size > pEnvironment->m_MaxNodeSize)
 				{
 					/* Too big for a sub-page, convert to sub-DB */
-					fp_flags &= ~DPSubp;
+					SubPageFlags &= ~DPSubp;
 				prep_subDB:
-					if (_pCursor->mc_db->md_flags & EDatabaseSubFlag_SortedDuplicatesFixedSize)
+					if (_pCursor->m_pDatabase->m_Flags & EDatabaseSubFlag_SortedDuplicatesFixedSize)
 					{
-						fp_flags |= DPLeaf2;
-						dummy.md_pad = fp->mp_pad;
-						dummy.md_flags = EDatabaseSubFlag_SortedDuplicatesFixedSize;
-						if (_pCursor->mc_db->md_flags & EDatabaseSubFlag_SortedDuplicatesIntegerKeys)
-							dummy.md_flags |= EDatabaseSubFlag_IntegerKeys;
+						SubPageFlags |= DPLeaf2;
+						DummyDatabase.m_Pad = pSubPage->m_Pad;
+						DummyDatabase.m_Flags = EDatabaseSubFlag_SortedDuplicatesFixedSize;
+						if (_pCursor->m_pDatabase->m_Flags & EDatabaseSubFlag_SortedDuplicatesIntegerKeys)
+							DummyDatabase.m_Flags |= EDatabaseSubFlag_IntegerKeys;
 					}
 					else
 					{
-						dummy.md_pad = 0;
-						dummy.md_flags = 0;
+						DummyDatabase.m_Pad = 0;
+						DummyDatabase.m_Flags = 0;
 					}
-					dummy.md_depth = 1;
-					dummy.md_branch_pages = 0;
-					dummy.md_leaf_pages = 1;
-					dummy.md_overflow_pages = 0;
-					dummy.md_entries = DNumKeys(fp);
-					xdata.m_Size = sizeof(CMdbDb);
-					xdata.m_pData = (uint8 *)&dummy;
-					if ((rc = fg_PageAlloc(_pCursor, 1, &mp)))
-						return rc;
-					offset = env->me_psize - olddata.m_Size;
-					flags |= DFDupData | DFSubData;
-					dummy.md_root = mp->mp_p.p_pgno;
-					sub_root = mp;
+					DummyDatabase.m_Depth = 1;
+					DummyDatabase.m_nBranchPages = 0;
+					DummyDatabase.m_nLeafPages = 1;
+					DummyDatabase.m_nOverflowPages = 0;
+					DummyDatabase.m_nEntries = DNumKeys(pSubPage);
+					NodeData.m_Size = sizeof(CMdbDb);
+					NodeData.m_pData = (uint8 *)&DummyDatabase;
+					if ((Result = fg_PageAlloc(_pCursor, 1, &pPage)))
+						return Result;
+					Growth = pEnvironment->m_PageSize - OldData.m_Size;
+					Flags |= DFDupData | DFSubData;
+					DummyDatabase.m_RootPage = pPage->m_PageNumber;
+					pSubRoot = pPage;
 				}
-				if (mp != fp)
+				if (pPage != pSubPage)
 				{
-					mp->mp_flags = fp_flags | DPDirty;
-					mp->mp_pad = fp->mp_pad;
-					mp->mp_lower = fp->mp_lower;
-					mp->mp_upper = fp->mp_upper + offset;
-					if (fp_flags & DPLeaf2)
-						memcpy(DMetaData(mp), DMetaData(fp), DNumKeys(fp) * fp->mp_pad);
+					pPage->m_Flags = SubPageFlags | DPDirty;
+					pPage->m_Pad = pSubPage->m_Pad;
+					pPage->m_FreeSpace.m_Lower = pSubPage->m_FreeSpace.m_Lower;
+					pPage->m_FreeSpace.m_Upper = pSubPage->m_FreeSpace.m_Upper + Growth;
+					if (SubPageFlags & DPLeaf2)
+						memcpy(DMetaData(pPage), DMetaData(pSubPage), DNumKeys(pSubPage) * pSubPage->m_Pad);
 					else
 					{
-						memcpy((char *)mp + mp->mp_upper + DPageBase, (char *)fp + fp->mp_upper + DPageBase, olddata.m_Size - fp->mp_upper - DPageBase);
-						memcpy((char *)(&mp->mp_ptrs), (char *)(&fp->mp_ptrs), DNumKeys(fp) * sizeof(mp->mp_ptrs[0]));
-						for (i = 0; i < DNumKeys(fp); i++)
-							mp->mp_ptrs[i] += offset;
+						memcpy
+							(
+								(char *)pPage + pPage->m_FreeSpace.m_Upper + DPageBase
+								, (char *)pSubPage + pSubPage->m_FreeSpace.m_Upper + DPageBase
+								, OldData.m_Size - pSubPage->m_FreeSpace.m_Upper - DPageBase
+							)
+						;
+						memcpy((char *)(&pPage->m_NodeOffsets), (char *)(&pSubPage->m_NodeOffsets), DNumKeys(pSubPage) * sizeof(pPage->m_NodeOffsets[0]));
+						for (iNode = 0; iNode < DNumKeys(pSubPage); iNode++)
+							pPage->m_NodeOffsets[iNode] += Growth;
 					}
 				}
 
-				rdata = &xdata;
-				flags |= DFDupData;
-				do_sub = 1;
-				if (!insert_key)
+				pNodeData = &NodeData;
+				Flags |= DFDupData;
+				bDoSub = 1;
+				if (!bInsertKey)
 					fg_NodeDel(_pCursor, 0);
 				goto new_sub;
 			}
 		current:
 			/* LMDB passes DFSubData in 'flags' to write a DB record */
-			if ((leaf->mn_flags ^ flags) & DFSubData)
+			if ((pLeaf->m_Flags ^ Flags) & DFSubData)
 				return DMdbIncompatible;
 			/* overflow page overwrites need special handling */
-			if (DFIsSet(leaf->mn_flags, DFBigData))
+			if (DFIsSet(pLeaf->m_Flags, DFBigData))
 			{
-				CMdbPage *omp;
-				CPgno pg;
-				int level, ovpages, dpages = DOverflowPages(_pData->m_Size, env->me_psize);
+				CMdbPage *pOverflowPage;
+				CPgno PageNumber;
+				int Level, nOverflowPages, nDataPages = DOverflowPages(_pData->m_Size, pEnvironment->m_PageSize);
 
-				memcpy(&pg, olddata.m_pData, sizeof(pg));
-				if ((rc2 = fg_PageGet(_pCursor, pg, &omp, &level)) != 0)
-					return rc2;
-				ovpages = omp->mp_pages;
+				memcpy(&PageNumber, OldData.m_pData, sizeof(PageNumber));
+				if ((Result2 = fg_PageGet(_pCursor, PageNumber, &pOverflowPage, &Level)) != 0)
+					return Result2;
+				nOverflowPages = pOverflowPage->m_nOverflowPages;
 
 				/* Is the ov page large enough? */
-				if (ovpages >= dpages)
+				if (nOverflowPages >= nDataPages)
 				{
-					if (!(omp->mp_flags & DPDirty) && (level || (env->me_flags & EDatabaseEnvironmentFlag_WriteMap)))
+					if (!(pOverflowPage->m_Flags & DPDirty) && (Level || (pEnvironment->m_Flags & EDatabaseEnvironmentFlag_WriteMap)))
 					{
-						rc = fg_PageUnspill(_pCursor->mc_txn, omp, &omp);
-						if (rc)
-							return rc;
-						level = 0; // dirty in this txn or clean
+						Result = fg_PageUnspill(_pCursor->m_pTransaction, pOverflowPage, &pOverflowPage);
+						if (Result)
+							return Result;
+						Level = 0; // dirty in this txn or clean
 					}
 					/* Is it dirty? */
-					if (omp->mp_flags & DPDirty)
+					if (pOverflowPage->m_Flags & DPDirty)
 					{
 						/* yes, overwrite it. Note in this case we don't
 						 * bother to try shrinking the page if the new data
 						 * is smaller than the overflow threshold.
 						 */
-						if (level > 1)
+						if (Level > 1)
 						{
 							/* It is writable only in a parent txn */
-							umint sz = (umint)env->me_psize * ovpages, off;
-							CMdbPage *np = fg_PageMalloc(_pCursor->mc_txn, ovpages);
-							CMdbId2 id2;
-							id2.mid = pg;
-							id2.mptr = np;
+							umint Size = (umint)pEnvironment->m_PageSize * nOverflowPages, CopyOffset;
+							CMdbPage *pNewPage = fg_PageMalloc(_pCursor->m_pTransaction, nOverflowPages);
+							CMdbId2 DirtyEntry;
+							DirtyEntry.m_ID = PageNumber;
+							DirtyEntry.m_pValue = pNewPage;
 							/* Note - this page is already counted in parent's dirty_room */
-							rc2 = fg_Mid2lInsert(_pCursor->mc_txn->mt_u.dirty_list, &id2);
-							DMibCheck(rc2 == 0);
+							Result2 = fg_Mid2lInsert(_pCursor->m_pTransaction->m_pDirtyList, &DirtyEntry);
+							DMibCheck(Result2 == 0);
 							/* Currently we make the page look as with put() in the
 							 * parent txn, in case the user peeks at EDatabaseWriteFlag_ReserveSpaced
-							 * or unused parts. Some users treat ovpages specially.
+							 * or unused parts. Some users treat nOverflowPages specially.
 							 */
-							if (!(flags & EDatabaseWriteFlag_ReserveSpace))
+							if (!(Flags & EDatabaseWriteFlag_ReserveSpace))
 							{
 								/* Skip the part where LMDB will put *data.
 								 * Copy end of page, adjusting alignment so
 								 * compiler may copy words instead of bytes.
 								 */
-								off = (DPageHeaderSize + _pData->m_Size) & -sizeof(umint);
-								memcpy((umint *)((char *)np + off), (umint *)((char *)omp + off), sz - off);
-								sz = DPageHeaderSize;
+								CopyOffset = (DPageHeaderSize + _pData->m_Size) & -sizeof(umint);
+								memcpy((umint *)((char *)pNewPage + CopyOffset), (umint *)((char *)pOverflowPage + CopyOffset), Size - CopyOffset);
+								Size = DPageHeaderSize;
 							}
-							memcpy(np, omp, sz); // Copy beginning of page
-							omp = np;
+							memcpy(pNewPage, pOverflowPage, Size); // Copy beginning of page
+							pOverflowPage = pNewPage;
 						}
-						DSetDataSize(leaf, _pData->m_Size);
-						if (DFIsSet(flags, EDatabaseWriteFlag_ReserveSpace))
-							_pData->m_pData = DMetaData(omp);
+						DSetDataSize(pLeaf, _pData->m_Size);
+						if (DFIsSet(Flags, EDatabaseWriteFlag_ReserveSpace))
+							_pData->m_pData = DMetaData(pOverflowPage);
 						else
-							memcpy(DMetaData(omp), _pData->m_pData, _pData->m_Size);
+							memcpy(DMetaData(pOverflowPage), _pData->m_pData, _pData->m_Size);
 						return DMdbSuccess;
 					}
 				}
-				if ((rc2 = fg_OvPageFree(_pCursor, omp)) != DMdbSuccess)
-					return rc2;
+				if ((Result2 = fg_OvPageFree(_pCursor, pOverflowPage)) != DMdbSuccess)
+					return Result2;
 			}
-			else if (_pData->m_Size == olddata.m_Size)
+			else if (_pData->m_Size == OldData.m_Size)
 			{
 				/* same size, just replace it. Note that we could
 				 * also reuse this node if the new data is smaller,
 				 * but instead we opt to shrink the node in that case.
 				 */
-				if (DFIsSet(flags, EDatabaseWriteFlag_ReserveSpace))
-					_pData->m_pData = olddata.m_pData;
-				else if (!(_pCursor->mc_flags & DCSub))
-					memcpy((ch8 *)olddata.m_pData, _pData->m_pData, _pData->m_Size);
+				if (DFIsSet(Flags, EDatabaseWriteFlag_ReserveSpace))
+					_pData->m_pData = OldData.m_pData;
+				else if (!(_pCursor->m_Flags & DCSub))
+					memcpy((ch8 *)OldData.m_pData, _pData->m_pData, _pData->m_Size);
 				else
 				{
-					memcpy(DNodeKey(leaf), _pKey->m_pData, _pKey->m_Size);
+					memcpy(DNodeKey(pLeaf), _pKey->m_pData, _pKey->m_Size);
 					goto fix_parent;
 				}
 				return DMdbSuccess;
@@ -1359,149 +1365,149 @@ namespace NMib::NDatabase::NPrivate
 			fg_NodeDel(_pCursor, 0);
 		}
 
-		rdata = _pData;
+		pNodeData = _pData;
 
 	new_sub:
-		nflags = flags & DNodeAddFlags;
-		nsize = DIsLeaf2(_pCursor->mc_pg[_pCursor->mc_top]) ? _pKey->m_Size : env->f_LeafSize(_pKey, rdata);
-		if (DSizeLeft(_pCursor->mc_pg[_pCursor->mc_top]) < nsize)
+		NodeFlags = Flags & DNodeAddFlags;
+		NodeSize = DIsLeaf2(_pCursor->m_Pages[_pCursor->m_iTop]) ? _pKey->m_Size : pEnvironment->f_LeafSize(_pKey, pNodeData);
+		if (DSizeLeft(_pCursor->m_Pages[_pCursor->m_iTop]) < NodeSize)
 		{
-			if ((flags & (DFDupData | DFSubData)) == DFDupData)
-				nflags &= ~EDatabaseWriteFlag_Append; // sub-page may need room to grow
-			if (!insert_key)
-				nflags |= DMdbSplitReplace;
-			rc = fg_PageSplit(_pCursor, _pKey, rdata, DPInvalid, nflags);
+			if ((Flags & (DFDupData | DFSubData)) == DFDupData)
+				NodeFlags &= ~EDatabaseWriteFlag_Append; // sub-page may need room to grow
+			if (!bInsertKey)
+				NodeFlags |= DMdbSplitReplace;
+			Result = fg_PageSplit(_pCursor, _pKey, pNodeData, DPInvalid, NodeFlags);
 		}
 		else
 		{
 			/* There is room already in this leaf page. */
-			rc = fg_NodeAdd(_pCursor, _pCursor->mc_ki[_pCursor->mc_top], _pKey, rdata, 0, nflags);
-			if (rc == 0)
+			Result = fg_NodeAdd(_pCursor, _pCursor->m_NodeIndices[_pCursor->m_iTop], _pKey, pNodeData, 0, NodeFlags);
+			if (Result == 0)
 			{
-				/* Adjust other cursors pointing to mp */
-				CMdbCursor *m2, *m3;
-				CDatabaseSubID dbi = _pCursor->mc_dbi;
-				unsigned i = _pCursor->mc_top;
-				CMdbPage *mp = _pCursor->mc_pg[i];
+				/* Adjust other cursors pointing to pPage */
+				CMdbCursor *pOther, *pOtherCursor;
+				CDatabaseSubID DatabaseID = _pCursor->m_DatabaseID;
+				unsigned iTop = _pCursor->m_iTop;
+				CMdbPage *pPage = _pCursor->m_Pages[iTop];
 
-				for (m2 = _pCursor->mc_txn->mt_cursors[dbi]; m2; m2 = m2->mc_next)
+				for (pOther = _pCursor->m_pTransaction->m_pCursors[DatabaseID]; pOther; pOther = pOther->m_pNext)
 				{
-					if (_pCursor->mc_flags & DCSub)
-						m3 = &m2->mc_xcursor->mx_cursor;
+					if (_pCursor->m_Flags & DCSub)
+						pOtherCursor = &pOther->m_pXCursor->m_Cursor;
 					else
-						m3 = m2;
-					if (m3 == _pCursor || m3->mc_snum < _pCursor->mc_snum || m3->mc_pg[i] != mp)
+						pOtherCursor = pOther;
+					if (pOtherCursor == _pCursor || pOtherCursor->m_nPages < _pCursor->m_nPages || pOtherCursor->m_Pages[iTop] != pPage)
 						continue;
-					if (m3->mc_ki[i] >= _pCursor->mc_ki[i] && insert_key)
-						m3->mc_ki[i]++;
-					DXCursorRefresh(m3, i, mp);
+					if (pOtherCursor->m_NodeIndices[iTop] >= _pCursor->m_NodeIndices[iTop] && bInsertKey)
+						pOtherCursor->m_NodeIndices[iTop]++;
+					DXCursorRefresh(pOtherCursor, iTop, pPage);
 				}
 			}
 		}
 
-		if (rc == DMdbSuccess)
+		if (Result == DMdbSuccess)
 		{
 			/* Now store the actual data in the child DB. Note that we're
 			 * storing the user data in the keys field, so there are strict
 			 * size limits on dupdata. The actual data fields of the child
 			 * DB are all zero size.
 			 */
-			if (do_sub)
+			if (bDoSub)
 			{
-				int xflags, new_dupdata;
-				CDatabaseOffset ecount;
+				int SubWriteFlags, bNewDuplicateData;
+				CDatabaseOffset nOldEntries;
 			put_sub:
-				xdata.m_Size = 0;
-				xdata.m_pData = (uint8 *)"";
-				leaf = DNodePtr(_pCursor->mc_pg[_pCursor->mc_top], _pCursor->mc_ki[_pCursor->mc_top]);
-				if (flags == EDatabaseWriteFlag_OverwriteAtCurrentCursorPos)
-					xflags = EDatabaseWriteFlag_OverwriteAtCurrentCursorPos | DMdbNoSpill;
+				NodeData.m_Size = 0;
+				NodeData.m_pData = (uint8 *)"";
+				pLeaf = DNodePtr(_pCursor->m_Pages[_pCursor->m_iTop], _pCursor->m_NodeIndices[_pCursor->m_iTop]);
+				if (Flags == EDatabaseWriteFlag_OverwriteAtCurrentCursorPos)
+					SubWriteFlags = EDatabaseWriteFlag_OverwriteAtCurrentCursorPos | DMdbNoSpill;
 				else
 				{
-					fg_XCursorInit1(_pCursor, leaf);
-					xflags = (flags & EDatabaseWriteFlag_NoDuplicateData) ? EDatabaseWriteFlag_NoOverwrite | DMdbNoSpill : DMdbNoSpill;
+					fg_XCursorInit1(_pCursor, pLeaf);
+					SubWriteFlags = (Flags & EDatabaseWriteFlag_NoDuplicateData) ? EDatabaseWriteFlag_NoOverwrite | DMdbNoSpill : DMdbNoSpill;
 				}
-				if (sub_root)
-					_pCursor->mc_xcursor->mx_cursor.mc_pg[0] = sub_root;
-				new_dupdata = (int)dkey.m_Size;
+				if (pSubRoot)
+					_pCursor->m_pXCursor->m_Cursor.m_Pages[0] = pSubRoot;
+				bNewDuplicateData = (int)DuplicateKey.m_Size;
 				/* converted, write the original data first */
-				if (dkey.m_Size)
+				if (DuplicateKey.m_Size)
 				{
-					rc = fg_CursorPut(&_pCursor->mc_xcursor->mx_cursor, &dkey, &xdata, (EDatabaseWriteFlag)xflags);
-					if (rc)
+					Result = fg_CursorPut(&_pCursor->m_pXCursor->m_Cursor, &DuplicateKey, &NodeData, (EDatabaseWriteFlag)SubWriteFlags);
+					if (Result)
 						goto bad_sub;
 					/* we've done our job */
-					dkey.m_Size = 0;
+					DuplicateKey.m_Size = 0;
 				}
-				if (!(leaf->mn_flags & DFSubData) || sub_root)
+				if (!(pLeaf->m_Flags & DFSubData) || pSubRoot)
 				{
-					/* Adjust other cursors pointing to mp */
-					CMdbCursor *m2;
-					CMdbXCursor *mx = _pCursor->mc_xcursor;
-					unsigned i = _pCursor->mc_top;
-					CMdbPage *mp = _pCursor->mc_pg[i];
+					/* Adjust other cursors pointing to pPage */
+					CMdbCursor *pOther;
+					CMdbXCursor *pXCursor = _pCursor->m_pXCursor;
+					unsigned iTop = _pCursor->m_iTop;
+					CMdbPage *pPage = _pCursor->m_Pages[iTop];
 
-					for (m2 = _pCursor->mc_txn->mt_cursors[_pCursor->mc_dbi]; m2; m2 = m2->mc_next)
+					for (pOther = _pCursor->m_pTransaction->m_pCursors[_pCursor->m_DatabaseID]; pOther; pOther = pOther->m_pNext)
 					{
-						if (m2 == _pCursor || m2->mc_snum < _pCursor->mc_snum)
+						if (pOther == _pCursor || pOther->m_nPages < _pCursor->m_nPages)
 							continue;
-						if (!(m2->mc_flags & DCInitialized))
+						if (!(pOther->m_Flags & DCInitialized))
 							continue;
-						if (m2->mc_pg[i] == mp)
+						if (pOther->m_Pages[iTop] == pPage)
 						{
-							if (m2->mc_ki[i] == _pCursor->mc_ki[i])
-								fg_XCursorInit2(m2, mx, new_dupdata);
-							else if (!insert_key)
-								DXCursorRefresh(m2, i, mp);
+							if (pOther->m_NodeIndices[iTop] == _pCursor->m_NodeIndices[iTop])
+								fg_XCursorInit2(pOther, pXCursor, bNewDuplicateData);
+							else if (!bInsertKey)
+								DXCursorRefresh(pOther, iTop, pPage);
 						}
 					}
 				}
-				ecount = _pCursor->mc_xcursor->mx_db.md_entries;
-				if (flags & EDatabaseWriteFlag_AppendDuplicateData)
-					xflags |= EDatabaseWriteFlag_Append;
-				rc = fg_CursorPut(&_pCursor->mc_xcursor->mx_cursor, _pData, &xdata, (EDatabaseWriteFlag)xflags);
-				if (flags & DFSubData)
+				nOldEntries = _pCursor->m_pXCursor->m_Database.m_nEntries;
+				if (Flags & EDatabaseWriteFlag_AppendDuplicateData)
+					SubWriteFlags |= EDatabaseWriteFlag_Append;
+				Result = fg_CursorPut(&_pCursor->m_pXCursor->m_Cursor, _pData, &NodeData, (EDatabaseWriteFlag)SubWriteFlags);
+				if (Flags & DFSubData)
 				{
-					void *db = DNodeData(leaf);
-					memcpy(db, &_pCursor->mc_xcursor->mx_db, sizeof(CMdbDb));
+					void *pDatabase = DNodeData(pLeaf);
+					memcpy(pDatabase, &_pCursor->m_pXCursor->m_Database, sizeof(CMdbDb));
 				}
-				insert_data = _pCursor->mc_xcursor->mx_db.md_entries - ecount;
+				bInsertData = _pCursor->m_pXCursor->m_Database.m_nEntries - nOldEntries;
 			}
 			/* Increment count unless we just replaced an existing item. */
-			if (insert_data)
-				_pCursor->mc_db->md_entries++;
-			if (insert_key)
+			if (bInsertData)
+				_pCursor->m_pDatabase->m_nEntries++;
+			if (bInsertKey)
 			{
 				/* Invalidate txn if we created an empty sub-DB */
-				if (rc)
+				if (Result)
 					goto bad_sub;
 				/* If we succeeded and the key didn't exist before,
 				 * make sure the cursor is marked valid.
 				 */
-				_pCursor->mc_flags |= DCInitialized;
+				_pCursor->m_Flags |= DCInitialized;
 			}
-			if (flags & EDatabaseWriteFlag_BatchDuplicateData)
+			if (Flags & EDatabaseWriteFlag_BatchDuplicateData)
 			{
-				if (!rc)
+				if (!Result)
 				{
-					mcount++;
+					nPutItems++;
 					/* let caller know how many succeeded, if any */
-					_pData[1].m_Size = mcount;
-					if (mcount < dcount)
+					_pData[1].m_Size = nPutItems;
+					if (nPutItems < nDataItems)
 					{
 						_pData[0].m_pData = (uint8 *)_pData[0].m_pData + _pData[0].m_Size;
-						insert_key = insert_data = 0;
+						bInsertKey = bInsertData = 0;
 						goto more;
 					}
 				}
 			}
-			return rc;
+			return Result;
 		bad_sub:
-			if (rc == DMdbKeyExist) // should not happen, we deleted that item
-				rc = DMdbProblem;
+			if (Result == DMdbKeyExist) // should not happen, we deleted that item
+				Result = DMdbProblem;
 		}
-		_pCursor->mc_txn->mt_flags |= DMdbTxnError;
-		return rc;
+		_pCursor->m_pTransaction->m_Flags |= DMdbTxnError;
+		return Result;
 	}
 
 	/** @brief Delete current key/data pair
@@ -1527,109 +1533,109 @@ namespace NMib::NDatabase::NPrivate
 	 */
 	int fg_CursorDel(CMdbCursor *_pCursor, EDatabaseWriteFlag _Flags)
 	{
-		uint32 flags = _Flags;
+		uint32 Flags = _Flags;
 		using namespace NPrivate;
 
-		CMdbNode *leaf;
-		CMdbPage *mp;
-		int rc;
+		CMdbNode *pLeaf;
+		CMdbPage *pPage;
+		int Result;
 
-		_pCursor->mc_txn->f_CheckBlocked();
+		_pCursor->m_pTransaction->f_CheckBlocked();
 
-		if (_pCursor->mc_txn->mt_flags & (DMdbTxnReadOnly))
+		if (_pCursor->m_pTransaction->m_Flags & (DMdbTxnReadOnly))
 			return EACCES;
 
-		if (!(_pCursor->mc_flags & DCInitialized))
+		if (!(_pCursor->m_Flags & DCInitialized))
 			return EINVAL;
 
-		if (_pCursor->mc_ki[_pCursor->mc_top] >= DNumKeys(_pCursor->mc_pg[_pCursor->mc_top]))
+		if (_pCursor->m_NodeIndices[_pCursor->m_iTop] >= DNumKeys(_pCursor->m_Pages[_pCursor->m_iTop]))
 			return DMdbNotFound;
 
-		if (!(flags & DMdbNoSpill) && (rc = fg_PageSpill(_pCursor, nullptr, nullptr)))
-			return rc;
+		if (!(Flags & DMdbNoSpill) && (Result = fg_PageSpill(_pCursor, nullptr, nullptr)))
+			return Result;
 
-		rc = fg_CursorTouch(_pCursor);
-		if (rc)
-			return rc;
+		Result = fg_CursorTouch(_pCursor);
+		if (Result)
+			return Result;
 
-		mp = _pCursor->mc_pg[_pCursor->mc_top];
-		if (DIsLeaf2(mp))
+		pPage = _pCursor->m_Pages[_pCursor->m_iTop];
+		if (DIsLeaf2(pPage))
 			goto del_key;
-		leaf = DNodePtr(mp, _pCursor->mc_ki[_pCursor->mc_top]);
+		pLeaf = DNodePtr(pPage, _pCursor->m_NodeIndices[_pCursor->m_iTop]);
 
-		if (DFIsSet(leaf->mn_flags, DFDupData))
+		if (DFIsSet(pLeaf->m_Flags, DFDupData))
 		{
-			if (flags & EDatabaseWriteFlag_NoDuplicateData)
+			if (Flags & EDatabaseWriteFlag_NoDuplicateData)
 			{
 				/* fg_CursorDel0() will subtract the final entry */
-				_pCursor->mc_db->md_entries -= _pCursor->mc_xcursor->mx_db.md_entries - 1;
-				_pCursor->mc_xcursor->mx_cursor.mc_flags &= ~DCInitialized;
+				_pCursor->m_pDatabase->m_nEntries -= _pCursor->m_pXCursor->m_Database.m_nEntries - 1;
+				_pCursor->m_pXCursor->m_Cursor.m_Flags &= ~DCInitialized;
 			}
 			else
 			{
-				if (!DFIsSet(leaf->mn_flags, DFSubData))
-					_pCursor->mc_xcursor->mx_cursor.mc_pg[0] = (CMdbPage *)DNodeData(leaf);
-				rc = fg_CursorDel(&_pCursor->mc_xcursor->mx_cursor, (EDatabaseWriteFlag)DMdbNoSpill);
-				if (rc)
-					return rc;
+				if (!DFIsSet(pLeaf->m_Flags, DFSubData))
+					_pCursor->m_pXCursor->m_Cursor.m_Pages[0] = (CMdbPage *)DNodeData(pLeaf);
+				Result = fg_CursorDel(&_pCursor->m_pXCursor->m_Cursor, (EDatabaseWriteFlag)DMdbNoSpill);
+				if (Result)
+					return Result;
 				/* If sub-DB still has entries, we're done */
-				if (_pCursor->mc_xcursor->mx_db.md_entries)
+				if (_pCursor->m_pXCursor->m_Database.m_nEntries)
 				{
-					if (leaf->mn_flags & DFSubData)
+					if (pLeaf->m_Flags & DFSubData)
 					{
 						/* update subDB info */
-						void *db = (CMdbPage *)DNodeData(leaf);
-						memcpy(db, &_pCursor->mc_xcursor->mx_db, sizeof(CMdbDb));
+						void *pDatabase = (CMdbPage *)DNodeData(pLeaf);
+						memcpy(pDatabase, &_pCursor->m_pXCursor->m_Database, sizeof(CMdbDb));
 					}
 					else
 					{
-						CMdbCursor *m2;
+						CMdbCursor *pOther;
 						/* shrink fake page */
-						fg_NodeShrink(mp, _pCursor->mc_ki[_pCursor->mc_top]);
-						leaf = DNodePtr(mp, _pCursor->mc_ki[_pCursor->mc_top]);
-						_pCursor->mc_xcursor->mx_cursor.mc_pg[0] = (CMdbPage *)DNodeData(leaf);
+						fg_NodeShrink(pPage, _pCursor->m_NodeIndices[_pCursor->m_iTop]);
+						pLeaf = DNodePtr(pPage, _pCursor->m_NodeIndices[_pCursor->m_iTop]);
+						_pCursor->m_pXCursor->m_Cursor.m_Pages[0] = (CMdbPage *)DNodeData(pLeaf);
 						/* fix other sub-DB cursors pointed at fake pages on this page */
-						for (m2 = _pCursor->mc_txn->mt_cursors[_pCursor->mc_dbi]; m2; m2 = m2->mc_next)
+						for (pOther = _pCursor->m_pTransaction->m_pCursors[_pCursor->m_DatabaseID]; pOther; pOther = pOther->m_pNext)
 						{
-							if (m2 == _pCursor || m2->mc_snum < _pCursor->mc_snum)
+							if (pOther == _pCursor || pOther->m_nPages < _pCursor->m_nPages)
 								continue;
-							if (!(m2->mc_flags & DCInitialized))
+							if (!(pOther->m_Flags & DCInitialized))
 								continue;
-							if (m2->mc_pg[_pCursor->mc_top] == mp)
-								DXCursorRefresh(m2, _pCursor->mc_top, mp);
+							if (pOther->m_Pages[_pCursor->m_iTop] == pPage)
+								DXCursorRefresh(pOther, _pCursor->m_iTop, pPage);
 						}
 					}
-					_pCursor->mc_db->md_entries--;
-					return rc;
+					_pCursor->m_pDatabase->m_nEntries--;
+					return Result;
 				}
 				else
-					_pCursor->mc_xcursor->mx_cursor.mc_flags &= ~DCInitialized;
+					_pCursor->m_pXCursor->m_Cursor.m_Flags &= ~DCInitialized;
 				/* otherwise fall thru and delete the sub-DB */
 			}
 
-			if (leaf->mn_flags & DFSubData)
+			if (pLeaf->m_Flags & DFSubData)
 			{
 				/* add all the child DB's pages to the free list */
-				rc = fg_Drop0(&_pCursor->mc_xcursor->mx_cursor, 0);
-				if (rc)
+				Result = fg_Drop0(&_pCursor->m_pXCursor->m_Cursor, 0);
+				if (Result)
 					goto fail;
 			}
 		}
 		/* LMDB passes DFSubData in 'flags' to delete a DB record */
-		else if ((leaf->mn_flags ^ flags) & DFSubData)
+		else if ((pLeaf->m_Flags ^ Flags) & DFSubData)
 		{
-			rc = DMdbIncompatible;
+			Result = DMdbIncompatible;
 			goto fail;
 		}
 
 		/* add overflow pages to free list */
-		if (DFIsSet(leaf->mn_flags, DFBigData))
+		if (DFIsSet(pLeaf->m_Flags, DFBigData))
 		{
-			CMdbPage *omp;
-			CPgno pg;
+			CMdbPage *pOverflowPage;
+			CPgno PageNumber;
 
-			memcpy(&pg, DNodeData(leaf), sizeof(pg));
-			if ((rc = fg_PageGet(_pCursor, pg, &omp, nullptr)) || (rc = fg_OvPageFree(_pCursor, omp)))
+			memcpy(&PageNumber, DNodeData(pLeaf), sizeof(PageNumber));
+			if ((Result = fg_PageGet(_pCursor, PageNumber, &pOverflowPage, nullptr)) || (Result = fg_OvPageFree(_pCursor, pOverflowPage)))
 				goto fail;
 		}
 
@@ -1637,8 +1643,8 @@ namespace NMib::NDatabase::NPrivate
 		return fg_CursorDel0(_pCursor);
 
 	fail:
-		_pCursor->mc_txn->mt_flags |= DMdbTxnError;
-		return rc;
+		_pCursor->m_pTransaction->m_Flags |= DMdbTxnError;
+		return Result;
 	}
 
 	/** @brief Return count of duplicates for current key.
@@ -1658,38 +1664,38 @@ namespace NMib::NDatabase::NPrivate
 		using namespace NPrivate;
 
 		// Return the count of duplicate data items for the current key
-		CMdbNode *leaf;
+		CMdbNode *pLeaf;
 
 		if (_pCursor == nullptr || o_pCount == nullptr)
 			return EINVAL;
 
-		if (_pCursor->mc_xcursor == nullptr)
+		if (_pCursor->m_pXCursor == nullptr)
 			return DMdbIncompatible;
 
-		_pCursor->mc_txn->f_CheckBlocked();
+		_pCursor->m_pTransaction->f_CheckBlocked();
 
-		if (!(_pCursor->mc_flags & DCInitialized))
+		if (!(_pCursor->m_Flags & DCInitialized))
 			return EINVAL;
 
-		if (!_pCursor->mc_snum)
+		if (!_pCursor->m_nPages)
 			return DMdbNotFound;
 
-		if (_pCursor->mc_flags & DCEof)
+		if (_pCursor->m_Flags & DCEof)
 		{
-			if (_pCursor->mc_ki[_pCursor->mc_top] >= DNumKeys(_pCursor->mc_pg[_pCursor->mc_top]))
+			if (_pCursor->m_NodeIndices[_pCursor->m_iTop] >= DNumKeys(_pCursor->m_Pages[_pCursor->m_iTop]))
 				return DMdbNotFound;
-			_pCursor->mc_flags ^= DCEof;
+			_pCursor->m_Flags ^= DCEof;
 		}
 
-		leaf = DNodePtr(_pCursor->mc_pg[_pCursor->mc_top], _pCursor->mc_ki[_pCursor->mc_top]);
-		if (!DFIsSet(leaf->mn_flags, DFDupData))
+		pLeaf = DNodePtr(_pCursor->m_Pages[_pCursor->m_iTop], _pCursor->m_NodeIndices[_pCursor->m_iTop]);
+		if (!DFIsSet(pLeaf->m_Flags, DFDupData))
 			*o_pCount = 1;
 		else
 		{
-			if (!(_pCursor->mc_xcursor->mx_cursor.mc_flags & DCInitialized))
+			if (!(_pCursor->m_pXCursor->m_Cursor.m_Flags & DCInitialized))
 				return EINVAL;
 
-			*o_pCount = _pCursor->mc_xcursor->mx_db.md_entries;
+			*o_pCount = _pCursor->m_pXCursor->m_Database.m_nEntries;
 		}
 		return DMdbSuccess;
 	}
@@ -1702,58 +1708,58 @@ namespace NMib::NDatabase::NPrivate
 	void fg_CursorUnref(CMdbCursor *mc)
 	{
 		int i;
-		if (mc->mc_txn->mt_rpages[0].mid)
+		if (mc->m_pTransaction->m_pReadOnlyPages[0].m_ID)
 		{
-			if (!mc->mc_snum || !mc->mc_pg[0] || DIsSubp(mc->mc_pg[0]))
+			if (!mc->m_nPages || !mc->m_Pages[0] || DIsSubp(mc->m_Pages[0]))
 				return;
-			for (i = 0; i < mc->mc_snum; i++)
-				fg_PageUnref(mc->mc_txn, mc->mc_pg[i]);
-			if (mc->mc_ovpg)
+			for (i = 0; i < mc->m_nPages; i++)
+				fg_PageUnref(mc->m_pTransaction, mc->m_Pages[i]);
+			if (mc->m_pOverflowPage)
 			{
-				fg_PageUnref(mc->mc_txn, mc->mc_ovpg);
-				mc->mc_ovpg = 0;
+				fg_PageUnref(mc->m_pTransaction, mc->m_pOverflowPage);
+				mc->m_pOverflowPage = 0;
 			}
 		}
-		mc->mc_snum = mc->mc_top = 0;
-		mc->mc_pg[0] = nullptr;
-		mc->mc_flags &= ~DCInitialized;
+		mc->m_nPages = mc->m_iTop = 0;
+		mc->m_Pages[0] = nullptr;
+		mc->m_Flags &= ~DCInitialized;
 	}
 #endif /* DMibDatabase_Always64BitSupport */
 
 	/** Back up parent txn's cursors, then grab the originals for tracking */
 	void fg_CursorShadow(CMdbTxn *_pSource, CMdbTxn *_pDestination)
 	{
-		CMdbCursor *mc, *bk;
-		CMdbXCursor *mx;
-		umint size;
-		int i;
+		CMdbCursor *pCursor, *pBackup;
+		CMdbXCursor *pXCursor;
+		umint Size;
+		int iDatabase;
 
-		for (i = _pSource->mt_numdbs; --i >= 0;)
+		for (iDatabase = _pSource->m_nDatabases; --iDatabase >= 0;)
 		{
-			if ((mc = _pSource->mt_cursors[i]) != nullptr)
+			if ((pCursor = _pSource->m_pCursors[iDatabase]) != nullptr)
 			{
-				size = sizeof(CMdbCursor);
-				if (mc->mc_xcursor)
-					size += sizeof(CMdbXCursor);
-				for (; mc; mc = bk->mc_next)
+				Size = sizeof(CMdbCursor);
+				if (pCursor->m_pXCursor)
+					Size += sizeof(CMdbXCursor);
+				for (; pCursor; pCursor = pBackup->m_pNext)
 				{
-					bk = (CMdbCursor *)NMemory::fg_Alloc(size);
-					*bk = *mc;
-					mc->mc_backup = bk;
-					mc->mc_db = &_pDestination->mt_dbs[i];
+					pBackup = (CMdbCursor *)NMemory::fg_Alloc(Size);
+					*pBackup = *pCursor;
+					pCursor->m_pBackup = pBackup;
+					pCursor->m_pDatabase = &_pDestination->m_pDatabases[iDatabase];
 					/* Kill pointers into _pSource to reduce abuse: The
-					 * user may not use mc until _pDestination ends. But we need a valid
+					 * user may not use pCursor until _pDestination ends. But we need a valid
 					 * txn pointer here for cursor fixups to keep working.
 					 */
-					mc->mc_txn = _pDestination;
-					mc->mc_dbflag = &_pDestination->mt_dbflags[i];
-					if ((mx = mc->mc_xcursor) != nullptr)
+					pCursor->m_pTransaction = _pDestination;
+					pCursor->m_pDatabaseFlag = &_pDestination->m_pDatabaseFlags[iDatabase];
+					if ((pXCursor = pCursor->m_pXCursor) != nullptr)
 					{
-						*(CMdbXCursor *)(bk + 1) = *mx;
-						mx->mx_cursor.mc_txn = _pDestination;
+						*(CMdbXCursor *)(pBackup + 1) = *pXCursor;
+						pXCursor->m_Cursor.m_pTransaction = _pDestination;
 					}
-					mc->mc_next = _pDestination->mt_cursors[i];
-					_pDestination->mt_cursors[i] = mc;
+					pCursor->m_pNext = _pDestination->m_pCursors[iDatabase];
+					_pDestination->m_pCursors[iDatabase] = pCursor;
 				}
 			}
 		}
@@ -1766,60 +1772,60 @@ namespace NMib::NDatabase::NPrivate
 	 */
 	void fg_CursorsClose(CMdbTxn *_pTransaction, unsigned _bMerge)
 	{
-		CMdbCursor **cursors = _pTransaction->mt_cursors, *mc, *next, *bk;
-		CMdbXCursor *mx;
-		int i;
+		CMdbCursor **pCursors = _pTransaction->m_pCursors, *pCursor, *pNext, *pBackup;
+		CMdbXCursor *pXCursor;
+		int iDatabase;
 
-		for (i = _pTransaction->mt_numdbs; --i >= 0;)
+		for (iDatabase = _pTransaction->m_nDatabases; --iDatabase >= 0;)
 		{
-			for (mc = cursors[i]; mc; mc = next)
+			for (pCursor = pCursors[iDatabase]; pCursor; pCursor = pNext)
 			{
-				next = mc->mc_next;
-				if ((bk = mc->mc_backup) != nullptr)
+				pNext = pCursor->m_pNext;
+				if ((pBackup = pCursor->m_pBackup) != nullptr)
 				{
 					if (_bMerge)
 					{
 						/* Commit changes to parent txn */
-						mc->mc_next = bk->mc_next;
-						mc->mc_backup = bk->mc_backup;
-						mc->mc_txn = bk->mc_txn;
-						mc->mc_db = bk->mc_db;
-						mc->mc_dbflag = bk->mc_dbflag;
-						if ((mx = mc->mc_xcursor) != nullptr)
-							mx->mx_cursor.mc_txn = bk->mc_txn;
+						pCursor->m_pNext = pBackup->m_pNext;
+						pCursor->m_pBackup = pBackup->m_pBackup;
+						pCursor->m_pTransaction = pBackup->m_pTransaction;
+						pCursor->m_pDatabase = pBackup->m_pDatabase;
+						pCursor->m_pDatabaseFlag = pBackup->m_pDatabaseFlag;
+						if ((pXCursor = pCursor->m_pXCursor) != nullptr)
+							pXCursor->m_Cursor.m_pTransaction = pBackup->m_pTransaction;
 					}
 					else
 					{
 						/* Abort nested txn */
-						*mc = *bk;
-						if ((mx = mc->mc_xcursor) != nullptr)
-							*mx = *(CMdbXCursor *)(bk + 1);
+						*pCursor = *pBackup;
+						if ((pXCursor = pCursor->m_pXCursor) != nullptr)
+							*pXCursor = *(CMdbXCursor *)(pBackup + 1);
 					}
-					mc = bk;
+					pCursor = pBackup;
 				}
 				/* Only malloced cursors are permanently tracked. */
 				umint Size = sizeof(CMdbCursor);
-				if (mc->mc_xcursor)
+				if (pCursor->m_pXCursor)
 					Size += sizeof(CMdbXCursor);
 
-				NMemory::fg_Free(mc, Size);
+				NMemory::fg_Free(pCursor, Size);
 			}
-			cursors[i] = nullptr;
+			pCursors[iDatabase] = nullptr;
 		}
 	}
 
 	/** Pop a page off the top of the cursor's stack. */
 	void fg_CursorPop(CMdbCursor *_pCursor)
 	{
-		if (_pCursor->mc_snum)
+		if (_pCursor->m_nPages)
 		{
-			DMibDatabaseTrace("popping page {} off db {} cursor {}", _pCursor->mc_pg[_pCursor->mc_top]->mp_p.p_pgno, DDbi(_pCursor), (void *)_pCursor);
+			DMibDatabaseTrace("popping page {} off db {} cursor {}", _pCursor->m_Pages[_pCursor->m_iTop]->m_PageNumber, DDbi(_pCursor), (void *)_pCursor);
 
-			_pCursor->mc_snum--;
-			if (_pCursor->mc_snum)
-				_pCursor->mc_top--;
+			_pCursor->m_nPages--;
+			if (_pCursor->m_nPages)
+				_pCursor->m_iTop--;
 			else
-				_pCursor->mc_flags &= ~DCInitialized;
+				_pCursor->m_Flags &= ~DCInitialized;
 		}
 	}
 
@@ -1828,17 +1834,17 @@ namespace NMib::NDatabase::NPrivate
 	 */
 	int fg_CursorPush(CMdbCursor *_pCursor, CMdbPage *_pPage)
 	{
-		DMibDatabaseTrace("pushing page {} on db {} cursor {}", _pPage->mp_p.p_pgno, DDbi(_pCursor), (void *)_pCursor);
+		DMibDatabaseTrace("pushing page {} on db {} cursor {}", _pPage->m_PageNumber, DDbi(_pCursor), (void *)_pCursor);
 
-		if (_pCursor->mc_snum >= DCursorStack)
+		if (_pCursor->m_nPages >= DCursorStack)
 		{
-			_pCursor->mc_txn->mt_flags |= DMdbTxnError;
+			_pCursor->m_pTransaction->m_Flags |= DMdbTxnError;
 			return DMdbCursorFull;
 		}
 
-		_pCursor->mc_top = _pCursor->mc_snum++;
-		_pCursor->mc_pg[_pCursor->mc_top] = _pPage;
-		_pCursor->mc_ki[_pCursor->mc_top] = 0;
+		_pCursor->m_iTop = _pCursor->m_nPages++;
+		_pCursor->m_Pages[_pCursor->m_iTop] = _pPage;
+		_pCursor->m_NodeIndices[_pCursor->m_iTop] = 0;
 
 		return DMdbSuccess;
 	}
@@ -1853,56 +1859,56 @@ namespace NMib::NDatabase::NPrivate
 	 */
 	int fg_CursorSibling(CMdbCursor *_pCursor, int _bMoveRight)
 	{
-		int rc;
-		CMdbNode *indx;
-		CMdbPage *mp;
+		int Result;
+		CMdbNode *pNode;
+		CMdbPage *pPage;
 #ifdef DMibDatabase_Always64BitSupport
 		CMdbPage *op;
 #endif
 
-		if (_pCursor->mc_snum < 2)
+		if (_pCursor->m_nPages < 2)
 			return DMdbNotFound; // root has no siblings
 
 #ifdef DMibDatabase_Always64BitSupport
-		op = _pCursor->mc_pg[_pCursor->mc_top];
+		op = _pCursor->m_Pages[_pCursor->m_iTop];
 #endif
 		fg_CursorPop(_pCursor);
-		DMibDatabaseTrace("parent page is page {}, index {}", _pCursor->mc_pg[_pCursor->mc_top]->mp_p.p_pgno, _pCursor->mc_ki[_pCursor->mc_top]);
+		DMibDatabaseTrace("parent page is page {}, index {}", _pCursor->m_Pages[_pCursor->m_iTop]->m_PageNumber, _pCursor->m_NodeIndices[_pCursor->m_iTop]);
 
-		if (_bMoveRight ? (_pCursor->mc_ki[_pCursor->mc_top] + 1u >= DNumKeys(_pCursor->mc_pg[_pCursor->mc_top])) : (_pCursor->mc_ki[_pCursor->mc_top] == 0))
+		if (_bMoveRight ? (_pCursor->m_NodeIndices[_pCursor->m_iTop] + 1u >= DNumKeys(_pCursor->m_Pages[_pCursor->m_iTop])) : (_pCursor->m_NodeIndices[_pCursor->m_iTop] == 0))
 		{
 			DMibDatabaseTrace("no more keys left, moving to {} sibling", _bMoveRight ? "right" : "left");
-			if ((rc = fg_CursorSibling(_pCursor, _bMoveRight)) != DMdbSuccess)
+			if ((Result = fg_CursorSibling(_pCursor, _bMoveRight)) != DMdbSuccess)
 			{
 				/* undo cursor_pop before returning */
-				_pCursor->mc_top++;
-				_pCursor->mc_snum++;
-				return rc;
+				_pCursor->m_iTop++;
+				_pCursor->m_nPages++;
+				return Result;
 			}
 		}
 		else
 		{
 			if (_bMoveRight)
-				_pCursor->mc_ki[_pCursor->mc_top]++;
+				_pCursor->m_NodeIndices[_pCursor->m_iTop]++;
 			else
-				_pCursor->mc_ki[_pCursor->mc_top]--;
-			DMibDatabaseTrace("just moving to {} index key {}", _bMoveRight ? "right" : "left", _pCursor->mc_ki[_pCursor->mc_top]);
+				_pCursor->m_NodeIndices[_pCursor->m_iTop]--;
+			DMibDatabaseTrace("just moving to {} index key {}", _bMoveRight ? "right" : "left", _pCursor->m_NodeIndices[_pCursor->m_iTop]);
 		}
-		DMibCheck(DIsBranch(_pCursor->mc_pg[_pCursor->mc_top]));
+		DMibCheck(DIsBranch(_pCursor->m_Pages[_pCursor->m_iTop]));
 
-		DMdbPageUnref(_pCursor->mc_txn, op);
+		DMdbPageUnref(_pCursor->m_pTransaction, op);
 
-		indx = DNodePtr(_pCursor->mc_pg[_pCursor->mc_top], _pCursor->mc_ki[_pCursor->mc_top]);
-		if ((rc = fg_PageGet(_pCursor, DNodePgno(indx), &mp, nullptr)) != 0)
+		pNode = DNodePtr(_pCursor->m_Pages[_pCursor->m_iTop], _pCursor->m_NodeIndices[_pCursor->m_iTop]);
+		if ((Result = fg_PageGet(_pCursor, DNodePgno(pNode), &pPage, nullptr)) != 0)
 		{
-			/* _pCursor will be inconsistent if caller does mc_snum++ as above */
-			_pCursor->mc_flags &= ~(DCInitialized | DCEof);
-			return rc;
+			/* _pCursor will be inconsistent if caller does m_nPages++ as above */
+			_pCursor->m_Flags &= ~(DCInitialized | DCEof);
+			return Result;
 		}
 
-		fg_CursorPush(_pCursor, mp);
+		fg_CursorPush(_pCursor, pPage);
 		if (!_bMoveRight)
-			_pCursor->mc_ki[_pCursor->mc_top] = DNumKeys(mp) - 1;
+			_pCursor->m_NodeIndices[_pCursor->m_iTop] = DNumKeys(pPage) - 1;
 
 		return DMdbSuccess;
 	}
@@ -1911,101 +1917,101 @@ namespace NMib::NDatabase::NPrivate
 	int fg_CursorNext(CMdbCursor *_pCursor, CDatabaseValue *_pKey, CDatabaseValue *_pData, EDatabaseCursorGet _Operation)
 	{
 		DMibFastCheck(_pKey);
-		CMdbPage *mp;
-		CMdbNode *leaf;
-		int rc;
+		CMdbPage *pPage;
+		CMdbNode *pLeaf;
+		int Result;
 
-		if ((_pCursor->mc_flags & DCDel && _Operation == EDatabaseCursorGet_NextDup))
+		if ((_pCursor->m_Flags & DCDel && _Operation == EDatabaseCursorGet_NextDup))
 			return DMdbNotFound;
 
-		if (!(_pCursor->mc_flags & DCInitialized))
+		if (!(_pCursor->m_Flags & DCInitialized))
 			return fg_CursorFirst(_pCursor, _pKey, _pData);
 
-		mp = _pCursor->mc_pg[_pCursor->mc_top];
+		pPage = _pCursor->m_Pages[_pCursor->m_iTop];
 
-		if (_pCursor->mc_flags & DCEof)
+		if (_pCursor->m_Flags & DCEof)
 		{
-			if (_pCursor->mc_ki[_pCursor->mc_top] >= DNumKeys(mp) - 1)
+			if (_pCursor->m_NodeIndices[_pCursor->m_iTop] >= DNumKeys(pPage) - 1)
 				return DMdbNotFound;
-			_pCursor->mc_flags ^= DCEof;
+			_pCursor->m_Flags ^= DCEof;
 		}
 
-		if (_pCursor->mc_db->md_flags & EDatabaseSubFlag_SortedDuplicates)
+		if (_pCursor->m_pDatabase->m_Flags & EDatabaseSubFlag_SortedDuplicates)
 		{
-			leaf = DNodePtr(mp, _pCursor->mc_ki[_pCursor->mc_top]);
-			if (DFIsSet(leaf->mn_flags, DFDupData))
+			pLeaf = DNodePtr(pPage, _pCursor->m_NodeIndices[_pCursor->m_iTop]);
+			if (DFIsSet(pLeaf->m_Flags, DFDupData))
 			{
 				if (_Operation == EDatabaseCursorGet_Next || _Operation == EDatabaseCursorGet_NextDup)
 				{
-					rc = fg_CursorNext(&_pCursor->mc_xcursor->mx_cursor, _pData, nullptr, EDatabaseCursorGet_Next);
-					if (_Operation != EDatabaseCursorGet_Next || rc != DMdbNotFound)
+					Result = fg_CursorNext(&_pCursor->m_pXCursor->m_Cursor, _pData, nullptr, EDatabaseCursorGet_Next);
+					if (_Operation != EDatabaseCursorGet_Next || Result != DMdbNotFound)
 					{
-						if (rc == DMdbSuccess)
-							DMdbGetKey(leaf, _pKey);
-						return rc;
+						if (Result == DMdbSuccess)
+							DMdbGetKey(pLeaf, _pKey);
+						return Result;
 					}
 				}
 				else
-					DMdbCursorUnref(&_pCursor->mc_xcursor->mx_cursor, 0);
+					DMdbCursorUnref(&_pCursor->m_pXCursor->m_Cursor, 0);
 			}
 			else
 			{
-				_pCursor->mc_xcursor->mx_cursor.mc_flags &= ~(DCInitialized | DCEof);
+				_pCursor->m_pXCursor->m_Cursor.m_Flags &= ~(DCInitialized | DCEof);
 				if (_Operation == EDatabaseCursorGet_NextDup)
 					return DMdbNotFound;
 			}
 		}
 
-		DMibDatabaseTrace("cursor_next: top page is {} in cursor {}", fg_DbgPgno(mp), (void *)_pCursor);
-		if (_pCursor->mc_flags & DCDel)
+		DMibDatabaseTrace("cursor_next: top page is {} in cursor {}", fg_DbgPgno(pPage), (void *)_pCursor);
+		if (_pCursor->m_Flags & DCDel)
 		{
-			_pCursor->mc_flags ^= DCDel;
+			_pCursor->m_Flags ^= DCDel;
 			goto skip;
 		}
 
-		if (_pCursor->mc_ki[_pCursor->mc_top] + 1u >= DNumKeys(mp))
+		if (_pCursor->m_NodeIndices[_pCursor->m_iTop] + 1u >= DNumKeys(pPage))
 		{
 			DPuts("=====> move to next sibling page");
-			if ((rc = fg_CursorSibling(_pCursor, 1)) != DMdbSuccess)
+			if ((Result = fg_CursorSibling(_pCursor, 1)) != DMdbSuccess)
 			{
-				_pCursor->mc_flags |= DCEof;
-				return rc;
+				_pCursor->m_Flags |= DCEof;
+				return Result;
 			}
-			mp = _pCursor->mc_pg[_pCursor->mc_top];
-			DMibDatabaseTrace("next page is {}, key index {}", mp->mp_p.p_pgno, _pCursor->mc_ki[_pCursor->mc_top]);
+			pPage = _pCursor->m_Pages[_pCursor->m_iTop];
+			DMibDatabaseTrace("next page is {}, key index {}", pPage->m_PageNumber, _pCursor->m_NodeIndices[_pCursor->m_iTop]);
 		}
 		else
-			_pCursor->mc_ki[_pCursor->mc_top]++;
+			_pCursor->m_NodeIndices[_pCursor->m_iTop]++;
 
 	skip:
-		DMibDatabaseTrace("==> cursor points to page {} with {} keys, key index {}", fg_DbgPgno(mp), DNumKeys(mp), _pCursor->mc_ki[_pCursor->mc_top]);
+		DMibDatabaseTrace("==> cursor points to page {} with {} keys, key index {}", fg_DbgPgno(pPage), DNumKeys(pPage), _pCursor->m_NodeIndices[_pCursor->m_iTop]);
 
-		if (DIsLeaf2(mp))
+		if (DIsLeaf2(pPage))
 		{
-			_pKey->m_Size = _pCursor->mc_db->md_pad;
-			_pKey->m_pData = DLeaf2Key(mp, _pCursor->mc_ki[_pCursor->mc_top], _pKey->m_Size);
+			_pKey->m_Size = _pCursor->m_pDatabase->m_Pad;
+			_pKey->m_pData = DLeaf2Key(pPage, _pCursor->m_NodeIndices[_pCursor->m_iTop], _pKey->m_Size);
 			return DMdbSuccess;
 		}
 
-		DMibCheck(DIsLeaf(mp));
-		leaf = DNodePtr(mp, _pCursor->mc_ki[_pCursor->mc_top]);
+		DMibCheck(DIsLeaf(pPage));
+		pLeaf = DNodePtr(pPage, _pCursor->m_NodeIndices[_pCursor->m_iTop]);
 
-		if (DFIsSet(leaf->mn_flags, DFDupData))
-			fg_XCursorInit1(_pCursor, leaf);
+		if (DFIsSet(pLeaf->m_Flags, DFDupData))
+			fg_XCursorInit1(_pCursor, pLeaf);
 		if (_pData)
 		{
-			if ((rc = fg_NodeRead(_pCursor, leaf, _pData)) != DMdbSuccess)
-				return rc;
+			if ((Result = fg_NodeRead(_pCursor, pLeaf, _pData)) != DMdbSuccess)
+				return Result;
 
-			if (DFIsSet(leaf->mn_flags, DFDupData))
+			if (DFIsSet(pLeaf->m_Flags, DFDupData))
 			{
-				rc = fg_CursorFirst(&_pCursor->mc_xcursor->mx_cursor, _pData, nullptr);
-				if (rc != DMdbSuccess)
-					return rc;
+				Result = fg_CursorFirst(&_pCursor->m_pXCursor->m_Cursor, _pData, nullptr);
+				if (Result != DMdbSuccess)
+					return Result;
 			}
 		}
 
-		DMdbGetKey(leaf, _pKey);
+		DMdbGetKey(pLeaf, _pKey);
 		return DMdbSuccess;
 	}
 
@@ -2014,182 +2020,182 @@ namespace NMib::NDatabase::NPrivate
 	{
 		DMibFastCheck(_pKey);
 
-		CMdbPage *mp;
-		CMdbNode *leaf;
-		int rc;
+		CMdbPage *pPage;
+		CMdbNode *pLeaf;
+		int Result;
 
-		if (!(_pCursor->mc_flags & DCInitialized))
+		if (!(_pCursor->m_Flags & DCInitialized))
 		{
-			rc = fg_CursorLast(_pCursor, _pKey, _pData);
-			if (rc)
-				return rc;
-			_pCursor->mc_ki[_pCursor->mc_top]++;
+			Result = fg_CursorLast(_pCursor, _pKey, _pData);
+			if (Result)
+				return Result;
+			_pCursor->m_NodeIndices[_pCursor->m_iTop]++;
 		}
 
-		mp = _pCursor->mc_pg[_pCursor->mc_top];
+		pPage = _pCursor->m_Pages[_pCursor->m_iTop];
 
-		if (_pCursor->mc_db->md_flags & EDatabaseSubFlag_SortedDuplicates)
+		if (_pCursor->m_pDatabase->m_Flags & EDatabaseSubFlag_SortedDuplicates)
 		{
-			leaf = DNodePtr(mp, _pCursor->mc_ki[_pCursor->mc_top]);
-			if (DFIsSet(leaf->mn_flags, DFDupData))
+			pLeaf = DNodePtr(pPage, _pCursor->m_NodeIndices[_pCursor->m_iTop]);
+			if (DFIsSet(pLeaf->m_Flags, DFDupData))
 			{
 				if (_Operation == EDatabaseCursorGet_Prev || _Operation == EDatabaseCursorGet_PrevDup)
 				{
-					rc = fg_CursorPrev(&_pCursor->mc_xcursor->mx_cursor, _pData, nullptr, EDatabaseCursorGet_Prev);
-					if (_Operation != EDatabaseCursorGet_Prev || rc != DMdbNotFound)
+					Result = fg_CursorPrev(&_pCursor->m_pXCursor->m_Cursor, _pData, nullptr, EDatabaseCursorGet_Prev);
+					if (_Operation != EDatabaseCursorGet_Prev || Result != DMdbNotFound)
 					{
-						if (rc == DMdbSuccess)
+						if (Result == DMdbSuccess)
 						{
-							DMdbGetKey(leaf, _pKey);
-							_pCursor->mc_flags &= ~DCEof;
+							DMdbGetKey(pLeaf, _pKey);
+							_pCursor->m_Flags &= ~DCEof;
 						}
-						return rc;
+						return Result;
 					}
 				}
 				else
-					DMdbCursorUnref(&_pCursor->mc_xcursor->mx_cursor, 0);
+					DMdbCursorUnref(&_pCursor->m_pXCursor->m_Cursor, 0);
 			}
 			else
 			{
-				_pCursor->mc_xcursor->mx_cursor.mc_flags &= ~(DCInitialized | DCEof);
+				_pCursor->m_pXCursor->m_Cursor.m_Flags &= ~(DCInitialized | DCEof);
 				if (_Operation == EDatabaseCursorGet_PrevDup)
 					return DMdbNotFound;
 			}
 		}
 
-		DMibDatabaseTrace("cursor_prev: top page is {} in cursor {}", fg_DbgPgno(mp), (void *)_pCursor);
+		DMibDatabaseTrace("cursor_prev: top page is {} in cursor {}", fg_DbgPgno(pPage), (void *)_pCursor);
 
-		_pCursor->mc_flags &= ~(DCEof | DCDel);
+		_pCursor->m_Flags &= ~(DCEof | DCDel);
 
-		if (_pCursor->mc_ki[_pCursor->mc_top] == 0)
+		if (_pCursor->m_NodeIndices[_pCursor->m_iTop] == 0)
 		{
 			DPuts("=====> move to prev sibling page");
-			if ((rc = fg_CursorSibling(_pCursor, 0)) != DMdbSuccess)
-				return rc;
-			mp = _pCursor->mc_pg[_pCursor->mc_top];
-			_pCursor->mc_ki[_pCursor->mc_top] = DNumKeys(mp) - 1;
-			DMibDatabaseTrace("prev page is {}, key index {}", mp->mp_p.p_pgno, _pCursor->mc_ki[_pCursor->mc_top]);
+			if ((Result = fg_CursorSibling(_pCursor, 0)) != DMdbSuccess)
+				return Result;
+			pPage = _pCursor->m_Pages[_pCursor->m_iTop];
+			_pCursor->m_NodeIndices[_pCursor->m_iTop] = DNumKeys(pPage) - 1;
+			DMibDatabaseTrace("prev page is {}, key index {}", pPage->m_PageNumber, _pCursor->m_NodeIndices[_pCursor->m_iTop]);
 		}
 		else
-			_pCursor->mc_ki[_pCursor->mc_top]--;
+			_pCursor->m_NodeIndices[_pCursor->m_iTop]--;
 
-		DMibDatabaseTrace("==> cursor points to page {} with {} keys, key index {}", fg_DbgPgno(mp), DNumKeys(mp), _pCursor->mc_ki[_pCursor->mc_top]);
+		DMibDatabaseTrace("==> cursor points to page {} with {} keys, key index {}", fg_DbgPgno(pPage), DNumKeys(pPage), _pCursor->m_NodeIndices[_pCursor->m_iTop]);
 
-		if (DIsLeaf2(mp))
+		if (DIsLeaf2(pPage))
 		{
-			_pKey->m_Size = _pCursor->mc_db->md_pad;
-			_pKey->m_pData = DLeaf2Key(mp, _pCursor->mc_ki[_pCursor->mc_top], _pKey->m_Size);
+			_pKey->m_Size = _pCursor->m_pDatabase->m_Pad;
+			_pKey->m_pData = DLeaf2Key(pPage, _pCursor->m_NodeIndices[_pCursor->m_iTop], _pKey->m_Size);
 			return DMdbSuccess;
 		}
 
-		DMibCheck(DIsLeaf(mp));
-		leaf = DNodePtr(mp, _pCursor->mc_ki[_pCursor->mc_top]);
+		DMibCheck(DIsLeaf(pPage));
+		pLeaf = DNodePtr(pPage, _pCursor->m_NodeIndices[_pCursor->m_iTop]);
 
-		if (DFIsSet(leaf->mn_flags, DFDupData))
-			fg_XCursorInit1(_pCursor, leaf);
+		if (DFIsSet(pLeaf->m_Flags, DFDupData))
+			fg_XCursorInit1(_pCursor, pLeaf);
 
 		if (_pData)
 		{
-			if ((rc = fg_NodeRead(_pCursor, leaf, _pData)) != DMdbSuccess)
-				return rc;
+			if ((Result = fg_NodeRead(_pCursor, pLeaf, _pData)) != DMdbSuccess)
+				return Result;
 
-			if (DFIsSet(leaf->mn_flags, DFDupData))
+			if (DFIsSet(pLeaf->m_Flags, DFDupData))
 			{
-				rc = fg_CursorLast(&_pCursor->mc_xcursor->mx_cursor, _pData, nullptr);
-				if (rc != DMdbSuccess)
-					return rc;
+				Result = fg_CursorLast(&_pCursor->m_pXCursor->m_Cursor, _pData, nullptr);
+				if (Result != DMdbSuccess)
+					return Result;
 			}
 		}
 
-		DMdbGetKey(leaf, _pKey);
+		DMdbGetKey(pLeaf, _pKey);
 		return DMdbSuccess;
 	}
 
 	/** Set the cursor on a specific data item. */
 	int fg_CursorSet(CMdbCursor *_pCursor, CDatabaseValue *_pKey, CDatabaseValue *_pData, EDatabaseCursorGet _Operation, int *o_pExact)
 	{
-		int rc;
-		CMdbPage *mp;
-		CMdbNode *leaf = nullptr;
+		int Result;
+		CMdbPage *pPage;
+		CMdbNode *pLeaf = nullptr;
 		DKBuf;
 
 		if (_pKey->m_Size == 0)
 			return DMdbBadValsize;
 
-		if (_pCursor->mc_xcursor)
+		if (_pCursor->m_pXCursor)
 		{
-			DMdbCursorUnref(&_pCursor->mc_xcursor->mx_cursor, 0);
-			_pCursor->mc_xcursor->mx_cursor.mc_flags &= ~(DCInitialized | DCEof);
+			DMdbCursorUnref(&_pCursor->m_pXCursor->m_Cursor, 0);
+			_pCursor->m_pXCursor->m_Cursor.m_Flags &= ~(DCInitialized | DCEof);
 		}
 
 		/* See if we're already on the right page */
-		if (_pCursor->mc_flags & DCInitialized)
+		if (_pCursor->m_Flags & DCInitialized)
 		{
-			CDatabaseValue nodekey;
+			CDatabaseValue NodeKey;
 
-			mp = _pCursor->mc_pg[_pCursor->mc_top];
-			if (!DNumKeys(mp))
+			pPage = _pCursor->m_Pages[_pCursor->m_iTop];
+			if (!DNumKeys(pPage))
 			{
-				_pCursor->mc_ki[_pCursor->mc_top] = 0;
+				_pCursor->m_NodeIndices[_pCursor->m_iTop] = 0;
 				return DMdbNotFound;
 			}
-			if (mp->mp_flags & DPLeaf2)
+			if (pPage->m_Flags & DPLeaf2)
 			{
-				nodekey.m_Size = _pCursor->mc_db->md_pad;
-				nodekey.m_pData = DLeaf2Key(mp, 0, nodekey.m_Size);
+				NodeKey.m_Size = _pCursor->m_pDatabase->m_Pad;
+				NodeKey.m_pData = DLeaf2Key(pPage, 0, NodeKey.m_Size);
 			}
 			else
 			{
-				leaf = DNodePtr(mp, 0);
-				DMdbGetKey2(leaf, nodekey);
+				pLeaf = DNodePtr(pPage, 0);
+				DMdbGetKey2(pLeaf, NodeKey);
 			}
-			rc = _pCursor->mc_dbx->m_fKeyCompare(*_pKey, nodekey);
-			if (rc == 0)
+			Result = _pCursor->m_pDatabaseInfo->m_fKeyCompare(*_pKey, NodeKey);
+			if (Result == 0)
 			{
 				/* Probably happens rarely, but first node on the page
 				 * was the one we wanted.
 				 */
-				_pCursor->mc_ki[_pCursor->mc_top] = 0;
+				_pCursor->m_NodeIndices[_pCursor->m_iTop] = 0;
 				if (o_pExact)
 					*o_pExact = 1;
 				goto set1;
 			}
-			if (rc > 0)
+			if (Result > 0)
 			{
-				uint32 i;
-				uint32 nkeys = DNumKeys(mp);
-				if (nkeys > 1)
+				uint32 iLevel;
+				uint32 nKeys = DNumKeys(pPage);
+				if (nKeys > 1)
 				{
-					if (mp->mp_flags & DPLeaf2)
-						nodekey.m_pData = DLeaf2Key(mp, nkeys - 1, nodekey.m_Size);
+					if (pPage->m_Flags & DPLeaf2)
+						NodeKey.m_pData = DLeaf2Key(pPage, nKeys - 1, NodeKey.m_Size);
 					else
 					{
-						leaf = DNodePtr(mp, nkeys - 1);
-						DMdbGetKey2(leaf, nodekey);
+						pLeaf = DNodePtr(pPage, nKeys - 1);
+						DMdbGetKey2(pLeaf, NodeKey);
 					}
-					rc = _pCursor->mc_dbx->m_fKeyCompare(*_pKey, nodekey);
-					if (rc == 0)
+					Result = _pCursor->m_pDatabaseInfo->m_fKeyCompare(*_pKey, NodeKey);
+					if (Result == 0)
 					{
 						/* last node was the one we wanted */
-						_pCursor->mc_ki[_pCursor->mc_top] = nkeys - 1;
+						_pCursor->m_NodeIndices[_pCursor->m_iTop] = nKeys - 1;
 						if (o_pExact)
 							*o_pExact = 1;
 						goto set1;
 					}
-					if (rc < 0)
+					if (Result < 0)
 					{
-						if (_pCursor->mc_ki[_pCursor->mc_top] < DNumKeys(mp))
+						if (_pCursor->m_NodeIndices[_pCursor->m_iTop] < DNumKeys(pPage))
 						{
 							/* This is definitely the right page, skip search_page */
-							if (mp->mp_flags & DPLeaf2)
-								nodekey.m_pData = DLeaf2Key(mp, _pCursor->mc_ki[_pCursor->mc_top], nodekey.m_Size);
+							if (pPage->m_Flags & DPLeaf2)
+								NodeKey.m_pData = DLeaf2Key(pPage, _pCursor->m_NodeIndices[_pCursor->m_iTop], NodeKey.m_Size);
 							else
 							{
-								leaf = DNodePtr(mp, _pCursor->mc_ki[_pCursor->mc_top]);
-								DMdbGetKey2(leaf, nodekey);
+								pLeaf = DNodePtr(pPage, _pCursor->m_NodeIndices[_pCursor->m_iTop]);
+								DMdbGetKey2(pLeaf, NodeKey);
 							}
-							rc = _pCursor->mc_dbx->m_fKeyCompare(*_pKey, nodekey);
-							if (rc == 0)
+							Result = _pCursor->m_pDatabaseInfo->m_fKeyCompare(*_pKey, NodeKey);
+							if (Result == 0)
 							{
 								/* current node was the one we wanted */
 								if (o_pExact)
@@ -2197,33 +2203,33 @@ namespace NMib::NDatabase::NPrivate
 								goto set1;
 							}
 						}
-						rc = 0;
-						_pCursor->mc_flags &= ~DCEof;
+						Result = 0;
+						_pCursor->m_Flags &= ~DCEof;
 						goto set2;
 					}
 				}
 				/* If any parents have right-sibs, search.
 				 * Otherwise, there's nothing further.
 				 */
-				for (i = 0; i < _pCursor->mc_top; i++)
+				for (iLevel = 0; iLevel < _pCursor->m_iTop; iLevel++)
 				{
-					if (_pCursor->mc_ki[i] < DNumKeys(_pCursor->mc_pg[i]) - 1)
+					if (_pCursor->m_NodeIndices[iLevel] < DNumKeys(_pCursor->m_Pages[iLevel]) - 1)
 						break;
 				}
-				if (i == _pCursor->mc_top)
+				if (iLevel == _pCursor->m_iTop)
 				{
 					/* There are no other pages */
-					_pCursor->mc_ki[_pCursor->mc_top] = nkeys;
+					_pCursor->m_NodeIndices[_pCursor->m_iTop] = nKeys;
 					return DMdbNotFound;
 				}
 			}
-			if (!_pCursor->mc_top)
+			if (!_pCursor->m_iTop)
 			{
 				/* There are no other pages */
-				_pCursor->mc_ki[_pCursor->mc_top] = 0;
+				_pCursor->m_NodeIndices[_pCursor->m_iTop] = 0;
 				if (_Operation == EDatabaseCursorGet_SetRange && !o_pExact)
 				{
-					rc = 0;
+					Result = 0;
 					goto set1;
 				}
 				else
@@ -2231,244 +2237,244 @@ namespace NMib::NDatabase::NPrivate
 			}
 		}
 		else
-			_pCursor->mc_pg[0] = 0;
+			_pCursor->m_Pages[0] = 0;
 
-		rc = fg_PageSearch(_pCursor, _pKey, 0);
-		if (rc != DMdbSuccess)
-			return rc;
+		Result = fg_PageSearch(_pCursor, _pKey, 0);
+		if (Result != DMdbSuccess)
+			return Result;
 
-		mp = _pCursor->mc_pg[_pCursor->mc_top];
-		DMibCheck(DIsLeaf(mp));
+		pPage = _pCursor->m_Pages[_pCursor->m_iTop];
+		DMibCheck(DIsLeaf(pPage));
 
 	set2:
-		leaf = fg_NodeSearch(_pCursor, _pKey, o_pExact);
+		pLeaf = fg_NodeSearch(_pCursor, _pKey, o_pExact);
 		if (o_pExact != nullptr && !*o_pExact)
 		{
 			/* EDatabaseCursorGet_Set specified and not an exact match. */
 			return DMdbNotFound;
 		}
 
-		if (leaf == nullptr)
+		if (pLeaf == nullptr)
 		{
 			DPuts("===> inexact leaf not found, goto sibling");
-			if ((rc = fg_CursorSibling(_pCursor, 1)) != DMdbSuccess)
+			if ((Result = fg_CursorSibling(_pCursor, 1)) != DMdbSuccess)
 			{
-				_pCursor->mc_flags |= DCEof;
-				return rc; // no entries matched
+				_pCursor->m_Flags |= DCEof;
+				return Result; // no entries matched
 			}
-			mp = _pCursor->mc_pg[_pCursor->mc_top];
-			DMibCheck(DIsLeaf(mp));
-			leaf = DNodePtr(mp, 0);
+			pPage = _pCursor->m_Pages[_pCursor->m_iTop];
+			DMibCheck(DIsLeaf(pPage));
+			pLeaf = DNodePtr(pPage, 0);
 		}
 
 	set1:
-		_pCursor->mc_flags |= DCInitialized;
-		_pCursor->mc_flags &= ~DCEof;
+		_pCursor->m_Flags |= DCInitialized;
+		_pCursor->m_Flags &= ~DCEof;
 
-		if (DIsLeaf2(mp))
+		if (DIsLeaf2(pPage))
 		{
 			if (_Operation == EDatabaseCursorGet_SetRange || _Operation == EDatabaseCursorGet_SetKey)
 			{
-				_pKey->m_Size = _pCursor->mc_db->md_pad;
-				_pKey->m_pData = DLeaf2Key(mp, _pCursor->mc_ki[_pCursor->mc_top], _pKey->m_Size);
+				_pKey->m_Size = _pCursor->m_pDatabase->m_Pad;
+				_pKey->m_pData = DLeaf2Key(pPage, _pCursor->m_NodeIndices[_pCursor->m_iTop], _pKey->m_Size);
 			}
 			return DMdbSuccess;
 		}
 
-		DMibFastCheck(leaf);
-		if (DFIsSet(leaf->mn_flags, DFDupData))
-			fg_XCursorInit1(_pCursor, leaf);
+		DMibFastCheck(pLeaf);
+		if (DFIsSet(pLeaf->m_Flags, DFDupData))
+			fg_XCursorInit1(_pCursor, pLeaf);
 		if (_pData)
 		{
-			if (DFIsSet(leaf->mn_flags, DFDupData))
+			if (DFIsSet(pLeaf->m_Flags, DFDupData))
 			{
 				if (_Operation == EDatabaseCursorGet_Set || _Operation == EDatabaseCursorGet_SetKey || _Operation == EDatabaseCursorGet_SetRange)
-					rc = fg_CursorFirst(&_pCursor->mc_xcursor->mx_cursor, _pData, nullptr);
+					Result = fg_CursorFirst(&_pCursor->m_pXCursor->m_Cursor, _pData, nullptr);
 				else
 				{
-					int ex2, *ex2p;
+					int SubExact, *pSubExact;
 					if (_Operation == EDatabaseCursorGet_GetBoth)
 					{
-						ex2p = &ex2;
-						ex2 = 0;
+						pSubExact = &SubExact;
+						SubExact = 0;
 					}
 					else
-						ex2p = nullptr;
-					rc = fg_CursorSet(&_pCursor->mc_xcursor->mx_cursor, _pData, nullptr, EDatabaseCursorGet_SetRange, ex2p);
-					if (rc != DMdbSuccess)
-						return rc;
+						pSubExact = nullptr;
+					Result = fg_CursorSet(&_pCursor->m_pXCursor->m_Cursor, _pData, nullptr, EDatabaseCursorGet_SetRange, pSubExact);
+					if (Result != DMdbSuccess)
+						return Result;
 				}
 			}
 			else if (_Operation == EDatabaseCursorGet_GetBoth || _Operation == EDatabaseCursorGet_GetBothRange)
 			{
-				CDatabaseValue olddata;
+				CDatabaseValue OldData;
 				FDatabaseCompare *pDataCompare = nullptr;
-				if ((rc = fg_NodeRead(_pCursor, leaf, &olddata)) != DMdbSuccess)
-					return rc;
-				pDataCompare = &(_pCursor->mc_dbx->m_fDataCompare);
-				if (DNeedCmpClong(*pDataCompare, olddata.m_Size))
+				if ((Result = fg_NodeRead(_pCursor, pLeaf, &OldData)) != DMdbSuccess)
+					return Result;
+				pDataCompare = &(_pCursor->m_pDatabaseInfo->m_fDataCompare);
+				if (DNeedCmpClong(*pDataCompare, OldData.m_Size))
 					pDataCompare = &g_mdb_cmp_clong;
-				rc = (*pDataCompare)(*_pData, olddata);
-				if (rc)
+				Result = (*pDataCompare)(*_pData, OldData);
+				if (Result)
 				{
-					if (_Operation == EDatabaseCursorGet_GetBoth || rc > 0)
+					if (_Operation == EDatabaseCursorGet_GetBoth || Result > 0)
 						return DMdbNotFound;
-					rc = 0;
+					Result = 0;
 				}
-				*_pData = olddata;
+				*_pData = OldData;
 			}
 			else
 			{
-				if (_pCursor->mc_xcursor)
-					_pCursor->mc_xcursor->mx_cursor.mc_flags &= ~(DCInitialized | DCEof);
-				if ((rc = fg_NodeRead(_pCursor, leaf, _pData)) != DMdbSuccess)
-					return rc;
+				if (_pCursor->m_pXCursor)
+					_pCursor->m_pXCursor->m_Cursor.m_Flags &= ~(DCInitialized | DCEof);
+				if ((Result = fg_NodeRead(_pCursor, pLeaf, _pData)) != DMdbSuccess)
+					return Result;
 			}
 		}
 
 		/* The key already matches in all other cases */
 		if (_Operation == EDatabaseCursorGet_SetRange || _Operation == EDatabaseCursorGet_SetKey)
-			DMdbGetKey(leaf, _pKey);
+			DMdbGetKey(pLeaf, _pKey);
 		DMibDatabaseTrace("==> cursor placed on key [{}]", DKey(_pKey));
 
-		return rc;
+		return Result;
 	}
 
 	/** Move the cursor to the first item in the database. */
 	int fg_CursorFirst(CMdbCursor *_pCursor, CDatabaseValue *_pKey, CDatabaseValue *_pData)
 	{
-		int rc;
-		CMdbNode *leaf;
+		int Result;
+		CMdbNode *pLeaf;
 
-		if (_pCursor->mc_xcursor)
+		if (_pCursor->m_pXCursor)
 		{
-			DMdbCursorUnref(&_pCursor->mc_xcursor->mx_cursor, 0);
-			_pCursor->mc_xcursor->mx_cursor.mc_flags &= ~(DCInitialized | DCEof);
+			DMdbCursorUnref(&_pCursor->m_pXCursor->m_Cursor, 0);
+			_pCursor->m_pXCursor->m_Cursor.m_Flags &= ~(DCInitialized | DCEof);
 		}
 
-		if (!(_pCursor->mc_flags & DCInitialized) || _pCursor->mc_top)
+		if (!(_pCursor->m_Flags & DCInitialized) || _pCursor->m_iTop)
 		{
-			rc = fg_PageSearch(_pCursor, nullptr, DMdbPsFirst);
-			if (rc != DMdbSuccess)
-				return rc;
+			Result = fg_PageSearch(_pCursor, nullptr, DMdbPsFirst);
+			if (Result != DMdbSuccess)
+				return Result;
 		}
-		DMibCheck(DIsLeaf(_pCursor->mc_pg[_pCursor->mc_top]));
+		DMibCheck(DIsLeaf(_pCursor->m_Pages[_pCursor->m_iTop]));
 
-		leaf = DNodePtr(_pCursor->mc_pg[_pCursor->mc_top], 0);
-		_pCursor->mc_flags |= DCInitialized;
-		_pCursor->mc_flags &= ~DCEof;
+		pLeaf = DNodePtr(_pCursor->m_Pages[_pCursor->m_iTop], 0);
+		_pCursor->m_Flags |= DCInitialized;
+		_pCursor->m_Flags &= ~DCEof;
 
-		_pCursor->mc_ki[_pCursor->mc_top] = 0;
+		_pCursor->m_NodeIndices[_pCursor->m_iTop] = 0;
 
-		if (DIsLeaf2(_pCursor->mc_pg[_pCursor->mc_top]))
+		if (DIsLeaf2(_pCursor->m_Pages[_pCursor->m_iTop]))
 		{
-			_pKey->m_Size = _pCursor->mc_db->md_pad;
-			_pKey->m_pData = DLeaf2Key(_pCursor->mc_pg[_pCursor->mc_top], 0, _pKey->m_Size);
+			_pKey->m_Size = _pCursor->m_pDatabase->m_Pad;
+			_pKey->m_pData = DLeaf2Key(_pCursor->m_Pages[_pCursor->m_iTop], 0, _pKey->m_Size);
 			return DMdbSuccess;
 		}
 
 		if (_pData)
 		{
-			if (DFIsSet(leaf->mn_flags, DFDupData))
+			if (DFIsSet(pLeaf->m_Flags, DFDupData))
 			{
-				fg_XCursorInit1(_pCursor, leaf);
-				rc = fg_CursorFirst(&_pCursor->mc_xcursor->mx_cursor, _pData, nullptr);
-				if (rc)
-					return rc;
+				fg_XCursorInit1(_pCursor, pLeaf);
+				Result = fg_CursorFirst(&_pCursor->m_pXCursor->m_Cursor, _pData, nullptr);
+				if (Result)
+					return Result;
 			}
 			else
 			{
-				if ((rc = fg_NodeRead(_pCursor, leaf, _pData)) != DMdbSuccess)
-					return rc;
+				if ((Result = fg_NodeRead(_pCursor, pLeaf, _pData)) != DMdbSuccess)
+					return Result;
 			}
 		}
-		DMdbGetKey(leaf, _pKey);
+		DMdbGetKey(pLeaf, _pKey);
 		return DMdbSuccess;
 	}
 
 	/** Move the cursor to the last item in the database. */
 	int fg_CursorLast(CMdbCursor *_pCursor, CDatabaseValue *_pKey, CDatabaseValue *_pData)
 	{
-		int rc;
-		CMdbNode *leaf;
+		int Result;
+		CMdbNode *pLeaf;
 
-		if (_pCursor->mc_xcursor)
+		if (_pCursor->m_pXCursor)
 		{
-			DMdbCursorUnref(&_pCursor->mc_xcursor->mx_cursor, 0);
-			_pCursor->mc_xcursor->mx_cursor.mc_flags &= ~(DCInitialized | DCEof);
+			DMdbCursorUnref(&_pCursor->m_pXCursor->m_Cursor, 0);
+			_pCursor->m_pXCursor->m_Cursor.m_Flags &= ~(DCInitialized | DCEof);
 		}
 
-		if (!(_pCursor->mc_flags & DCInitialized) || _pCursor->mc_top)
+		if (!(_pCursor->m_Flags & DCInitialized) || _pCursor->m_iTop)
 		{
-			rc = fg_PageSearch(_pCursor, nullptr, DMdbPsLast);
-			if (rc != DMdbSuccess)
-				return rc;
+			Result = fg_PageSearch(_pCursor, nullptr, DMdbPsLast);
+			if (Result != DMdbSuccess)
+				return Result;
 		}
-		DMibCheck(DIsLeaf(_pCursor->mc_pg[_pCursor->mc_top]));
+		DMibCheck(DIsLeaf(_pCursor->m_Pages[_pCursor->m_iTop]));
 
-		_pCursor->mc_ki[_pCursor->mc_top] = DNumKeys(_pCursor->mc_pg[_pCursor->mc_top]) - 1;
-		_pCursor->mc_flags |= DCInitialized | DCEof;
-		leaf = DNodePtr(_pCursor->mc_pg[_pCursor->mc_top], _pCursor->mc_ki[_pCursor->mc_top]);
+		_pCursor->m_NodeIndices[_pCursor->m_iTop] = DNumKeys(_pCursor->m_Pages[_pCursor->m_iTop]) - 1;
+		_pCursor->m_Flags |= DCInitialized | DCEof;
+		pLeaf = DNodePtr(_pCursor->m_Pages[_pCursor->m_iTop], _pCursor->m_NodeIndices[_pCursor->m_iTop]);
 
-		if (DIsLeaf2(_pCursor->mc_pg[_pCursor->mc_top]))
+		if (DIsLeaf2(_pCursor->m_Pages[_pCursor->m_iTop]))
 		{
-			_pKey->m_Size = _pCursor->mc_db->md_pad;
-			_pKey->m_pData = DLeaf2Key(_pCursor->mc_pg[_pCursor->mc_top], _pCursor->mc_ki[_pCursor->mc_top], _pKey->m_Size);
+			_pKey->m_Size = _pCursor->m_pDatabase->m_Pad;
+			_pKey->m_pData = DLeaf2Key(_pCursor->m_Pages[_pCursor->m_iTop], _pCursor->m_NodeIndices[_pCursor->m_iTop], _pKey->m_Size);
 			return DMdbSuccess;
 		}
 
 		if (_pData)
 		{
-			if (DFIsSet(leaf->mn_flags, DFDupData))
+			if (DFIsSet(pLeaf->m_Flags, DFDupData))
 			{
-				fg_XCursorInit1(_pCursor, leaf);
-				rc = fg_CursorLast(&_pCursor->mc_xcursor->mx_cursor, _pData, nullptr);
-				if (rc)
-					return rc;
+				fg_XCursorInit1(_pCursor, pLeaf);
+				Result = fg_CursorLast(&_pCursor->m_pXCursor->m_Cursor, _pData, nullptr);
+				if (Result)
+					return Result;
 			}
 			else
 			{
-				if ((rc = fg_NodeRead(_pCursor, leaf, _pData)) != DMdbSuccess)
-					return rc;
+				if ((Result = fg_NodeRead(_pCursor, pLeaf, _pData)) != DMdbSuccess)
+					return Result;
 			}
 		}
 
-		DMdbGetKey(leaf, _pKey);
+		DMdbGetKey(pLeaf, _pKey);
 		return DMdbSuccess;
 	}
 
-	/** Touch all the pages in the cursor stack. Set mc_top.
+	/** Touch all the pages in the cursor stack. Set m_iTop.
 	 *	Makes sure all the pages are writable, before attempting a write operation.
 	 * @param[in] _pCursor The cursor to operate on.
 	 */
 	int fg_CursorTouch(CMdbCursor *_pCursor)
 	{
-		int rc = DMdbSuccess;
+		int Result = DMdbSuccess;
 
-		if (_pCursor->mc_dbi >= DCoreDbs && !(*_pCursor->mc_dbflag & (DDbDirty | DDbDupData)))
+		if (_pCursor->m_DatabaseID >= DCoreDbs && !(*_pCursor->m_pDatabaseFlag & (DDbDirty | DDbDupData)))
 		{
 			/* Touch DB record of named DB */
-			CMdbCursor mc2;
-			CMdbXCursor mcx;
-			if (DTxnDbiChanged(_pCursor->mc_txn, _pCursor->mc_dbi))
+			CMdbCursor MainCursor;
+			CMdbXCursor MainXCursor;
+			if (DTxnDbiChanged(_pCursor->m_pTransaction, _pCursor->m_DatabaseID))
 				DMibError("Stale write transaction");
-			fg_CursorInit(&mc2, _pCursor->mc_txn, DMainDbi, &mcx);
-			rc = fg_PageSearch(&mc2, &_pCursor->mc_dbx->m_DatabaseName, DMdbPsModify);
-			if (rc)
-				return rc;
-			*_pCursor->mc_dbflag |= DDbDirty;
+			fg_CursorInit(&MainCursor, _pCursor->m_pTransaction, DMainDbi, &MainXCursor);
+			Result = fg_PageSearch(&MainCursor, &_pCursor->m_pDatabaseInfo->m_DatabaseName, DMdbPsModify);
+			if (Result)
+				return Result;
+			*_pCursor->m_pDatabaseFlag |= DDbDirty;
 		}
-		_pCursor->mc_top = 0;
-		if (_pCursor->mc_snum)
+		_pCursor->m_iTop = 0;
+		if (_pCursor->m_nPages)
 		{
 			do
 			{
-				rc = fg_PageTouch(_pCursor);
+				Result = fg_PageTouch(_pCursor);
 			}
-			while (!rc && ++(_pCursor->mc_top) < _pCursor->mc_snum);
-			_pCursor->mc_top = _pCursor->mc_snum - 1;
+			while (!Result && ++(_pCursor->m_iTop) < _pCursor->m_nPages);
+			_pCursor->m_iTop = _pCursor->m_nPages - 1;
 		}
-		return rc;
+		return Result;
 	}
 
 	/** Initial setup of a sorted-dups cursor.
@@ -2482,22 +2488,22 @@ namespace NMib::NDatabase::NPrivate
 	 */
 	void fg_XCursorInit0(CMdbCursor *_pCursor)
 	{
-		CMdbXCursor *mx = _pCursor->mc_xcursor;
+		CMdbXCursor *pXCursor = _pCursor->m_pXCursor;
 
-		mx->mx_cursor.mc_xcursor = nullptr;
-		mx->mx_cursor.mc_txn = _pCursor->mc_txn;
-		mx->mx_cursor.mc_db = &mx->mx_db;
-		mx->mx_cursor.mc_dbx = &mx->mx_dbx;
-		mx->mx_cursor.mc_dbi = _pCursor->mc_dbi;
-		mx->mx_cursor.mc_dbflag = &mx->mx_dbflag;
-		mx->mx_cursor.mc_snum = 0;
-		mx->mx_cursor.mc_top = 0;
-		DMcSetOvpg(&mx->mx_cursor, NULL);
-		mx->mx_cursor.mc_flags = DCSub | (_pCursor->mc_flags & (DCOrigReadOnly | DCWriteMap));
-		mx->mx_dbx.m_DatabaseName.m_Size = 0;
-		mx->mx_dbx.m_DatabaseName.m_pData = nullptr;
-		mx->mx_dbx.m_fKeyCompare = _pCursor->mc_dbx->m_fDataCompare;
-		mx->mx_dbx.m_fDataCompare = nullptr;
+		pXCursor->m_Cursor.m_pXCursor = nullptr;
+		pXCursor->m_Cursor.m_pTransaction = _pCursor->m_pTransaction;
+		pXCursor->m_Cursor.m_pDatabase = &pXCursor->m_Database;
+		pXCursor->m_Cursor.m_pDatabaseInfo = &pXCursor->m_DatabaseInfo;
+		pXCursor->m_Cursor.m_DatabaseID = _pCursor->m_DatabaseID;
+		pXCursor->m_Cursor.m_pDatabaseFlag = &pXCursor->m_DatabaseFlag;
+		pXCursor->m_Cursor.m_nPages = 0;
+		pXCursor->m_Cursor.m_iTop = 0;
+		DMcSetOvpg(&pXCursor->m_Cursor, NULL);
+		pXCursor->m_Cursor.m_Flags = DCSub | (_pCursor->m_Flags & (DCOrigReadOnly | DCWriteMap));
+		pXCursor->m_DatabaseInfo.m_DatabaseName.m_Size = 0;
+		pXCursor->m_DatabaseInfo.m_DatabaseName.m_pData = nullptr;
+		pXCursor->m_DatabaseInfo.m_fKeyCompare = _pCursor->m_pDatabaseInfo->m_fDataCompare;
+		pXCursor->m_DatabaseInfo.m_fDataCompare = nullptr;
 	}
 
 	/** Final setup of a sorted-dups cursor.
@@ -2508,44 +2514,44 @@ namespace NMib::NDatabase::NPrivate
 	 */
 	void fg_XCursorInit1(CMdbCursor *_pCursor, CMdbNode *_pNode)
 	{
-		CMdbXCursor *mx = _pCursor->mc_xcursor;
+		CMdbXCursor *pXCursor = _pCursor->m_pXCursor;
 
-		mx->mx_cursor.mc_flags &= DCSub | DCOrigReadOnly | DCWriteMap;
-		if (_pNode->mn_flags & DFSubData)
+		pXCursor->m_Cursor.m_Flags &= DCSub | DCOrigReadOnly | DCWriteMap;
+		if (_pNode->m_Flags & DFSubData)
 		{
-			memcpy(&mx->mx_db, DNodeData(_pNode), sizeof(CMdbDb));
-			mx->mx_cursor.mc_pg[0] = 0;
-			mx->mx_cursor.mc_snum = 0;
-			mx->mx_cursor.mc_top = 0;
+			memcpy(&pXCursor->m_Database, DNodeData(_pNode), sizeof(CMdbDb));
+			pXCursor->m_Cursor.m_Pages[0] = 0;
+			pXCursor->m_Cursor.m_nPages = 0;
+			pXCursor->m_Cursor.m_iTop = 0;
 		}
 		else
 		{
-			CMdbPage *fp = (CMdbPage *)DNodeData(_pNode);
-			mx->mx_db.md_pad = 0;
-			mx->mx_db.md_flags = 0;
-			mx->mx_db.md_depth = 1;
-			mx->mx_db.md_branch_pages = 0;
-			mx->mx_db.md_leaf_pages = 1;
-			mx->mx_db.md_overflow_pages = 0;
-			mx->mx_db.md_entries = DNumKeys(fp);
-			DCopyPgno(mx->mx_db.md_root, fp->mp_p.p_pgno);
-			mx->mx_cursor.mc_snum = 1;
-			mx->mx_cursor.mc_top = 0;
-			mx->mx_cursor.mc_flags |= DCInitialized;
-			mx->mx_cursor.mc_pg[0] = fp;
-			mx->mx_cursor.mc_ki[0] = 0;
-			if (_pCursor->mc_db->md_flags & EDatabaseSubFlag_SortedDuplicatesFixedSize)
+			CMdbPage *pSubPage = (CMdbPage *)DNodeData(_pNode);
+			pXCursor->m_Database.m_Pad = 0;
+			pXCursor->m_Database.m_Flags = 0;
+			pXCursor->m_Database.m_Depth = 1;
+			pXCursor->m_Database.m_nBranchPages = 0;
+			pXCursor->m_Database.m_nLeafPages = 1;
+			pXCursor->m_Database.m_nOverflowPages = 0;
+			pXCursor->m_Database.m_nEntries = DNumKeys(pSubPage);
+			DCopyPgno(pXCursor->m_Database.m_RootPage, pSubPage->m_PageNumber);
+			pXCursor->m_Cursor.m_nPages = 1;
+			pXCursor->m_Cursor.m_iTop = 0;
+			pXCursor->m_Cursor.m_Flags |= DCInitialized;
+			pXCursor->m_Cursor.m_Pages[0] = pSubPage;
+			pXCursor->m_Cursor.m_NodeIndices[0] = 0;
+			if (_pCursor->m_pDatabase->m_Flags & EDatabaseSubFlag_SortedDuplicatesFixedSize)
 			{
-				mx->mx_db.md_flags = EDatabaseSubFlag_SortedDuplicatesFixedSize;
-				mx->mx_db.md_pad = fp->mp_pad;
-				if (_pCursor->mc_db->md_flags & EDatabaseSubFlag_SortedDuplicatesIntegerKeys)
-					mx->mx_db.md_flags |= EDatabaseSubFlag_IntegerKeys;
+				pXCursor->m_Database.m_Flags = EDatabaseSubFlag_SortedDuplicatesFixedSize;
+				pXCursor->m_Database.m_Pad = pSubPage->m_Pad;
+				if (_pCursor->m_pDatabase->m_Flags & EDatabaseSubFlag_SortedDuplicatesIntegerKeys)
+					pXCursor->m_Database.m_Flags |= EDatabaseSubFlag_IntegerKeys;
 			}
 		}
-		DMibDatabaseTrace("Sub-db -{} root page {}", mx->mx_cursor.mc_dbi, mx->mx_db.md_root);
-		mx->mx_dbflag = DDbValid | DDbUserValid | DDbDupData;
-		if (DNeedCmpClong(mx->mx_dbx.m_fKeyCompare, mx->mx_db.md_pad))
-			mx->mx_dbx.m_fKeyCompare = g_mdb_cmp_clong;
+		DMibDatabaseTrace("Sub-db -{} root page {}", pXCursor->m_Cursor.m_DatabaseID, pXCursor->m_Database.m_RootPage);
+		pXCursor->m_DatabaseFlag = DDbValid | DDbUserValid | DDbDupData;
+		if (DNeedCmpClong(pXCursor->m_DatabaseInfo.m_fKeyCompare, pXCursor->m_Database.m_Pad))
+			pXCursor->m_DatabaseInfo.m_fKeyCompare = g_mdb_cmp_clong;
 	}
 
 	/** Fixup a sorted-dups cursor due to underlying update.
@@ -2558,51 +2564,51 @@ namespace NMib::NDatabase::NPrivate
 	 */
 	void fg_XCursorInit2(CMdbCursor *_pCursor, CMdbXCursor *_pSourceXCursor, int _bNewDuplicateData)
 	{
-		CMdbXCursor *mx = _pCursor->mc_xcursor;
+		CMdbXCursor *pXCursor = _pCursor->m_pXCursor;
 
 		if (_bNewDuplicateData)
 		{
-			mx->mx_cursor.mc_snum = 1;
-			mx->mx_cursor.mc_top = 0;
-			mx->mx_cursor.mc_flags |= DCInitialized;
-			mx->mx_cursor.mc_ki[0] = 0;
-			mx->mx_dbflag = DDbValid | DDbUserValid | DDbDupData;
+			pXCursor->m_Cursor.m_nPages = 1;
+			pXCursor->m_Cursor.m_iTop = 0;
+			pXCursor->m_Cursor.m_Flags |= DCInitialized;
+			pXCursor->m_Cursor.m_NodeIndices[0] = 0;
+			pXCursor->m_DatabaseFlag = DDbValid | DDbUserValid | DDbDupData;
 #if DMibPPtrBits < DMibDatabase_IDBits	/* matches fg_XCursorInit1:DNeedCmpClong() */
-			mx->mx_dbx.m_fKeyCompare = _pSourceXCursor->mx_dbx.m_fKeyCompare;
+			pXCursor->m_DatabaseInfo.m_fKeyCompare = _pSourceXCursor->m_DatabaseInfo.m_fKeyCompare;
 #endif
 		}
-		else if (!(mx->mx_cursor.mc_flags & DCInitialized))
+		else if (!(pXCursor->m_Cursor.m_Flags & DCInitialized))
 			return;
-		mx->mx_db = _pSourceXCursor->mx_db;
-		mx->mx_cursor.mc_pg[0] = _pSourceXCursor->mx_cursor.mc_pg[0];
-		DMibDatabaseTrace("Sub-db -{} root page {}", mx->mx_cursor.mc_dbi, mx->mx_db.md_root);
+		pXCursor->m_Database = _pSourceXCursor->m_Database;
+		pXCursor->m_Cursor.m_Pages[0] = _pSourceXCursor->m_Cursor.m_Pages[0];
+		DMibDatabaseTrace("Sub-db -{} root page {}", pXCursor->m_Cursor.m_DatabaseID, pXCursor->m_Database.m_RootPage);
 	}
 
 	/** Initialize a cursor for a given transaction and database. */
 	void fg_CursorInit(CMdbCursor *_pCursor, CMdbTxn *_pTransaction, CDatabaseSubID _DatabaseID, CMdbXCursor *_pXCursor)
 	{
-		_pCursor->mc_next = nullptr;
-		_pCursor->mc_backup = nullptr;
-		_pCursor->mc_dbi = _DatabaseID;
-		_pCursor->mc_txn = _pTransaction;
-		_pCursor->mc_db = &_pTransaction->mt_dbs[_DatabaseID];
-		_pCursor->mc_dbx = &_pTransaction->mt_dbxs[_DatabaseID];
-		_pCursor->mc_dbflag = &_pTransaction->mt_dbflags[_DatabaseID];
-		_pCursor->mc_snum = 0;
-		_pCursor->mc_top = 0;
-		_pCursor->mc_pg[0] = 0;
-		_pCursor->mc_ki[0] = 0;
+		_pCursor->m_pNext = nullptr;
+		_pCursor->m_pBackup = nullptr;
+		_pCursor->m_DatabaseID = _DatabaseID;
+		_pCursor->m_pTransaction = _pTransaction;
+		_pCursor->m_pDatabase = &_pTransaction->m_pDatabases[_DatabaseID];
+		_pCursor->m_pDatabaseInfo = &_pTransaction->m_pDatabaseInfos[_DatabaseID];
+		_pCursor->m_pDatabaseFlag = &_pTransaction->m_pDatabaseFlags[_DatabaseID];
+		_pCursor->m_nPages = 0;
+		_pCursor->m_iTop = 0;
+		_pCursor->m_Pages[0] = 0;
+		_pCursor->m_NodeIndices[0] = 0;
 		DMcSetOvpg(_pCursor, NULL);
-		_pCursor->mc_flags = _pTransaction->mt_flags & (DCOrigReadOnly | DCWriteMap);
-		if (_pTransaction->mt_dbs[_DatabaseID].md_flags & EDatabaseSubFlag_SortedDuplicates)
+		_pCursor->m_Flags = _pTransaction->m_Flags & (DCOrigReadOnly | DCWriteMap);
+		if (_pTransaction->m_pDatabases[_DatabaseID].m_Flags & EDatabaseSubFlag_SortedDuplicates)
 		{
 			DMibCheck(_pXCursor != nullptr);
-			_pCursor->mc_xcursor = _pXCursor;
+			_pCursor->m_pXCursor = _pXCursor;
 			fg_XCursorInit0(_pCursor);
 		}
 		else
-			_pCursor->mc_xcursor = nullptr;
-		if (*_pCursor->mc_dbflag & DDbStale)
+			_pCursor->m_pXCursor = nullptr;
+		if (*_pCursor->m_pDatabaseFlag & DDbStale)
 			fg_PageSearch(_pCursor, nullptr, DMdbPsRootonly);
 	}
 
@@ -2612,133 +2618,133 @@ namespace NMib::NDatabase::NPrivate
 	 */
 	void fg_CursorCopy(CMdbCursor const *_pSourceCursor, CMdbCursor *_pDestinationCursor)
 	{
-		uint32 i;
+		uint32 iLevel;
 
-		_pDestinationCursor->mc_txn = _pSourceCursor->mc_txn;
-		_pDestinationCursor->mc_dbi = _pSourceCursor->mc_dbi;
-		_pDestinationCursor->mc_db = _pSourceCursor->mc_db;
-		_pDestinationCursor->mc_dbx = _pSourceCursor->mc_dbx;
-		_pDestinationCursor->mc_snum = _pSourceCursor->mc_snum;
-		_pDestinationCursor->mc_top = _pSourceCursor->mc_top;
-		_pDestinationCursor->mc_flags = _pSourceCursor->mc_flags;
+		_pDestinationCursor->m_pTransaction = _pSourceCursor->m_pTransaction;
+		_pDestinationCursor->m_DatabaseID = _pSourceCursor->m_DatabaseID;
+		_pDestinationCursor->m_pDatabase = _pSourceCursor->m_pDatabase;
+		_pDestinationCursor->m_pDatabaseInfo = _pSourceCursor->m_pDatabaseInfo;
+		_pDestinationCursor->m_nPages = _pSourceCursor->m_nPages;
+		_pDestinationCursor->m_iTop = _pSourceCursor->m_iTop;
+		_pDestinationCursor->m_Flags = _pSourceCursor->m_Flags;
 		DMcSetOvpg(_pDestinationCursor, DMcOvpg(_pSourceCursor));
 
-		for (i = 0; i < _pSourceCursor->mc_snum; i++)
+		for (iLevel = 0; iLevel < _pSourceCursor->m_nPages; iLevel++)
 		{
-			_pDestinationCursor->mc_pg[i] = _pSourceCursor->mc_pg[i];
-			_pDestinationCursor->mc_ki[i] = _pSourceCursor->mc_ki[i];
+			_pDestinationCursor->m_Pages[iLevel] = _pSourceCursor->m_Pages[iLevel];
+			_pDestinationCursor->m_NodeIndices[iLevel] = _pSourceCursor->m_NodeIndices[iLevel];
 		}
 	}
 
 	/** Complete a delete operation started by #fg_CursorDel(). */
 	int fg_CursorDel0(CMdbCursor *_pCursor)
 	{
-		int rc;
-		CMdbPage *mp;
-		CIndx ki;
-		uint32 nkeys;
-		CMdbCursor *m2, *m3;
-		CDatabaseSubID dbi = _pCursor->mc_dbi;
+		int Result;
+		CMdbPage *pPage;
+		CIndx iNode;
+		uint32 nKeys;
+		CMdbCursor *pOther, *pOtherCursor;
+		CDatabaseSubID DatabaseID = _pCursor->m_DatabaseID;
 
-		ki = _pCursor->mc_ki[_pCursor->mc_top];
-		mp = _pCursor->mc_pg[_pCursor->mc_top];
-		fg_NodeDel(_pCursor, _pCursor->mc_db->md_pad);
-		_pCursor->mc_db->md_entries--;
+		iNode = _pCursor->m_NodeIndices[_pCursor->m_iTop];
+		pPage = _pCursor->m_Pages[_pCursor->m_iTop];
+		fg_NodeDel(_pCursor, _pCursor->m_pDatabase->m_Pad);
+		_pCursor->m_pDatabase->m_nEntries--;
 		{
-			/* Adjust other cursors pointing to mp */
-			for (m2 = _pCursor->mc_txn->mt_cursors[dbi]; m2; m2 = m2->mc_next)
+			/* Adjust other cursors pointing to pPage */
+			for (pOther = _pCursor->m_pTransaction->m_pCursors[DatabaseID]; pOther; pOther = pOther->m_pNext)
 			{
-				m3 = (_pCursor->mc_flags & DCSub) ? &m2->mc_xcursor->mx_cursor : m2;
-				if (!(m2->mc_flags & m3->mc_flags & DCInitialized))
+				pOtherCursor = (_pCursor->m_Flags & DCSub) ? &pOther->m_pXCursor->m_Cursor : pOther;
+				if (!(pOther->m_Flags & pOtherCursor->m_Flags & DCInitialized))
 					continue;
-				if (m3 == _pCursor || m3->mc_snum < _pCursor->mc_snum)
+				if (pOtherCursor == _pCursor || pOtherCursor->m_nPages < _pCursor->m_nPages)
 					continue;
-				if (m3->mc_pg[_pCursor->mc_top] == mp)
+				if (pOtherCursor->m_Pages[_pCursor->m_iTop] == pPage)
 				{
-					if (m3->mc_ki[_pCursor->mc_top] == ki)
+					if (pOtherCursor->m_NodeIndices[_pCursor->m_iTop] == iNode)
 					{
-						m3->mc_flags |= DCDel;
-						if (_pCursor->mc_db->md_flags & EDatabaseSubFlag_SortedDuplicates)
+						pOtherCursor->m_Flags |= DCDel;
+						if (_pCursor->m_pDatabase->m_Flags & EDatabaseSubFlag_SortedDuplicates)
 						{
 							/* Sub-cursor referred into dataset which is gone */
-							m3->mc_xcursor->mx_cursor.mc_flags &= ~(DCInitialized | DCEof);
+							pOtherCursor->m_pXCursor->m_Cursor.m_Flags &= ~(DCInitialized | DCEof);
 						}
 						continue;
 					}
-					else if (m3->mc_ki[_pCursor->mc_top] > ki)
-						m3->mc_ki[_pCursor->mc_top]--;
-					DXCursorRefresh(m3, _pCursor->mc_top, mp);
+					else if (pOtherCursor->m_NodeIndices[_pCursor->m_iTop] > iNode)
+						pOtherCursor->m_NodeIndices[_pCursor->m_iTop]--;
+					DXCursorRefresh(pOtherCursor, _pCursor->m_iTop, pPage);
 				}
 			}
 		}
-		rc = fg_Rebalance(_pCursor);
+		Result = fg_Rebalance(_pCursor);
 
-		if (rc == DMdbSuccess)
+		if (Result == DMdbSuccess)
 		{
 			/* DB is totally empty now, just bail out.
 			 * Other cursors adjustments were already done
 			 * by fg_Rebalance and aren't needed here.
 			 */
-			if (!_pCursor->mc_snum)
-				return rc;
+			if (!_pCursor->m_nPages)
+				return Result;
 
-			mp = _pCursor->mc_pg[_pCursor->mc_top];
-			nkeys = DNumKeys(mp);
+			pPage = _pCursor->m_Pages[_pCursor->m_iTop];
+			nKeys = DNumKeys(pPage);
 
-			/* Adjust other cursors pointing to mp */
-			for (m2 = _pCursor->mc_txn->mt_cursors[dbi]; !rc && m2; m2 = m2->mc_next)
+			/* Adjust other cursors pointing to pPage */
+			for (pOther = _pCursor->m_pTransaction->m_pCursors[DatabaseID]; !Result && pOther; pOther = pOther->m_pNext)
 			{
-				m3 = (_pCursor->mc_flags & DCSub) ? &m2->mc_xcursor->mx_cursor : m2;
-				if (!(m2->mc_flags & m3->mc_flags & DCInitialized))
+				pOtherCursor = (_pCursor->m_Flags & DCSub) ? &pOther->m_pXCursor->m_Cursor : pOther;
+				if (!(pOther->m_Flags & pOtherCursor->m_Flags & DCInitialized))
 					continue;
-				if (m3->mc_snum < _pCursor->mc_snum)
+				if (pOtherCursor->m_nPages < _pCursor->m_nPages)
 					continue;
-				if (m3->mc_pg[_pCursor->mc_top] == mp)
+				if (pOtherCursor->m_Pages[_pCursor->m_iTop] == pPage)
 				{
-					/* if m3 points past last node in page, find next sibling */
-					if (m3->mc_ki[_pCursor->mc_top] >= _pCursor->mc_ki[_pCursor->mc_top])
+					/* if pOtherCursor points past last node in page, find next sibling */
+					if (pOtherCursor->m_NodeIndices[_pCursor->m_iTop] >= _pCursor->m_NodeIndices[_pCursor->m_iTop])
 					{
-						if (m3->mc_ki[_pCursor->mc_top] >= nkeys)
+						if (pOtherCursor->m_NodeIndices[_pCursor->m_iTop] >= nKeys)
 						{
-							rc = fg_CursorSibling(m3, 1);
-							if (rc == DMdbNotFound)
+							Result = fg_CursorSibling(pOtherCursor, 1);
+							if (Result == DMdbNotFound)
 							{
-								m3->mc_flags |= DCEof;
-								rc = DMdbSuccess;
+								pOtherCursor->m_Flags |= DCEof;
+								Result = DMdbSuccess;
 								continue;
 							}
 						}
-						if (_pCursor->mc_db->md_flags & EDatabaseSubFlag_SortedDuplicates)
+						if (_pCursor->m_pDatabase->m_Flags & EDatabaseSubFlag_SortedDuplicates)
 						{
-							CMdbNode *node = DNodePtr(m3->mc_pg[m3->mc_top], m3->mc_ki[m3->mc_top]);
+							CMdbNode *pNode = DNodePtr(pOtherCursor->m_Pages[pOtherCursor->m_iTop], pOtherCursor->m_NodeIndices[pOtherCursor->m_iTop]);
 							/* If this node has dupdata, it may need to be reinited
 							 * because its data has moved.
 							 * If the xcursor was not initd it must be reinited.
 							 * Else if node points to a subDB, nothing is needed.
-							 * Else (xcursor was initd, not a subDB) needs mc_pg[0] reset.
+							 * Else (xcursor was initd, not a subDB) needs m_Pages[0] reset.
 							 */
-							if (node->mn_flags & DFDupData)
+							if (pNode->m_Flags & DFDupData)
 							{
-								if (m3->mc_xcursor->mx_cursor.mc_flags & DCInitialized)
+								if (pOtherCursor->m_pXCursor->m_Cursor.m_Flags & DCInitialized)
 								{
-									if (!(node->mn_flags & DFSubData))
-										m3->mc_xcursor->mx_cursor.mc_pg[0] = (CMdbPage *)DNodeData(node);
+									if (!(pNode->m_Flags & DFSubData))
+										pOtherCursor->m_pXCursor->m_Cursor.m_Pages[0] = (CMdbPage *)DNodeData(pNode);
 								}
 								else
 								{
-									fg_XCursorInit1(m3, node);
-									m3->mc_xcursor->mx_cursor.mc_flags |= DCDel;
+									fg_XCursorInit1(pOtherCursor, pNode);
+									pOtherCursor->m_pXCursor->m_Cursor.m_Flags |= DCDel;
 								}
 							}
 						}
 					}
 				}
 			}
-			_pCursor->mc_flags |= DCDel;
+			_pCursor->m_Flags |= DCDel;
 		}
 
-		if (rc)
-			_pCursor->mc_txn->mt_flags |= DMdbTxnError;
-		return rc;
+		if (Result)
+			_pCursor->m_pTransaction->m_Flags |= DMdbTxnError;
+		return Result;
 	}
 }

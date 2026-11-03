@@ -91,8 +91,8 @@ namespace NMib::NDatabase::NPrivate
 
 		if (_Error >= DMdbKeyExist && _Error <= DMdbLastErrcode)
 		{
-			int i = _Error - DMdbKeyExist;
-			return g_ErrorStrings[i];
+			int iError = _Error - DMdbKeyExist;
+			return g_ErrorStrings[iError];
 		}
 
 #ifdef DPlatformFamily_Windows
@@ -127,8 +127,8 @@ namespace NMib::NDatabase::NPrivate
 
 		if (_Error >= DMdbKeyExist && _Error <= DMdbLastErrcode)
 		{
-			int i = _Error - DMdbKeyExist;
-			return g_ErrorStrings[i];
+			int iError = _Error - DMdbKeyExist;
+			return g_ErrorStrings[iError];
 		}
 
 #ifdef DPlatformFamily_Windows

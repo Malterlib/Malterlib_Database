@@ -47,44 +47,44 @@ namespace NMib::NDatabase::NPrivate
 	 */
 	void fg_DefaultCmp(CMdbTxn *_pTransaction, CDatabaseSubID _DatabaseID)
 	{
-		auto &Database = _pTransaction->mt_dbs[_DatabaseID];
-		auto &LocalDatabase = _pTransaction->mt_dbxs[_DatabaseID];
+		auto &Database = _pTransaction->m_pDatabases[_DatabaseID];
+		auto &LocalDatabase = _pTransaction->m_pDatabaseInfos[_DatabaseID];
 
-		uint16 f = Database.md_flags;
+		uint16 Flags = Database.m_Flags;
 
 		FDatabaseCompare fKeyCompare;
 
-		if (f & EDatabaseSubFlag_ReverseKeys)
-			fKeyCompare = g_mdb_cmp_memnr;
+		if (Flags & EDatabaseSubFlag_ReverseKeys)
+			fKeyCompare = g_fCompareMemNR;
 		else
 		{
-			if (f & EDatabaseSubFlag_IntegerKeys)
-				fKeyCompare = g_mdb_cmp_cint;
+			if (Flags & EDatabaseSubFlag_IntegerKeys)
+				fKeyCompare = g_fCompareCInt;
 			else
-				fKeyCompare = g_mdb_cmp_memn;
+				fKeyCompare = g_fCompareMemN;
 		}
 
 		LocalDatabase.m_fKeyCompare = fg_Move(fKeyCompare);
 
 		FDatabaseCompare fDataCompare;
 
-		if (!(f & EDatabaseSubFlag_SortedDuplicates))
+		if (!(Flags & EDatabaseSubFlag_SortedDuplicates))
 			;
 		else
 		{
-			if (f & EDatabaseSubFlag_SortedDuplicatesIntegerKeys)
+			if (Flags & EDatabaseSubFlag_SortedDuplicatesIntegerKeys)
 			{
-				if (f & EDatabaseSubFlag_SortedDuplicatesFixedSize)
-					fDataCompare = g_mdb_cmp_int;
+				if (Flags & EDatabaseSubFlag_SortedDuplicatesFixedSize)
+					fDataCompare = g_fCompareInt;
 				else
-					fDataCompare = g_mdb_cmp_cint;
+					fDataCompare = g_fCompareCInt;
 			}
 			else
 			{
-				if (f & EDatabaseSubFlag_SortedDuplicatesReverseKeys)
-					fDataCompare = g_mdb_cmp_memnr;
+				if (Flags & EDatabaseSubFlag_SortedDuplicatesReverseKeys)
+					fDataCompare = g_fCompareMemNR;
 				else
-					fDataCompare = g_mdb_cmp_memn;
+					fDataCompare = g_fCompareMemN;
 			}
 		}
 
@@ -113,82 +113,82 @@ namespace NMib::NDatabase::NPrivate
 	int fg_CmpCInt(CDatabaseValue const &_Left, CDatabaseValue const &_Right)
 	{
 #if BYTE_ORDER == LITTLE_ENDIAN
-		unsigned short *u, *c;
-		int x;
+		unsigned short *pLeft, *pRight;
+		int Difference;
 
-		u = (unsigned short *)((char *)_Left.m_pData + _Left.m_Size);
-		c = (unsigned short *)((char *)_Right.m_pData + _Left.m_Size);
+		pLeft = (unsigned short *)((char *)_Left.m_pData + _Left.m_Size);
+		pRight = (unsigned short *)((char *)_Right.m_pData + _Left.m_Size);
 		do
 		{
-			x = *--u - *--c;
+			Difference = *--pLeft - *--pRight;
 		}
-		while (!x && u > (unsigned short *)_Left.m_pData);
-		return x;
+		while (!Difference && pLeft > (unsigned short *)_Left.m_pData);
+		return Difference;
 #else
-		unsigned short *u, *c, *end;
-		int x;
+		unsigned short *pLeft, *pRight, *end;
+		int Difference;
 
 		end = (unsigned short *)((char *)_Left.m_pData + _Left.m_Size);
-		u = (unsigned short *)_Left.m_pData;
-		c = (unsigned short *)_Right.m_pData;
+		pLeft = (unsigned short *)_Left.m_pData;
+		pRight = (unsigned short *)_Right.m_pData;
 		do
 		{
-			x = *u++ - *c++;
+			Difference = *pLeft++ - *pRight++;
 		}
-		while (!x && u < end);
-		return x;
+		while (!Difference && pLeft < end);
+		return Difference;
 #endif
 	}
 
 	/** Compare two items lexically */
 	int fg_CmpMemN(CDatabaseValue const &_Left, CDatabaseValue const &_Right)
 	{
-		int diff;
-		smint len_diff;
-		uint32 len;
+		int Difference;
+		smint SizeDifference;
+		uint32 Size;
 
-		len = _Left.m_Size;
-		len_diff = (smint)_Left.m_Size - (smint)_Right.m_Size;
-		if (len_diff > 0)
+		Size = _Left.m_Size;
+		SizeDifference = (smint)_Left.m_Size - (smint)_Right.m_Size;
+		if (SizeDifference > 0)
 		{
-			len = _Right.m_Size;
-			len_diff = 1;
+			Size = _Right.m_Size;
+			SizeDifference = 1;
 		}
 
-		diff = memcmp(_Left.m_pData, _Right.m_pData, len);
-		return diff ? diff : len_diff < 0 ? -1 : len_diff;
+		Difference = memcmp(_Left.m_pData, _Right.m_pData, Size);
+		return Difference ? Difference : SizeDifference < 0 ? -1 : SizeDifference;
 	}
 
 	/** Compare two items in reverse byte order */
 	int fg_CmpMemNR(CDatabaseValue const &_Left, CDatabaseValue const &_Right)
 	{
-		unsigned char const *p1, *p2, *p1_lim;
-		smint len_diff;
-		int diff;
+		unsigned char const *pLeft, *pRight, *pLeftLimit;
+		smint SizeDifference;
+		int Difference;
 
-		p1_lim = (unsigned char const *)_Left.m_pData;
-		p1 = (unsigned char const *)_Left.m_pData + _Left.m_Size;
-		p2 = (unsigned char const *)_Right.m_pData + _Right.m_Size;
+		pLeftLimit = (unsigned char const *)_Left.m_pData;
+		pLeft = (unsigned char const *)_Left.m_pData + _Left.m_Size;
+		pRight = (unsigned char const *)_Right.m_pData + _Right.m_Size;
 
-		len_diff = (smint)_Left.m_Size - (smint)_Right.m_Size;
-		if (len_diff > 0)
+		SizeDifference = (smint)_Left.m_Size - (smint)_Right.m_Size;
+		if (SizeDifference > 0)
 		{
-			p1_lim += len_diff;
-			len_diff = 1;
+			pLeftLimit += SizeDifference;
+			SizeDifference = 1;
 		}
 
-		while (p1 > p1_lim)
+		while (pLeft > pLeftLimit)
 		{
-			diff = *--p1 - *--p2;
-			if (diff)
-				return diff;
+			Difference = *--pLeft - *--pRight;
+			if (Difference)
+				return Difference;
 		}
-		return len_diff < 0 ? -1 : len_diff;
+		return SizeDifference < 0 ? -1 : SizeDifference;
 	}
 
-	FDatabaseCompare g_mdb_cmp_memn = fg_CmpMemN;
-	FDatabaseCompare g_mdb_cmp_memnr = fg_CmpMemNR;
-	FDatabaseCompare g_mdb_cmp_int = fg_CmpInt;
-	FDatabaseCompare g_mdb_cmp_cint = fg_CmpCInt;
-	FDatabaseCompare g_mdb_cmp_long = fg_CmpLong;
+	FDatabaseCompare g_fCompareMemN = fg_CmpMemN;
+	FDatabaseCompare g_fCompareMemNR = fg_CmpMemNR;
+	FDatabaseCompare g_fCompareInt = fg_CmpInt;
+	FDatabaseCompare g_fCompareCInt = fg_CmpCInt;
+	FDatabaseCompare g_fCompareLong = fg_CmpLong;
 }

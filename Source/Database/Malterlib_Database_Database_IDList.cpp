@@ -38,39 +38,39 @@ namespace NMib::NDatabase::NPrivate
 		 * if found, returns position of _ID
 		 * if not found, returns first position greater than _ID
 		 */
-		unsigned base = 0;
-		unsigned cursor = 1;
-		int val = 0;
-		unsigned n = _pIDs[0];
+		unsigned iBase = 0;
+		unsigned iCursor = 1;
+		int Compare = 0;
+		unsigned nRemaining = _pIDs[0];
 
-		while (0 < n)
+		while (0 < nRemaining)
 		{
-			unsigned pivot = n >> 1;
-			cursor = base + pivot + 1;
-			val = DCmp(_pIDs[cursor], _ID);
+			unsigned nHalf = nRemaining >> 1;
+			iCursor = iBase + nHalf + 1;
+			Compare = DCmp(_pIDs[iCursor], _ID);
 
-			if (val < 0)
-				n = pivot;
-			else if (val > 0)
+			if (Compare < 0)
+				nRemaining = nHalf;
+			else if (Compare > 0)
 			{
-				base = cursor;
-				n -= pivot + 1;
+				iBase = iCursor;
+				nRemaining -= nHalf + 1;
 			}
 			else
-				return cursor;
+				return iCursor;
 		}
 
-		if (val > 0)
-			++cursor;
-		return cursor;
+		if (Compare > 0)
+			++iCursor;
+		return iCursor;
 	}
 
 	CMdbIdl fg_MidlAlloc(int _nIDs)
 	{
-		CMdbIdl ids = (CMdbIdl)NMib::NMemory::fg_Alloc((_nIDs + 2) * sizeof(CMdbId));
-		*ids++ = _nIDs;
-		*ids = 0;
-		return ids;
+		CMdbIdl pIDs = (CMdbIdl)NMib::NMemory::fg_Alloc((_nIDs + 2) * sizeof(CMdbId));
+		*pIDs++ = _nIDs;
+		*pIDs = 0;
+		return pIDs;
 	}
 
 	void fg_MidlFree(CMdbIdl _pIDs)
@@ -85,169 +85,169 @@ namespace NMib::NDatabase::NPrivate
 
 	void fg_MidlShrink(CMdbIdl *_pIDList)
 	{
-		CMdbIdl ids = *_pIDList;
+		CMdbIdl pIDs = *_pIDList;
 		umint NewSize = (DMdbIdlUmMax + 2) * sizeof(CMdbId);
-		if (*(--ids) > DMdbIdlUmMax && (ids = (CMdbIdl)NMib::NMemory::fg_Resize(ids, NewSize, 0)))
+		if (*(--pIDs) > DMdbIdlUmMax && (pIDs = (CMdbIdl)NMib::NMemory::fg_Resize(pIDs, NewSize, 0)))
 		{
-			*ids++ = DMdbIdlUmMax;
-			*_pIDList = ids;
+			*pIDs++ = DMdbIdlUmMax;
+			*_pIDList = pIDs;
 		}
 	}
 
 	static void fg_MidlGrow(CMdbIdl *_pIDList, int _nIDs)
 	{
-		CMdbIdl idn = *_pIDList - 1;
+		CMdbIdl pAllocation = *_pIDList - 1;
 		/* grow it */
-		umint NewSize = (*idn + _nIDs + 2) * sizeof(CMdbId);
-		idn = (CMdbIdl)NMib::NMemory::fg_Resize(idn, NewSize, 0, EAllocationFlag_SizeNotNeeded);
-		*idn++ += _nIDs;
-		*_pIDList = idn;
+		umint NewSize = (*pAllocation + _nIDs + 2) * sizeof(CMdbId);
+		pAllocation = (CMdbIdl)NMib::NMemory::fg_Resize(pAllocation, NewSize, 0, EAllocationFlag_SizeNotNeeded);
+		*pAllocation++ += _nIDs;
+		*_pIDList = pAllocation;
 	}
 
 	void fg_MidlNeed(CMdbIdl *_pIDList, unsigned _nIDs)
 	{
-		CMdbIdl ids = *_pIDList;
-		_nIDs += ids[0];
-		if (_nIDs > ids[-1])
+		CMdbIdl pIDs = *_pIDList;
+		_nIDs += pIDs[0];
+		if (_nIDs > pIDs[-1])
 		{
 			_nIDs = (_nIDs + _nIDs / 4 + (256 + 2)) & -256;
 			umint NewSize = _nIDs * sizeof(CMdbId);
-			ids = (CMdbIdl)NMib::NMemory::fg_Resize(ids - 1, NewSize, 0, EAllocationFlag_SizeNotNeeded);
-			*ids++ = _nIDs - 2;
-			*_pIDList = ids;
+			pIDs = (CMdbIdl)NMib::NMemory::fg_Resize(pIDs - 1, NewSize, 0, EAllocationFlag_SizeNotNeeded);
+			*pIDs++ = _nIDs - 2;
+			*_pIDList = pIDs;
 		}
 	}
 
 	void fg_MidlAppend(CMdbIdl *_pIDList, CMdbId _ID)
 	{
-		CMdbIdl ids = *_pIDList;
+		CMdbIdl pIDs = *_pIDList;
 		/* Too big? */
-		if (ids[0] >= ids[-1])
+		if (pIDs[0] >= pIDs[-1])
 		{
 			fg_MidlGrow(_pIDList, DMdbIdlUmMax);
-			ids = *_pIDList;
+			pIDs = *_pIDList;
 		}
-		ids[0]++;
-		ids[ids[0]] = _ID;
+		pIDs[0]++;
+		pIDs[pIDs[0]] = _ID;
 	}
 
 	void fg_MidlAppendList(CMdbIdl *_pIDList, CMdbIdl _pAppendIDs)
 	{
-		CMdbIdl ids = *_pIDList;
+		CMdbIdl pIDs = *_pIDList;
 		/* Too big? */
-		if (ids[0] + _pAppendIDs[0] >= ids[-1])
+		if (pIDs[0] + _pAppendIDs[0] >= pIDs[-1])
 		{
 			fg_MidlGrow(_pIDList, _pAppendIDs[0]);
-			ids = *_pIDList;
+			pIDs = *_pIDList;
 		}
-		memcpy(&ids[ids[0] + 1], &_pAppendIDs[1], _pAppendIDs[0] * sizeof(CMdbId));
-		ids[0] += _pAppendIDs[0];
+		memcpy(&pIDs[pIDs[0] + 1], &_pAppendIDs[1], _pAppendIDs[0] * sizeof(CMdbId));
+		pIDs[0] += _pAppendIDs[0];
 	}
 
 	void fg_MidlAppendRange(CMdbIdl *_pIDList, CMdbId _ID, unsigned _nIDs)
 	{
-		CMdbId *ids = *_pIDList, len = ids[0];
+		CMdbId *pIDs = *_pIDList, nExisting = pIDs[0];
 		/* Too big? */
-		if (len + _nIDs > ids[-1])
+		if (nExisting + _nIDs > pIDs[-1])
 		{
 			fg_MidlGrow(_pIDList, _nIDs | DMdbIdlUmMax);
-			ids = *_pIDList;
+			pIDs = *_pIDList;
 		}
-		ids[0] = len + _nIDs;
-		ids += len;
+		pIDs[0] = nExisting + _nIDs;
+		pIDs += nExisting;
 		while (_nIDs)
-			ids[_nIDs--] = _ID++;
+			pIDs[_nIDs--] = _ID++;
 	}
 
 	void fg_MidlXMerge(CMdbIdl _pIDs, CMdbIdl _pMergeIDs)
 	{
-		CMdbId old_id, merge_id, i = _pMergeIDs[0], j = _pIDs[0], k = i + j, total = k;
+		CMdbId OldID, MergeID, iMerge = _pMergeIDs[0], iOld = _pIDs[0], iDestination = iMerge + iOld, nTotal = iDestination;
 		_pIDs[0] = (CMdbId)-1; // delimiter for _pIDs scan below
-		old_id = _pIDs[j];
-		while (i)
+		OldID = _pIDs[iOld];
+		while (iMerge)
 		{
-			merge_id = _pMergeIDs[i--];
-			for (; old_id < merge_id; old_id = _pIDs[--j])
-				_pIDs[k--] = old_id;
-			_pIDs[k--] = merge_id;
+			MergeID = _pMergeIDs[iMerge--];
+			for (; OldID < MergeID; OldID = _pIDs[--iOld])
+				_pIDs[iDestination--] = OldID;
+			_pIDs[iDestination--] = MergeID;
 		}
-		_pIDs[0] = total;
+		_pIDs[0] = nTotal;
 	}
 
 	/* Quicksort + Insertion sort for small arrays */
 
 #define DSmall	8
-#define	DMidlSwap(d_Left,d_Right)	{ itmp=(d_Left); (d_Left)=(d_Right); (d_Right)=itmp; }
+#define	DMidlSwap(d_Left,d_Right)	{ SwapTemp=(d_Left); (d_Left)=(d_Right); (d_Right)=SwapTemp; }
 
 	void fg_MidlSort(CMdbIdl _pIDs)
 	{
 		/* Max possible depth of int-indexed tree * 2 items/level */
-		int istack[sizeof(int) * 8 * 2];
-		int i, j, k, l, ir, jstack;
-		CMdbId a, itmp;
+		int IndexStack[sizeof(int) * 8 * 2];
+		int iUp, iDown, iMedian, iLow, iHigh, iStack;
+		CMdbId Pivot, SwapTemp;
 
-		ir = (int)_pIDs[0];
-		l = 1;
-		jstack = 0;
+		iHigh = (int)_pIDs[0];
+		iLow = 1;
+		iStack = 0;
 		for (;;)
 		{
-			if (ir - l < DSmall)
+			if (iHigh - iLow < DSmall)
 			{ // Insertion sort
-				for (j = l + 1; j <= ir; j++)
+				for (iDown = iLow + 1; iDown <= iHigh; iDown++)
 				{
-					a = _pIDs[j];
-					for (i = j - 1; i >= 1; i--)
+					Pivot = _pIDs[iDown];
+					for (iUp = iDown - 1; iUp >= 1; iUp--)
 					{
-						if (_pIDs[i] >= a)
+						if (_pIDs[iUp] >= Pivot)
 							break;
-						_pIDs[i + 1] = _pIDs[i];
+						_pIDs[iUp + 1] = _pIDs[iUp];
 					}
-					_pIDs[i + 1] = a;
+					_pIDs[iUp + 1] = Pivot;
 				}
-				if (jstack == 0)
+				if (iStack == 0)
 					break;
-				ir = istack[jstack--];
-				l = istack[jstack--];
+				iHigh = IndexStack[iStack--];
+				iLow = IndexStack[iStack--];
 			}
 			else
 			{
-				k = (l + ir) >> 1; // Choose median of left, center, right
-				DMidlSwap(_pIDs[k], _pIDs[l + 1]);
-				if (_pIDs[l] < _pIDs[ir])
-					DMidlSwap(_pIDs[l], _pIDs[ir]);
-				if (_pIDs[l + 1] < _pIDs[ir])
-					DMidlSwap(_pIDs[l + 1], _pIDs[ir]);
-				if (_pIDs[l] < _pIDs[l + 1])
-					DMidlSwap(_pIDs[l], _pIDs[l + 1]);
-				i = l + 1;
-				j = ir;
-				a = _pIDs[l + 1];
+				iMedian = (iLow + iHigh) >> 1; // Choose median of left, center, right
+				DMidlSwap(_pIDs[iMedian], _pIDs[iLow + 1]);
+				if (_pIDs[iLow] < _pIDs[iHigh])
+					DMidlSwap(_pIDs[iLow], _pIDs[iHigh]);
+				if (_pIDs[iLow + 1] < _pIDs[iHigh])
+					DMidlSwap(_pIDs[iLow + 1], _pIDs[iHigh]);
+				if (_pIDs[iLow] < _pIDs[iLow + 1])
+					DMidlSwap(_pIDs[iLow], _pIDs[iLow + 1]);
+				iUp = iLow + 1;
+				iDown = iHigh;
+				Pivot = _pIDs[iLow + 1];
 				for (;;)
 				{
 					do
-						i++;
-					while (_pIDs[i] > a);
+						iUp++;
+					while (_pIDs[iUp] > Pivot);
 					do
-						j--;
-					while (_pIDs[j] < a);
-					if (j < i)
+						iDown--;
+					while (_pIDs[iDown] < Pivot);
+					if (iDown < iUp)
 						break;
-					DMidlSwap(_pIDs[i], _pIDs[j]);
+					DMidlSwap(_pIDs[iUp], _pIDs[iDown]);
 				}
-				_pIDs[l + 1] = _pIDs[j];
-				_pIDs[j] = a;
-				jstack += 2;
-				if (ir - i + 1 >= j - l)
+				_pIDs[iLow + 1] = _pIDs[iDown];
+				_pIDs[iDown] = Pivot;
+				iStack += 2;
+				if (iHigh - iUp + 1 >= iDown - iLow)
 				{
-					istack[jstack] = ir;
-					istack[jstack - 1] = i;
-					ir = j - 1;
+					IndexStack[iStack] = iHigh;
+					IndexStack[iStack - 1] = iUp;
+					iHigh = iDown - 1;
 				}
 				else
 				{
-					istack[jstack] = j - 1;
-					istack[jstack - 1] = l;
-					l = i;
+					IndexStack[iStack] = iDown - 1;
+					IndexStack[iStack - 1] = iLow;
+					iLow = iUp;
 				}
 			}
 		}
@@ -260,52 +260,52 @@ namespace NMib::NDatabase::NPrivate
 		 * if found, returns position of _ID
 		 * if not found, returns first position greater than _ID
 		 */
-		unsigned base = 0;
-		unsigned cursor = 1;
-		int val = 0;
-		unsigned n = (unsigned)_pIDs[0].mid;
+		unsigned iBase = 0;
+		unsigned iCursor = 1;
+		int Compare = 0;
+		unsigned nRemaining = (unsigned)_pIDs[0].m_ID;
 
-		while (0 < n)
+		while (0 < nRemaining)
 		{
-			unsigned pivot = n >> 1;
-			cursor = base + pivot + 1;
-			val = DCmp(_ID, _pIDs[cursor].mid);
+			unsigned nHalf = nRemaining >> 1;
+			iCursor = iBase + nHalf + 1;
+			Compare = DCmp(_ID, _pIDs[iCursor].m_ID);
 
-			if (val < 0)
-				n = pivot;
-			else if (val > 0)
+			if (Compare < 0)
+				nRemaining = nHalf;
+			else if (Compare > 0)
 			{
-				base = cursor;
-				n -= pivot + 1;
+				iBase = iCursor;
+				nRemaining -= nHalf + 1;
 			}
 			else
-				return cursor;
+				return iCursor;
 		}
 
-		if (val > 0)
-			++cursor;
-		return cursor;
+		if (Compare > 0)
+			++iCursor;
+		return iCursor;
 	}
 
 	int fg_Mid2lInsert(CMdbId2L _pIDs, CMdbId2 *_pID)
 	{
-		unsigned x, i;
+		unsigned iInsert, iMove;
 
-		x = fg_Mid2lSearch(_pIDs, _pID->mid);
+		iInsert = fg_Mid2lSearch(_pIDs, _pID->m_ID);
 
-		if (x < 1)
+		if (iInsert < 1)
 		{
 			/* internal error */
 			return -2;
 		}
 
-		if (x <= _pIDs[0].mid && _pIDs[x].mid == _pID->mid)
+		if (iInsert <= _pIDs[0].m_ID && _pIDs[iInsert].m_ID == _pID->m_ID)
 		{
 			/* duplicate */
 			return -1;
 		}
 
-		if (_pIDs[0].mid >= DMdbIdlUmMax)
+		if (_pIDs[0].m_ID >= DMdbIdlUmMax)
 		{
 			/* too big */
 			return -2;
@@ -313,10 +313,10 @@ namespace NMib::NDatabase::NPrivate
 		else
 		{
 			/* insert _pID */
-			_pIDs[0].mid++;
-			for (i = (unsigned)_pIDs[0].mid; i > x; i--)
-				_pIDs[i] = _pIDs[i - 1];
-			_pIDs[x] = *_pID;
+			_pIDs[0].m_ID++;
+			for (iMove = (unsigned)_pIDs[0].m_ID; iMove > iInsert; iMove--)
+				_pIDs[iMove] = _pIDs[iMove - 1];
+			_pIDs[iInsert] = *_pID;
 		}
 
 		return 0;
@@ -325,10 +325,10 @@ namespace NMib::NDatabase::NPrivate
 	int fg_Mid2lAppend(CMdbId2L _pIDs, CMdbId2 *_pID)
 	{
 		/* Too big? */
-		if (_pIDs[0].mid >= DMdbIdlUmMax)
+		if (_pIDs[0].m_ID >= DMdbIdlUmMax)
 			return -2;
-		_pIDs[0].mid++;
-		_pIDs[_pIDs[0].mid] = *_pID;
+		_pIDs[0].m_ID++;
+		_pIDs[_pIDs[0].m_ID] = *_pID;
 		return 0;
 	}
 
@@ -343,13 +343,13 @@ namespace NMib::NDatabase::NPrivate
 		unsigned base = 0;
 		unsigned cursor = 1;
 		int val = 0;
-		unsigned n = (unsigned)ids[0].mid;
+		unsigned n = (unsigned)ids[0].m_ID;
 
 		while (0 < n)
 		{
 			unsigned pivot = n >> 1;
 			cursor = base + pivot + 1;
-			val = DCmp(id, ids[cursor].mid);
+			val = DCmp(id, ids[cursor].m_ID);
 
 			if (val < 0)
 				n = pivot;
@@ -371,7 +371,7 @@ namespace NMib::NDatabase::NPrivate
 	{
 		unsigned x, i;
 
-		x = fg_Mid3lSearch(ids, id->mid);
+		x = fg_Mid3lSearch(ids, id->m_ID);
 
 		if (x < 1)
 		{
@@ -379,15 +379,15 @@ namespace NMib::NDatabase::NPrivate
 			return -2;
 		}
 
-		if (x <= ids[0].mid && ids[x].mid == id->mid)
+		if (x <= ids[0].m_ID && ids[x].m_ID == id->m_ID)
 		{
 			/* duplicate */
 			return -1;
 		}
 
 		/* insert id */
-		ids[0].mid++;
-		for (i = (unsigned)ids[0].mid; i > x; i--)
+		ids[0].m_ID++;
+		for (i = (unsigned)ids[0].m_ID; i > x; i--)
 			ids[i] = ids[i - 1];
 		ids[x] = *id;
 

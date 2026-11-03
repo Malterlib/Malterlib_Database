@@ -75,11 +75,11 @@ namespace NMib::NDatabase
 			friend struct CResultSetDescription;
 		};
 
-		NContainer::TCVector<EResultDataType> m_lKeyPartTypes;
-		NContainer::TCVector<NResultSet::CSubType> m_lKeyPartSubTypes;
+		NContainer::TCVector<EResultDataType> m_KeyPartTypes;
+		NContainer::TCVector<NResultSet::CSubType> m_KeyPartSubTypes;
 
-		NContainer::TCVector<EResultDataType> m_lColumnTypes;
-		NContainer::TCVector<NResultSet::CSubType> m_lColumnSubTypes;
+		NContainer::TCVector<EResultDataType> m_ColumnTypes;
+		NContainer::TCVector<NResultSet::CSubType> m_ColumnSubTypes;
 
 		inline CAccessor f_KeyPart(EResultDataType _Type, NResultSet::CSubType _SubType = 0);
 		inline CAccessor f_Column(EResultDataType _Type, NResultSet::CSubType _SubType = 0);

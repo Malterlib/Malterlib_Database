@@ -46,19 +46,19 @@ namespace NMib::NDatabase::NPrivate
 	CDatabaseOffset DMibDatabaseInfrequentSection fg_FSize(HANDLE _FileHandle)
 	{
 #ifdef DPlatformFamily_Windows
-		LARGE_INTEGER fsize;
+		LARGE_INTEGER FileSize;
 
-		if (!GetFileSizeEx(_FileHandle, &fsize))
+		if (!GetFileSizeEx(_FileHandle, &FileSize))
 			DMibError(NStr::fg_Format("Error getting file size: {}", DErrCode()));
 
-		return fsize.QuadPart;
+		return FileSize.QuadPart;
 #else
-		struct stat st;
+		struct stat Stat;
 
-		if (fstat(_FileHandle, &st))
+		if (fstat(_FileHandle, &Stat))
 			DMibError(NStr::fg_Format("Error getting file size: {}", DErrCode()));
 
-		return st.st_size;
+		return Stat.st_size;
 #endif
 	}
 
@@ -75,43 +75,43 @@ namespace NMib::NDatabase::NPrivate
 		 * to be patched.
 		 */
 		{
-			struct statfs st;
-			fstatfs(_pEnvironment->me_fd, &st);
-			while (st.f_type == 0xEF53)
+			struct statfs FileSystemStats;
+			fstatfs(_pEnvironment->m_FileHandle, &FileSystemStats);
+			while (FileSystemStats.f_type == 0xEF53)
 			{
-				struct utsname uts;
-				int i;
-				uname(&uts);
-				if (uts.release[0] < '3')
+				struct utsname SystemName;
+				int VersionNumber;
+				uname(&SystemName);
+				if (SystemName.release[0] < '3')
 				{
-					if (!strncmp(uts.release, "2.6.32.", 7))
+					if (!strncmp(SystemName.release, "2.6.32.", 7))
 					{
-						i = atoi(uts.release + 7);
-						if (i >= 60)
+						VersionNumber = atoi(SystemName.release + 7);
+						if (VersionNumber >= 60)
 							break; // 2.6.32.60 and newer is OK
 					}
-					else if (!strncmp(uts.release, "2.6.34.", 7))
+					else if (!strncmp(SystemName.release, "2.6.34.", 7))
 					{
-						i = atoi(uts.release + 7);
-						if (i >= 15)
+						VersionNumber = atoi(SystemName.release + 7);
+						if (VersionNumber >= 15)
 							break; // 2.6.34.15 and newer is OK
 					}
 				}
-				else if (uts.release[0] == '3')
+				else if (SystemName.release[0] == '3')
 				{
-					i = atoi(uts.release + 2);
-					if (i > 5)
+					VersionNumber = atoi(SystemName.release + 2);
+					if (VersionNumber > 5)
 						break; // 3.6 and newer is OK
-					if (i == 5)
+					if (VersionNumber == 5)
 					{
-						i = atoi(uts.release + 4);
-						if (i >= 4)
+						VersionNumber = atoi(SystemName.release + 4);
+						if (VersionNumber >= 4)
 							break; // 3.5.4 and newer is OK
 					}
-					else if (i == 2)
+					else if (VersionNumber == 2)
 					{
-						i = atoi(uts.release + 4);
-						if (i >= 30)
+						VersionNumber = atoi(SystemName.release + 4);
+						if (VersionNumber >= 30)
 							break; // 3.2.30 and newer is OK
 					}
 				}

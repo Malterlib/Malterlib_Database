@@ -15,13 +15,13 @@ namespace NMib::NDatabase
 		auto const &KeyPartRowValueIndices = mp_pResultSet->mp_KeyPartRowValueIndices;
 		auto const &KeyPartValues = mp_pResultSet->mp_KeyPartValues;
 
-		static constexpr EResultDataType KeyPartType = NResultSet::TCTypeToDataType<tf_CType>::mc_Type;
+		static constexpr EResultDataType c_KeyPartType = NResultSet::TCTypeToDataType<tf_CType>::mc_Type;
 
 		umint iValue = KeyPartRowValueIndices[mp_iKeyPart][mp_iRow];
 
-		auto const &lValuesArray = KeyPartValues[mp_iKeyPart].f_Get<KeyPartType>();
+		auto const &ValuesArray = KeyPartValues[mp_iKeyPart].f_Get<c_KeyPartType>();
 
-		return lValuesArray[iValue];
+		return ValuesArray[iValue];
 	}
 
 	uint32 CResultSet::CKeyPartIterator::f_GetValueIndex() const
@@ -59,12 +59,12 @@ namespace NMib::NDatabase
 
 		umint iCurColPos = mp_ColumnValueIterators[mp_iColumn];
 
-		static constexpr EResultDataType ColumnType = NResultSet::TCTypeToDataType<tf_CType>::mc_Type;
+		static constexpr EResultDataType c_ColumnType = NResultSet::TCTypeToDataType<tf_CType>::mc_Type;
 
-		auto const &lValueArray = Columns[mp_iColumn].f_Get<ColumnType>();
+		auto const &ValueArray = Columns[mp_iColumn].f_Get<c_ColumnType>();
 
-		if (iCurColPos < lValueArray.f_GetLen() && lValueArray[iCurColPos].m_iRow == mp_iRow)
-			return &lValueArray[iCurColPos].m_Data;
+		if (iCurColPos < ValueArray.f_GetLen() && ValueArray[iCurColPos].m_iRow == mp_iRow)
+			return &ValueArray[iCurColPos].m_Data;
 		else
 			return nullptr;
 	}
@@ -91,11 +91,11 @@ namespace NMib::NDatabase
 	template <typename tf_CType>
 	tf_CType const &CResultSet::CRowIterator::f_GetKeyPart(umint _iKeyPart) const
 	{
-		static constexpr EResultDataType KeyPartType = NResultSet::TCTypeToDataType<tf_CType>::mc_Type;
+		static constexpr EResultDataType c_KeyPartType = NResultSet::TCTypeToDataType<tf_CType>::mc_Type;
 
 		umint iValue = mp_pResultSet->mp_KeyPartRowValueIndices[_iKeyPart][mp_iCurRow];
 
-		return mp_pResultSet->mp_KeyPartValues[_iKeyPart].f_Get<KeyPartType>()[iValue];
+		return mp_pResultSet->mp_KeyPartValues[_iKeyPart].f_Get<c_KeyPartType>()[iValue];
 	}
 
 	uint32 CResultSet::CRowIterator::f_GetKeyPartValueIndex(umint _iKeyPart) const
@@ -110,12 +110,12 @@ namespace NMib::NDatabase
 
 		umint iCurColPos = mp_ColumnValueIterators[_iColumn];
 
-		static constexpr EResultDataType ColumnType = NResultSet::TCTypeToDataType<tf_CType>::mc_Type;
+		static constexpr EResultDataType c_ColumnType = NResultSet::TCTypeToDataType<tf_CType>::mc_Type;
 
-		auto const &lValueArray = Columns[_iColumn].f_Get<ColumnType>();
+		auto const &ValueArray = Columns[_iColumn].f_Get<c_ColumnType>();
 
-		if (iCurColPos < lValueArray.f_GetLen() && lValueArray[iCurColPos].m_iRow == mp_iCurRow)
-			return &lValueArray[iCurColPos].m_Data;
+		if (iCurColPos < ValueArray.f_GetLen() && ValueArray[iCurColPos].m_iRow == mp_iCurRow)
+			return &ValueArray[iCurColPos].m_Data;
 		else
 			return nullptr;
 	}
@@ -139,11 +139,11 @@ namespace NMib::NDatabase
 	{
 		auto const &KeyPartValues = mp_KeyPartValues;
 
-		static constexpr EResultDataType KeyPartType = NResultSet::TCTypeToDataType<tf_CType>::mc_Type;
+		static constexpr EResultDataType c_KeyPartType = NResultSet::TCTypeToDataType<tf_CType>::mc_Type;
 
-		auto const &lValueArray = KeyPartValues[_iKeyPart].f_Get<KeyPartType>();
+		auto const &ValueArray = KeyPartValues[_iKeyPart].f_Get<c_KeyPartType>();
 
-		return lValueArray;
+		return ValueArray;
 	}
 
 	/*
