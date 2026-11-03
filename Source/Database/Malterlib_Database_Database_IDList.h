@@ -169,7 +169,7 @@ namespace NMib::NDatabase::NPrivate
 	int fg_Mid2lAppend(CMdbId2L _pIDs, CMdbId2 *_pID);
 
 #ifdef DMibDatabase_Always64BitSupport
-	struct MDB_ID3
+	struct CMdbId3
 	{
 		CMdbId m_ID;          ///< The ID
 		void *m_pValue;       ///< The pointer
@@ -177,10 +177,10 @@ namespace NMib::NDatabase::NPrivate
 		uint32 m_nReferences; ///< Refcounter
 	};
 
-	typedef MDB_ID3 *MDB_ID3L;
+	typedef CMdbId3 *CMdbId3L;
 
-	unsigned fg_Mid3lSearch(MDB_ID3L ids, CMdbId id);
-	int fg_Mid3lInsert(MDB_ID3L ids, MDB_ID3 *id);
+	unsigned fg_Mid3lSearch(CMdbId3L _pIDs, CMdbId _ID);
+	int fg_Mid3lInsert(CMdbId3L _pIDs, CMdbId3 *_pID);
 
 #endif /* DMibDatabase_Always64BitSupport */
 	/** @} */

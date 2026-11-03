@@ -1358,7 +1358,7 @@ namespace NMib::NDatabase
 		unsigned char *m_pDatabaseFlags;
 #ifdef DMibDatabase_Always64BitSupport
 		/** List of read-only pages (actually chunks) */
-		NPrivate::MDB_ID3L m_pReadOnlyPages;
+		NPrivate::CMdbId3L m_pReadOnlyPages;
 		/** We map chunks of 16 pages. Even though Windows uses 4KB pages, all
 		 * mappings must begin on 64KB boundaries. So we round off all pgnos to
 		 * a chunk boundary. We do the same on Linux for symmetry, and also to
@@ -1585,7 +1585,7 @@ namespace NMib::NDatabase
 		// NOLINTNEXTLINE(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
 		HANDLE m_MetaFileHandle; ///< For writing and syncing the meta pages
 #if defined(DMibDatabase_Always64BitSupport) && defined(DPlatformFamily_Windows)
-		HANDLE m_FileMappingHandle; ///< File Mapping handle
+		HANDLE m_pFileMappingHandle; ///< File Mapping handle
 #endif
 		/** Failed to update the meta page. Probably an I/O error. */
 #define	DMdbFatalError	0x80000000U
@@ -1650,8 +1650,8 @@ namespace NMib::NDatabase
 #	endif
 #endif
 #ifdef DMibDatabase_Always64BitSupport
-		NPrivate::MDB_ID3L m_pReadOnlyPages;  ///< like CMdbTxn's #m_pReadOnlyPages, but global to env
-		pthread_mutex_t m_ReadOnlyPagesMutex; ///< control access to #m_pReadOnlyPages
+		NPrivate::CMdbId3L m_pReadOnlyPages;  ///< like CMdbTxn's #m_pReadOnlyPages, but global to env
+		pthread_mutex_t m_ReadOnlyPagesMutex; ///< control access to #m_pReadOnlyPages // NOLINT(malterlib-conceptual-prefix): a HANDLE on Windows and a struct with pthreads
 #	define DMdbErpageSize	16384
 #	define DMdbErpageMax	(DMdbErpageSize-1)
 		uint32 m_ReadOnlyPageCheck;
@@ -1897,7 +1897,7 @@ namespace NMib::NDatabase
 #define DMdbNoSpill	0x8000
 
 #ifdef DMibDatabase_Always64BitSupport
-		void fg_PageUnref(CMdbTxn *txn, CMdbPage *mp);
+		void fg_PageUnref(CMdbTxn *_pTransaction, CMdbPage *_pPage);
 #	define DMdbPageUnref(d_Txn, d_Mp)	fg_PageUnref(d_Txn, d_Mp)
 #else
 #	define DMdbPageUnref(d_Txn, d_Mp)
@@ -1939,7 +1939,7 @@ namespace NMib::NDatabase
 		int fg_CursorCount(CMdbCursor *_pCursor, CDatabaseOffset *o_pCount);
 
 #ifdef DMibDatabase_Always64BitSupport
-		void fg_CursorUnref(CMdbCursor *mc);
+		void fg_CursorUnref(CMdbCursor *_pCursor);
 #	define DMdbCursorUnref(d_Mc, d_Force) \
 		(((d_Force) || ((d_Mc)->m_Flags & DCInitialized)) \
 		 ? fg_CursorUnref(d_Mc) \

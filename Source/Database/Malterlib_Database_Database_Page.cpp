@@ -123,20 +123,20 @@ namespace NMib::NDatabase
 	}
 
 #ifdef DMibDatabase_Always64BitSupport
-	void NPrivate::fg_PageUnref(CMdbTxn *txn, CMdbPage *mp)
+	void NPrivate::fg_PageUnref(CMdbTxn *_pTransaction, CMdbPage *_pPage)
 	{
-		CPgno pgno;
-		MDB_ID3L tl = txn->m_pReadOnlyPages;
-		unsigned x, rem;
-		if (mp->m_Flags & (DPSubp | DPDirty))
+		CPgno PageNumber;
+		CMdbId3L pReadOnlyPages = _pTransaction->m_pReadOnlyPages;
+		unsigned iPage, Remainder;
+		if (_pPage->m_Flags & (DPSubp | DPDirty))
 			return;
-		rem = mp->m_PageNumber & (DMdbRpageChunk - 1);
-		pgno = mp->m_PageNumber ^ rem;
-		x = fg_Mid3lSearch(tl, pgno);
-		if (x != tl[0].m_ID && tl[x + 1].m_ID == mp->m_PageNumber)
-			x++;
-		if (tl[x].m_nReferences)
-			tl[x].m_nReferences--;
+		Remainder = _pPage->m_PageNumber & (DMdbRpageChunk - 1);
+		PageNumber = _pPage->m_PageNumber ^ Remainder;
+		iPage = fg_Mid3lSearch(pReadOnlyPages, PageNumber);
+		if (iPage != pReadOnlyPages[0].m_ID && pReadOnlyPages[iPage + 1].m_ID == _pPage->m_PageNumber)
+			iPage++;
+		if (pReadOnlyPages[iPage].m_nReferences)
+			pReadOnlyPages[iPage].m_nReferences--;
 	}
 #endif
 
@@ -1106,33 +1106,33 @@ namespace NMib::NDatabase
 	 * explicitly, in the added m_pOverflowPage field. A single cursor can only hold a
 	 * reference to one overflow page at a time.
 	 *
-	 * @param[in] txn the transaction for this access.
-	 * @param[in] pgno the page number for the page to retrieve.
-	 * @param[out] ret address of a pointer where the page's address will be stored.
+	 * @param[in] _pTransaction the transaction for this access.
+	 * @param[in] _PageNumber the page number for the page to retrieve.
+	 * @param[out] o_pPage address of a pointer where the page's address will be stored.
 	 * @return 0 on success, non-zero on failure.
 	 */
-	int fg_RPageGet(CMdbTxn *txn, CPgno pg0, CMdbPage **ret)
+	int fg_RPageGet(CMdbTxn *_pTransaction, CPgno _PageNumber, CMdbPage **o_pPage)
 	{
-		CMdbEnv *env = txn->m_pEnvironment;
-		CMdbPage *p;
-		MDB_ID3L tl = txn->m_pReadOnlyPages;
-		MDB_ID3L el = env->m_pReadOnlyPages;
-		MDB_ID3 id3;
-		unsigned x, rem;
-		CPgno pgno;
-		int rc, retries = 1;
+		CMdbEnv *pEnvironment = _pTransaction->m_pEnvironment;
+		CMdbPage *pPage;
+		CMdbId3L pTransactionPages = _pTransaction->m_pReadOnlyPages;
+		CMdbId3L pEnvironmentPages = pEnvironment->m_pReadOnlyPages;
+		CMdbId3 Entry;
+		unsigned iPage, Remainder;
+		CPgno ChunkPageNumber;
+		int Result, nRetries = 1;
 #	ifdef DPlatformFamily_Windows
-		LARGE_INTEGER off;
-		SIZE_T len;
+		LARGE_INTEGER Offset;
+		SIZE_T Length;
 #		define DSetOff(d_Off,d_Val)	d_Off.QuadPart = d_Val
 #		define DMap(d_Rc,d_Env,d_Addr,d_Len,d_Off)	\
 			d_Addr = nullptr; \
-			d_Rc = g_fDatabase_NtMapViewOfSection(d_Env->m_FileMappingHandle, GetCurrentProcess(), &d_Addr, 0, \
+			d_Rc = g_fDatabase_NtMapViewOfSection(d_Env->m_pFileMappingHandle, GetCurrentProcess(), &d_Addr, 0, \
 				d_Len, &d_Off, &d_Len, ViewUnmap, (d_Env->m_Flags & EDatabaseEnvironmentFlag_ReadOnly) ? 0 : MEM_RESERVE, PAGE_READONLY); \
 			if (d_Rc) d_Rc = fg_Nt2Win32(d_Rc)
 #	else
-		off_t off;
-		umint len;
+		off_t Offset;
+		umint Length;
 #		define DSetOff(d_Off,d_Val)	d_Off = d_Val
 #		define DMap(d_Rc,d_Env,d_Addr,d_Len,d_Off)	\
 			d_Addr = mmap(nullptr, d_Len, PROT_READ, MAP_SHARED, d_Env->m_FileHandle, d_Off); \
@@ -1142,245 +1142,245 @@ namespace NMib::NDatabase
 		/* remember the offset of the actual page number, so we can
 		 * return the correct pointer at the end.
 		 */
-		rem = pg0 & (DMdbRpageChunk - 1);
-		pgno = pg0 ^ rem;
+		Remainder = _PageNumber & (DMdbRpageChunk - 1);
+		ChunkPageNumber = _PageNumber ^ Remainder;
 
-		id3.m_ID = 0;
-		x = fg_Mid3lSearch(tl, pgno);
-		if (x <= tl[0].m_ID && tl[x].m_ID == pgno)
+		Entry.m_ID = 0;
+		iPage = fg_Mid3lSearch(pTransactionPages, ChunkPageNumber);
+		if (iPage <= pTransactionPages[0].m_ID && pTransactionPages[iPage].m_ID == ChunkPageNumber)
 		{
-			if (x != tl[0].m_ID && tl[x + 1].m_ID == pg0)
-				x++;
+			if (iPage != pTransactionPages[0].m_ID && pTransactionPages[iPage + 1].m_ID == _PageNumber)
+				iPage++;
 			/* check for overflow size */
-			p = (CMdbPage *)((char *)tl[x].m_pValue + rem * env->m_PageSize);
-			if (DIsOverflow(p) && p->m_nOverflowPages + rem > tl[x].m_nPages)
+			pPage = (CMdbPage *)((char *)pTransactionPages[iPage].m_pValue + Remainder * pEnvironment->m_PageSize);
+			if (DIsOverflow(pPage) && pPage->m_nOverflowPages + Remainder > pTransactionPages[iPage].m_nPages)
 			{
-				id3.m_nPages = p->m_nOverflowPages + rem;
-				len = id3.m_nPages * env->m_PageSize;
-				DSetOff(off, pgno * env->m_PageSize);
-				DMap(rc, env, id3.m_pValue, len, off);
-				if (rc)
-					return rc;
+				Entry.m_nPages = pPage->m_nOverflowPages + Remainder;
+				Length = Entry.m_nPages * pEnvironment->m_PageSize;
+				DSetOff(Offset, ChunkPageNumber * pEnvironment->m_PageSize);
+				DMap(Result, pEnvironment, Entry.m_pValue, Length, Offset);
+				if (Result)
+					return Result;
 				/* check for local-only page */
-				if (rem)
+				if (Remainder)
 				{
-					DMibCheck(tl[x].m_ID != pg0);
+					DMibCheck(pTransactionPages[iPage].m_ID != _PageNumber);
 					/* hope there's room to insert this locally.
 					 * setting m_ID here tells later code to just insert
 					 * this id3 instead of searching for a match.
 					 */
-					id3.m_ID = pg0;
+					Entry.m_ID = _PageNumber;
 					goto notlocal;
 				}
 				else
 				{
 					/* ignore the mapping we got from env, use new one */
-					tl[x].m_pValue = id3.m_pValue;
-					tl[x].m_nPages = id3.m_nPages;
+					pTransactionPages[iPage].m_pValue = Entry.m_pValue;
+					pTransactionPages[iPage].m_nPages = Entry.m_nPages;
 					/* if no active ref, see if we can replace in env */
-					if (!tl[x].m_nReferences)
+					if (!pTransactionPages[iPage].m_nReferences)
 					{
-						unsigned i;
-						pthread_mutex_lock(&env->m_ReadOnlyPagesMutex);
-						i = fg_Mid3lSearch(el, tl[x].m_ID);
-						if (el[i].m_nReferences == 1)
+						unsigned iEntry;
+						pthread_mutex_lock(&pEnvironment->m_ReadOnlyPagesMutex);
+						iEntry = fg_Mid3lSearch(pEnvironmentPages, pTransactionPages[iPage].m_ID);
+						if (pEnvironmentPages[iEntry].m_nReferences == 1)
 						{
 							/* just us, replace it */
-							munmap(el[i].m_pValue, el[i].m_nPages * env->m_PageSize);
-							el[i].m_pValue = tl[x].m_pValue;
-							el[i].m_nPages = tl[x].m_nPages;
+							munmap(pEnvironmentPages[iEntry].m_pValue, pEnvironmentPages[iEntry].m_nPages * pEnvironment->m_PageSize);
+							pEnvironmentPages[iEntry].m_pValue = pTransactionPages[iPage].m_pValue;
+							pEnvironmentPages[iEntry].m_nPages = pTransactionPages[iPage].m_nPages;
 						}
 						else
 						{
 							/* there are others, remove ourself */
-							el[i].m_nReferences--;
+							pEnvironmentPages[iEntry].m_nReferences--;
 						}
-						pthread_mutex_unlock(&env->m_ReadOnlyPagesMutex);
+						pthread_mutex_unlock(&pEnvironment->m_ReadOnlyPagesMutex);
 					}
 				}
 			}
-			id3.m_pValue = tl[x].m_pValue;
-			id3.m_nPages = tl[x].m_nPages;
-			tl[x].m_nReferences++;
+			Entry.m_pValue = pTransactionPages[iPage].m_pValue;
+			Entry.m_nPages = pTransactionPages[iPage].m_nPages;
+			pTransactionPages[iPage].m_nReferences++;
 			goto ok;
 		}
 
 	notlocal:
-		if (tl[0].m_ID >= DMdbTrpageMax - txn->m_ReadOnlyPageCheck)
+		if (pTransactionPages[0].m_ID >= DMdbTrpageMax - _pTransaction->m_ReadOnlyPageCheck)
 		{
-			unsigned i, y;
+			unsigned iEntry, iFree;
 			/* purge unref'd pages from our list and unref in env */
-			pthread_mutex_lock(&env->m_ReadOnlyPagesMutex);
+			pthread_mutex_lock(&pEnvironment->m_ReadOnlyPagesMutex);
 		retry:
-			y = 0;
-			for (i = 1; i <= tl[0].m_ID; i++)
+			iFree = 0;
+			for (iEntry = 1; iEntry <= pTransactionPages[0].m_ID; iEntry++)
 			{
-				if (!tl[i].m_nReferences)
+				if (!pTransactionPages[iEntry].m_nReferences)
 				{
-					if (!y)
-						y = i;
+					if (!iFree)
+						iFree = iEntry;
 					/* tmp overflow pages don't go to env */
-					if (tl[i].m_ID & (DMdbRpageChunk - 1))
+					if (pTransactionPages[iEntry].m_ID & (DMdbRpageChunk - 1))
 					{
-						munmap(tl[i].m_pValue, tl[i].m_nPages * env->m_PageSize);
+						munmap(pTransactionPages[iEntry].m_pValue, pTransactionPages[iEntry].m_nPages * pEnvironment->m_PageSize);
 						continue;
 					}
-					x = fg_Mid3lSearch(el, tl[i].m_ID);
-					el[x].m_nReferences--;
+					iPage = fg_Mid3lSearch(pEnvironmentPages, pTransactionPages[iEntry].m_ID);
+					pEnvironmentPages[iPage].m_nReferences--;
 				}
 			}
-			pthread_mutex_unlock(&env->m_ReadOnlyPagesMutex);
-			if (!y)
+			pthread_mutex_unlock(&pEnvironment->m_ReadOnlyPagesMutex);
+			if (!iFree)
 			{
 				/* we didn't find any unref'd chunks.
 				 * if we're out of room, fail.
 				 */
-				if (tl[0].m_ID >= DMdbTrpageMax)
+				if (pTransactionPages[0].m_ID >= DMdbTrpageMax)
 					return DMdbTxnFull;
 				/* otherwise, raise threshold for next time around
 				 * and let this go.
 				 */
-				txn->m_ReadOnlyPageCheck /= 2;
+				_pTransaction->m_ReadOnlyPageCheck /= 2;
 			}
 			else
 			{
 				/* we found some unused; consolidate the list */
-				for (i = y + 1; i <= tl[0].m_ID; i++)
+				for (iEntry = iFree + 1; iEntry <= pTransactionPages[0].m_ID; iEntry++)
 				{
-					if (tl[i].m_nReferences)
-						tl[y++] = tl[i];
+					if (pTransactionPages[iEntry].m_nReferences)
+						pTransactionPages[iFree++] = pTransactionPages[iEntry];
 				}
-				tl[0].m_ID = y - 1;
+				pTransactionPages[0].m_ID = iFree - 1;
 				/* decrease the check threshold toward its original value */
-				if (!txn->m_ReadOnlyPageCheck)
-					txn->m_ReadOnlyPageCheck = 1;
-				while (txn->m_ReadOnlyPageCheck < tl[0].m_ID && txn->m_ReadOnlyPageCheck < DMdbTrpageSize / 2)
-					txn->m_ReadOnlyPageCheck *= 2;
+				if (!_pTransaction->m_ReadOnlyPageCheck)
+					_pTransaction->m_ReadOnlyPageCheck = 1;
+				while (_pTransaction->m_ReadOnlyPageCheck < pTransactionPages[0].m_ID && _pTransaction->m_ReadOnlyPageCheck < DMdbTrpageSize / 2)
+					_pTransaction->m_ReadOnlyPageCheck *= 2;
 			}
 		}
-		if (tl[0].m_ID < DMdbTrpageSize)
+		if (pTransactionPages[0].m_ID < DMdbTrpageSize)
 		{
-			id3.m_nReferences = 1;
-			if (id3.m_ID)
+			Entry.m_nReferences = 1;
+			if (Entry.m_ID)
 				goto found;
 			/* don't map past last written page in read-only envs */
-			if ((env->m_Flags & EDatabaseEnvironmentFlag_ReadOnly) && pgno + DMdbRpageChunk - 1 > txn->m_LastPageNumber)
-				id3.m_nPages = txn->m_LastPageNumber + 1 - pgno;
+			if ((pEnvironment->m_Flags & EDatabaseEnvironmentFlag_ReadOnly) && ChunkPageNumber + DMdbRpageChunk - 1 > _pTransaction->m_LastPageNumber)
+				Entry.m_nPages = _pTransaction->m_LastPageNumber + 1 - ChunkPageNumber;
 			else
-				id3.m_nPages = DMdbRpageChunk;
-			len = id3.m_nPages * env->m_PageSize;
-			id3.m_ID = pgno;
+				Entry.m_nPages = DMdbRpageChunk;
+			Length = Entry.m_nPages * pEnvironment->m_PageSize;
+			Entry.m_ID = ChunkPageNumber;
 
 			/* search for page in env */
-			pthread_mutex_lock(&env->m_ReadOnlyPagesMutex);
-			x = fg_Mid3lSearch(el, pgno);
-			if (x <= el[0].m_ID && el[x].m_ID == pgno)
+			pthread_mutex_lock(&pEnvironment->m_ReadOnlyPagesMutex);
+			iPage = fg_Mid3lSearch(pEnvironmentPages, ChunkPageNumber);
+			if (iPage <= pEnvironmentPages[0].m_ID && pEnvironmentPages[iPage].m_ID == ChunkPageNumber)
 			{
-				id3.m_pValue = el[x].m_pValue;
-				id3.m_nPages = el[x].m_nPages;
+				Entry.m_pValue = pEnvironmentPages[iPage].m_pValue;
+				Entry.m_nPages = pEnvironmentPages[iPage].m_nPages;
 				/* check for overflow size */
-				p = (CMdbPage *)((char *)id3.m_pValue + rem * env->m_PageSize);
-				if (DIsOverflow(p) && p->m_nOverflowPages + rem > id3.m_nPages)
+				pPage = (CMdbPage *)((char *)Entry.m_pValue + Remainder * pEnvironment->m_PageSize);
+				if (DIsOverflow(pPage) && pPage->m_nOverflowPages + Remainder > Entry.m_nPages)
 				{
-					id3.m_nPages = p->m_nOverflowPages + rem;
-					len = id3.m_nPages * env->m_PageSize;
-					DSetOff(off, pgno * env->m_PageSize);
-					DMap(rc, env, id3.m_pValue, len, off);
-					if (rc)
+					Entry.m_nPages = pPage->m_nOverflowPages + Remainder;
+					Length = Entry.m_nPages * pEnvironment->m_PageSize;
+					DSetOff(Offset, ChunkPageNumber * pEnvironment->m_PageSize);
+					DMap(Result, pEnvironment, Entry.m_pValue, Length, Offset);
+					if (Result)
 						goto fail;
-					if (!el[x].m_nReferences)
+					if (!pEnvironmentPages[iPage].m_nReferences)
 					{
-						munmap(el[x].m_pValue, env->m_PageSize * el[x].m_nPages);
-						el[x].m_pValue = id3.m_pValue;
-						el[x].m_nPages = id3.m_nPages;
+						munmap(pEnvironmentPages[iPage].m_pValue, pEnvironment->m_PageSize * pEnvironmentPages[iPage].m_nPages);
+						pEnvironmentPages[iPage].m_pValue = Entry.m_pValue;
+						pEnvironmentPages[iPage].m_nPages = Entry.m_nPages;
 					}
 					else
 					{
-						id3.m_ID = pg0;
-						pthread_mutex_unlock(&env->m_ReadOnlyPagesMutex);
+						Entry.m_ID = _PageNumber;
+						pthread_mutex_unlock(&pEnvironment->m_ReadOnlyPagesMutex);
 						goto found;
 					}
 				}
-				el[x].m_nReferences++;
-				pthread_mutex_unlock(&env->m_ReadOnlyPagesMutex);
+				pEnvironmentPages[iPage].m_nReferences++;
+				pthread_mutex_unlock(&pEnvironment->m_ReadOnlyPagesMutex);
 				goto found;
 			}
-			if (el[0].m_ID >= DMdbErpageMax - env->m_ReadOnlyPageCheck)
+			if (pEnvironmentPages[0].m_ID >= DMdbErpageMax - pEnvironment->m_ReadOnlyPageCheck)
 			{
 				/* purge unref'd pages */
-				unsigned i, y = 0;
-				for (i = 1; i <= el[0].m_ID; i++)
+				unsigned iEntry, iFree = 0;
+				for (iEntry = 1; iEntry <= pEnvironmentPages[0].m_ID; iEntry++)
 				{
-					if (!el[i].m_nReferences)
+					if (!pEnvironmentPages[iEntry].m_nReferences)
 					{
-						if (!y)
-							y = i;
-						munmap(el[i].m_pValue, env->m_PageSize * el[i].m_nPages);
+						if (!iFree)
+							iFree = iEntry;
+						munmap(pEnvironmentPages[iEntry].m_pValue, pEnvironment->m_PageSize * pEnvironmentPages[iEntry].m_nPages);
 					}
 				}
-				if (!y)
+				if (!iFree)
 				{
-					if (retries)
+					if (nRetries)
 					{
 						/* see if we can unref some local pages */
-						retries--;
-						id3.m_ID = 0;
+						nRetries--;
+						Entry.m_ID = 0;
 						goto retry;
 					}
-					if (el[0].m_ID >= DMdbErpageMax)
+					if (pEnvironmentPages[0].m_ID >= DMdbErpageMax)
 					{
-						pthread_mutex_unlock(&env->m_ReadOnlyPagesMutex);
+						pthread_mutex_unlock(&pEnvironment->m_ReadOnlyPagesMutex);
 						return DMdbMapFull;
 					}
-					env->m_ReadOnlyPageCheck /= 2;
+					pEnvironment->m_ReadOnlyPageCheck /= 2;
 				}
 				else
 				{
-					for (i = y + 1; i <= el[0].m_ID; i++)
+					for (iEntry = iFree + 1; iEntry <= pEnvironmentPages[0].m_ID; iEntry++)
 					{
-						if (el[i].m_nReferences)
-							el[y++] = el[i];
+						if (pEnvironmentPages[iEntry].m_nReferences)
+							pEnvironmentPages[iFree++] = pEnvironmentPages[iEntry];
 					}
-					el[0].m_ID = y - 1;
-					if (!env->m_ReadOnlyPageCheck)
-						env->m_ReadOnlyPageCheck = 1;
-					while (env->m_ReadOnlyPageCheck < el[0].m_ID && env->m_ReadOnlyPageCheck < DMdbErpageSize / 2)
-						env->m_ReadOnlyPageCheck *= 2;
+					pEnvironmentPages[0].m_ID = iFree - 1;
+					if (!pEnvironment->m_ReadOnlyPageCheck)
+						pEnvironment->m_ReadOnlyPageCheck = 1;
+					while (pEnvironment->m_ReadOnlyPageCheck < pEnvironmentPages[0].m_ID && pEnvironment->m_ReadOnlyPageCheck < DMdbErpageSize / 2)
+						pEnvironment->m_ReadOnlyPageCheck *= 2;
 				}
 			}
-			DSetOff(off, pgno * env->m_PageSize);
-			DMap(rc, env, id3.m_pValue, len, off);
-			if (rc)
+			DSetOff(Offset, ChunkPageNumber * pEnvironment->m_PageSize);
+			DMap(Result, pEnvironment, Entry.m_pValue, Length, Offset);
+			if (Result)
 			{
 			fail:
-				pthread_mutex_unlock(&env->m_ReadOnlyPagesMutex);
-				return rc;
+				pthread_mutex_unlock(&pEnvironment->m_ReadOnlyPagesMutex);
+				return Result;
 			}
 			/* check for overflow size */
-			p = (CMdbPage *)((char *)id3.m_pValue + rem * env->m_PageSize);
-			if (DIsOverflow(p) && p->m_nOverflowPages + rem > id3.m_nPages)
+			pPage = (CMdbPage *)((char *)Entry.m_pValue + Remainder * pEnvironment->m_PageSize);
+			if (DIsOverflow(pPage) && pPage->m_nOverflowPages + Remainder > Entry.m_nPages)
 			{
-				id3.m_nPages = p->m_nOverflowPages + rem;
-				munmap(id3.m_pValue, len);
-				len = id3.m_nPages * env->m_PageSize;
-				DMap(rc, env, id3.m_pValue, len, off);
-				if (rc)
+				Entry.m_nPages = pPage->m_nOverflowPages + Remainder;
+				munmap(Entry.m_pValue, Length);
+				Length = Entry.m_nPages * pEnvironment->m_PageSize;
+				DMap(Result, pEnvironment, Entry.m_pValue, Length, Offset);
+				if (Result)
 					goto fail;
 			}
-			fg_Mid3lInsert(el, &id3);
-			pthread_mutex_unlock(&env->m_ReadOnlyPagesMutex);
+			fg_Mid3lInsert(pEnvironmentPages, &Entry);
+			pthread_mutex_unlock(&pEnvironment->m_ReadOnlyPagesMutex);
 		found:
-			fg_Mid3lInsert(tl, &id3);
+			fg_Mid3lInsert(pTransactionPages, &Entry);
 		}
 		else
 			return DMdbTxnFull;
 	ok:
-		p = (CMdbPage *)((char *)id3.m_pValue + rem * env->m_PageSize);
+		pPage = (CMdbPage *)((char *)Entry.m_pValue + Remainder * pEnvironment->m_PageSize);
 #	if DMibDatabaseDebug	/* we don't need this check any more */
-		if (DIsOverflow(p))
-			DMibCheck(p->m_nOverflowPages + rem <= id3.m_nPages);
+		if (DIsOverflow(pPage))
+			DMibCheck(pPage->m_nOverflowPages + Remainder <= Entry.m_nPages);
 #	endif
-		*ret = p;
+		*o_pPage = pPage;
 		return DMdbSuccess;
 	}
 #endif
@@ -1445,11 +1445,11 @@ namespace NMib::NDatabase
 	mapped:
 		{
 #ifdef DMibDatabase_Always64BitSupport
-			int rc = fg_RPageGet(pTransaction, _PageNumber, &pPage);
-			if (rc)
+			int Result = fg_RPageGet(pTransaction, _PageNumber, &pPage);
+			if (Result)
 			{
 				pTransaction->m_Flags |= DMdbTxnError;
-				return rc;
+				return Result;
 			}
 #else
 			CMdbEnv *pEnvironment = pTransaction->m_pEnvironment;
@@ -1652,9 +1652,9 @@ namespace NMib::NDatabase
 
 #ifdef DMibDatabase_Always64BitSupport
 		{
-			int i;
-			for (i = 1; i < _pCursor->m_nPages; i++)
-				DMdbPageUnref(_pCursor->m_pTransaction, _pCursor->m_Pages[i]);
+			int iPage;
+			for (iPage = 1; iPage < _pCursor->m_nPages; iPage++)
+				DMdbPageUnref(_pCursor->m_pTransaction, _pCursor->m_Pages[iPage]);
 		}
 #endif
 		_pCursor->m_nPages = 1;

@@ -276,7 +276,7 @@ namespace NMib::NDatabase
 #ifdef DMibDatabase_Always64BitSupport
 			if (!_pParent)
 			{
-				pTransaction->m_pReadOnlyPages = (NPrivate::MDB_ID3L)NMemory::fg_Alloc(DMdbTrpageSize * sizeof(MDB_ID3));
+				pTransaction->m_pReadOnlyPages = (NPrivate::CMdbId3L)NMemory::fg_Alloc(DMdbTrpageSize * sizeof(CMdbId3));
 				pTransaction->m_pReadOnlyPages[0].m_ID = 0;
 				pTransaction->m_ReadOnlyPageCheck = DMdbTrpageSize / 2;
 			}
@@ -292,7 +292,7 @@ namespace NMib::NDatabase
 		auto Cleanup2 = g_OnScopeExit / [&]
 			{
 				if (pTransaction->m_pReadOnlyPages)
-					NMemory::fg_Free(pTransaction->m_pReadOnlyPages, DMdbTrpageSize * sizeof(MDB_ID3));
+					NMemory::fg_Free(pTransaction->m_pReadOnlyPages, DMdbTrpageSize * sizeof(CMdbId3));
 			}
 		;
 #endif
@@ -1068,32 +1068,32 @@ namespace NMib::NDatabase
 #ifdef DMibDatabase_Always64BitSupport
 		if (!_pTransaction->m_pParent)
 		{
-			MDB_ID3L el = pEnvironment->m_pReadOnlyPages, tl = _pTransaction->m_pReadOnlyPages;
-			unsigned i, x, n = tl[0].m_ID;
+			CMdbId3L pEnvironmentPages = pEnvironment->m_pReadOnlyPages, pTransactionPages = _pTransaction->m_pReadOnlyPages;
+			unsigned iEntry, iPage, nEntries = pTransactionPages[0].m_ID;
 			pthread_mutex_lock(&pEnvironment->m_ReadOnlyPagesMutex);
-			for (i = 1; i <= n; i++)
+			for (iEntry = 1; iEntry <= nEntries; iEntry++)
 			{
-				if (tl[i].m_ID & (DMdbRpageChunk - 1))
+				if (pTransactionPages[iEntry].m_ID & (DMdbRpageChunk - 1))
 				{
 					/* tmp overflow pages that we didn't share in env */
-					munmap(tl[i].m_pValue, tl[i].m_nPages * pEnvironment->m_PageSize);
+					munmap(pTransactionPages[iEntry].m_pValue, pTransactionPages[iEntry].m_nPages * pEnvironment->m_PageSize);
 				}
 				else
 				{
-					x = fg_Mid3lSearch(el, tl[i].m_ID);
-					if (tl[i].m_pValue == el[x].m_pValue)
-						el[x].m_nReferences--;
+					iPage = fg_Mid3lSearch(pEnvironmentPages, pTransactionPages[iEntry].m_ID);
+					if (pTransactionPages[iEntry].m_pValue == pEnvironmentPages[iPage].m_pValue)
+						pEnvironmentPages[iPage].m_nReferences--;
 					else
 					{
 						/* another tmp overflow page */
-						munmap(tl[i].m_pValue, tl[i].m_nPages * pEnvironment->m_PageSize);
+						munmap(pTransactionPages[iEntry].m_pValue, pTransactionPages[iEntry].m_nPages * pEnvironment->m_PageSize);
 					}
 				}
 			}
 			pthread_mutex_unlock(&pEnvironment->m_ReadOnlyPagesMutex);
-			tl[0].m_ID = 0;
+			pTransactionPages[0].m_ID = 0;
 			if (_Mode & DMdbEndFree)
-				NMemory::fg_Free(tl, DMdbTrpageSize * sizeof(MDB_ID3));
+				NMemory::fg_Free(pTransactionPages, DMdbTrpageSize * sizeof(CMdbId3));
 		}
 #endif
 		if (_Mode & DMdbEndFree)

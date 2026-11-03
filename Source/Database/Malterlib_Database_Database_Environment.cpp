@@ -279,7 +279,7 @@ namespace NMib::NDatabase
 			DMibError(NStr::fg_Format("Error opening mutex {}", fg_StrError(Result)));
 
 		{
-			Environment.m_pReadOnlyPages = (NPrivate::MDB_ID3L)NMemory::fg_Alloc(DMdbErpageSize * sizeof(NPrivate::MDB_ID3));
+			Environment.m_pReadOnlyPages = (NPrivate::CMdbId3L)NMemory::fg_Alloc(DMdbErpageSize * sizeof(NPrivate::CMdbId3));
 			Environment.m_pReadOnlyPages[0].m_ID = 0;
 			Environment.m_ReadOnlyPageCheck = DMdbErpageSize / 2;
 		}
@@ -344,7 +344,7 @@ namespace NMib::NDatabase
 			pTransaction->m_pDatabaseFlags = (unsigned char *)(pTransaction->m_pDatabaseSequences + Environment.m_MaxDatabases);
 			pTransaction->m_pEnvironment = &Environment;
 #ifdef DMibDatabase_Always64BitSupport
-			pTransaction->m_pReadOnlyPages = (NPrivate::MDB_ID3L)NMemory::fg_Alloc(DMdbTrpageSize * sizeof(MDB_ID3));
+			pTransaction->m_pReadOnlyPages = (NPrivate::CMdbId3L)NMemory::fg_Alloc(DMdbTrpageSize * sizeof(CMdbId3));
 			pTransaction->m_pReadOnlyPages[0].m_ID = 0;
 			pTransaction->m_ReadOnlyPageCheck = DMdbTrpageSize / 2;
 #endif
@@ -1239,7 +1239,7 @@ namespace NMib::NDatabase
 #	endif
 		Status = g_fDatabase_NtMapViewOfSection(pSection, GetCurrentProcess(), &pView, 0, 0, nullptr, &ViewSize, ViewUnmap, AllocationType, PageProtection);
 #	ifdef DMibDatabase_Always64BitSupport
-		m_FileMappingHandle = pSection;
+		m_pFileMappingHandle = pSection;
 #	else
 		g_fDatabase_NtClose(pSection);
 #	endif
@@ -1567,14 +1567,14 @@ namespace NMib::NDatabase
 		NMemory::fg_Free(m_pDirtyList, DMdbIdlUmSize * sizeof(CMdbId2));
 #ifdef DMibDatabase_Always64BitSupport
 		if (m_pPreallocatedTransaction && m_pPreallocatedTransaction->m_pReadOnlyPages)
-			NMemory::fg_Free(m_pPreallocatedTransaction->m_pReadOnlyPages, DMdbTrpageSize * sizeof(MDB_ID3));
+			NMemory::fg_Free(m_pPreallocatedTransaction->m_pReadOnlyPages, DMdbTrpageSize * sizeof(CMdbId3));
 		if (m_pReadOnlyPages)
 		{
-			MDB_ID3L el = m_pReadOnlyPages;
-			unsigned int x;
-			for (x = 1; x <= el[0].m_ID; x++)
-				munmap(el[x].m_pValue, el[x].m_nPages * m_PageSize);
-			NMemory::fg_Free(el, DMdbErpageSize * sizeof(NPrivate::MDB_ID3));
+			CMdbId3L pReadOnlyPages = m_pReadOnlyPages;
+			unsigned int iEntry;
+			for (iEntry = 1; iEntry <= pReadOnlyPages[0].m_ID; iEntry++)
+				munmap(pReadOnlyPages[iEntry].m_pValue, pReadOnlyPages[iEntry].m_nPages * m_PageSize);
+			NMemory::fg_Free(pReadOnlyPages, DMdbErpageSize * sizeof(NPrivate::CMdbId3));
 		}
 #endif
 		{
@@ -1683,8 +1683,8 @@ namespace NMib::NDatabase
 		}
 #ifdef DMibDatabase_Always64BitSupport
 #	ifdef DPlatformFamily_Windows
-		if (m_FileMappingHandle)
-			CloseHandle(m_FileMappingHandle);
+		if (m_pFileMappingHandle)
+			CloseHandle(m_pFileMappingHandle);
 		if (m_ReadOnlyPagesMutex)
 			CloseHandle(m_ReadOnlyPagesMutex);
 #	else

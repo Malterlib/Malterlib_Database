@@ -333,63 +333,63 @@ namespace NMib::NDatabase::NPrivate
 	}
 
 #ifdef DMibDatabase_Always64BitSupport
-	unsigned fg_Mid3lSearch(MDB_ID3L ids, CMdbId id)
+	unsigned fg_Mid3lSearch(CMdbId3L _pIDs, CMdbId _ID)
 	{
 		/*
-		 * binary search of id in ids
-		 * if found, returns position of id
-		 * if not found, returns first position greater than id
+		 * binary search of _ID in _pIDs
+		 * if found, returns position of _ID
+		 * if not found, returns first position greater than _ID
 		 */
-		unsigned base = 0;
-		unsigned cursor = 1;
-		int val = 0;
-		unsigned n = (unsigned)ids[0].m_ID;
+		unsigned iBase = 0;
+		unsigned iCursor = 1;
+		int Compare = 0;
+		unsigned nRemaining = (unsigned)_pIDs[0].m_ID;
 
-		while (0 < n)
+		while (0 < nRemaining)
 		{
-			unsigned pivot = n >> 1;
-			cursor = base + pivot + 1;
-			val = DCmp(id, ids[cursor].m_ID);
+			unsigned nHalf = nRemaining >> 1;
+			iCursor = iBase + nHalf + 1;
+			Compare = DCmp(_ID, _pIDs[iCursor].m_ID);
 
-			if (val < 0)
-				n = pivot;
-			else if (val > 0)
+			if (Compare < 0)
+				nRemaining = nHalf;
+			else if (Compare > 0)
 			{
-				base = cursor;
-				n -= pivot + 1;
+				iBase = iCursor;
+				nRemaining -= nHalf + 1;
 			}
 			else
-				return cursor;
+				return iCursor;
 		}
 
-		if (val > 0)
-			++cursor;
-		return cursor;
+		if (Compare > 0)
+			++iCursor;
+		return iCursor;
 	}
 
-	int fg_Mid3lInsert(MDB_ID3L ids, MDB_ID3 *id)
+	int fg_Mid3lInsert(CMdbId3L _pIDs, CMdbId3 *_pID)
 	{
-		unsigned x, i;
+		unsigned iInsert, iMove;
 
-		x = fg_Mid3lSearch(ids, id->m_ID);
+		iInsert = fg_Mid3lSearch(_pIDs, _pID->m_ID);
 
-		if (x < 1)
+		if (iInsert < 1)
 		{
 			/* internal error */
 			return -2;
 		}
 
-		if (x <= ids[0].m_ID && ids[x].m_ID == id->m_ID)
+		if (iInsert <= _pIDs[0].m_ID && _pIDs[iInsert].m_ID == _pID->m_ID)
 		{
 			/* duplicate */
 			return -1;
 		}
 
-		/* insert id */
-		ids[0].m_ID++;
-		for (i = (unsigned)ids[0].m_ID; i > x; i--)
-			ids[i] = ids[i - 1];
-		ids[x] = *id;
+		/* insert _pID */
+		_pIDs[0].m_ID++;
+		for (iMove = (unsigned)_pIDs[0].m_ID; iMove > iInsert; iMove--)
+			_pIDs[iMove] = _pIDs[iMove - 1];
+		_pIDs[iInsert] = *_pID;
 
 		return 0;
 	}

@@ -1705,24 +1705,24 @@ namespace NMib::NDatabase::NPrivate
 	// ---------------------------------------------------------------------------------------------------------------------------------------
 
 #ifdef DMibDatabase_Always64BitSupport
-	void fg_CursorUnref(CMdbCursor *mc)
+	void fg_CursorUnref(CMdbCursor *_pCursor)
 	{
-		int i;
-		if (mc->m_pTransaction->m_pReadOnlyPages[0].m_ID)
+		int iPage;
+		if (_pCursor->m_pTransaction->m_pReadOnlyPages[0].m_ID)
 		{
-			if (!mc->m_nPages || !mc->m_Pages[0] || DIsSubp(mc->m_Pages[0]))
+			if (!_pCursor->m_nPages || !_pCursor->m_Pages[0] || DIsSubp(_pCursor->m_Pages[0]))
 				return;
-			for (i = 0; i < mc->m_nPages; i++)
-				fg_PageUnref(mc->m_pTransaction, mc->m_Pages[i]);
-			if (mc->m_pOverflowPage)
+			for (iPage = 0; iPage < _pCursor->m_nPages; iPage++)
+				fg_PageUnref(_pCursor->m_pTransaction, _pCursor->m_Pages[iPage]);
+			if (_pCursor->m_pOverflowPage)
 			{
-				fg_PageUnref(mc->m_pTransaction, mc->m_pOverflowPage);
-				mc->m_pOverflowPage = 0;
+				fg_PageUnref(_pCursor->m_pTransaction, _pCursor->m_pOverflowPage);
+				_pCursor->m_pOverflowPage = 0;
 			}
 		}
-		mc->m_nPages = mc->m_iTop = 0;
-		mc->m_Pages[0] = nullptr;
-		mc->m_Flags &= ~DCInitialized;
+		_pCursor->m_nPages = _pCursor->m_iTop = 0;
+		_pCursor->m_Pages[0] = nullptr;
+		_pCursor->m_Flags &= ~DCInitialized;
 	}
 #endif /* DMibDatabase_Always64BitSupport */
 
@@ -1863,14 +1863,14 @@ namespace NMib::NDatabase::NPrivate
 		CMdbNode *pNode;
 		CMdbPage *pPage;
 #ifdef DMibDatabase_Always64BitSupport
-		CMdbPage *op;
+		CMdbPage *pOriginalPage;
 #endif
 
 		if (_pCursor->m_nPages < 2)
 			return DMdbNotFound; // root has no siblings
 
 #ifdef DMibDatabase_Always64BitSupport
-		op = _pCursor->m_Pages[_pCursor->m_iTop];
+		pOriginalPage = _pCursor->m_Pages[_pCursor->m_iTop];
 #endif
 		fg_CursorPop(_pCursor);
 		DMibDatabaseTrace("parent page is page {}, index {}", _pCursor->m_Pages[_pCursor->m_iTop]->m_PageNumber, _pCursor->m_NodeIndices[_pCursor->m_iTop]);
@@ -1896,7 +1896,7 @@ namespace NMib::NDatabase::NPrivate
 		}
 		DMibCheck(DIsBranch(_pCursor->m_Pages[_pCursor->m_iTop]));
 
-		DMdbPageUnref(_pCursor->m_pTransaction, op);
+		DMdbPageUnref(_pCursor->m_pTransaction, pOriginalPage);
 
 		pNode = DNodePtr(_pCursor->m_Pages[_pCursor->m_iTop], _pCursor->m_NodeIndices[_pCursor->m_iTop]);
 		if ((Result = fg_PageGet(_pCursor, DNodePgno(pNode), &pPage, nullptr)) != 0)
