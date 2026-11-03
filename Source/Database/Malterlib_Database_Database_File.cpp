@@ -43,7 +43,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 namespace NMib::NDatabase::NPrivate
 {
-	CDatabaseOffset DMibDatabaseInfrequentSection mdb_fsize(HANDLE fd)
+	CDatabaseOffset DMibDatabaseInfrequentSection fg_FSize(HANDLE fd)
 	{
 #ifdef DPlatformFamily_Windows
 		LARGE_INTEGER fsize;

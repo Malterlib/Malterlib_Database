@@ -42,10 +42,10 @@ namespace NMib::NDatabase::NPrivate
 	 * Called immediately after a database is opened to set the defaults.
 	 * The user can then override them with #f_SetDatabaseKeyCompare() or
 	 * #f_SetDatabaseDataCompare().
-	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
+	 * @param[in] txn A transaction handle returned by #f_TxnBegin()
 	 * @param[in] dbi A database handle returned by #f_OpenDatabase()
 	 */
-	void mdb_default_cmp(CMdbTxn *txn, CDatabaseSubID dbi)
+	void fg_DefaultCmp(CMdbTxn *txn, CDatabaseSubID dbi)
 	{
 		auto &Database = txn->mt_dbs[dbi];
 		auto &LocalDatabase = txn->mt_dbxs[dbi];
@@ -92,7 +92,7 @@ namespace NMib::NDatabase::NPrivate
 	}
 
 	/** Compare two items pointing at aligned #CDatabaseOffset's */
-	int mdb_cmp_long(CDatabaseValue const &_Left, CDatabaseValue const &_Right)
+	int fg_CmpLong(CDatabaseValue const &_Left, CDatabaseValue const &_Right)
 	{
 		return (*(CDatabaseOffset *)_Left.m_pData < *(CDatabaseOffset *)_Right.m_pData) ? -1 : *(CDatabaseOffset *)_Left.m_pData > *(CDatabaseOffset *)_Right.m_pData;
 	}
@@ -102,7 +102,7 @@ namespace NMib::NDatabase::NPrivate
 	 *	This is also set as #EDatabaseSubFlag_SortedDuplicatesIntegerKeys|#EDatabaseSubFlag_SortedDuplicatesFixedSize's #CMdbDbx.%m_fDataCompare,
 	 *	but #mdb_cmp_clong() is called instead if the data type is #CDatabaseOffset.
 	 */
-	int mdb_cmp_int(CDatabaseValue const &_Left, CDatabaseValue const &_Right)
+	int fg_CmpInt(CDatabaseValue const &_Left, CDatabaseValue const &_Right)
 	{
 		return (*(uint32 *)_Left.m_pData < *(uint32 *)_Right.m_pData) ? -1 : *(uint32 *)_Left.m_pData > *(uint32 *)_Right.m_pData;
 	}
@@ -110,7 +110,7 @@ namespace NMib::NDatabase::NPrivate
 	/** Compare two items pointing at unsigned ints of unknown alignment.
 	 *	Nodes and keys are guaranteed to be 2-byte aligned.
 	 */
-	int mdb_cmp_cint(CDatabaseValue const &_Left, CDatabaseValue const &_Right)
+	int fg_CmpCInt(CDatabaseValue const &_Left, CDatabaseValue const &_Right)
 	{
 #if BYTE_ORDER == LITTLE_ENDIAN
 		unsigned short *u, *c;
@@ -141,7 +141,7 @@ namespace NMib::NDatabase::NPrivate
 	}
 
 	/** Compare two items lexically */
-	int mdb_cmp_memn(CDatabaseValue const &_Left, CDatabaseValue const &_Right)
+	int fg_CmpMemN(CDatabaseValue const &_Left, CDatabaseValue const &_Right)
 	{
 		int diff;
 		smint len_diff;
@@ -160,7 +160,7 @@ namespace NMib::NDatabase::NPrivate
 	}
 
 	/** Compare two items in reverse byte order */
-	int mdb_cmp_memnr(CDatabaseValue const &_Left, CDatabaseValue const &_Right)
+	int fg_CmpMemNR(CDatabaseValue const &_Left, CDatabaseValue const &_Right)
 	{
 		unsigned char const *p1, *p2, *p1_lim;
 		smint len_diff;
@@ -186,9 +186,9 @@ namespace NMib::NDatabase::NPrivate
 		return len_diff < 0 ? -1 : len_diff;
 	}
 
-	FDatabaseCompare g_mdb_cmp_memn = mdb_cmp_memn;
-	FDatabaseCompare g_mdb_cmp_memnr = mdb_cmp_memnr;
-	FDatabaseCompare g_mdb_cmp_int = mdb_cmp_int;
-	FDatabaseCompare g_mdb_cmp_cint = mdb_cmp_cint;
-	FDatabaseCompare g_mdb_cmp_long = mdb_cmp_long;
+	FDatabaseCompare g_mdb_cmp_memn = fg_CmpMemN;
+	FDatabaseCompare g_mdb_cmp_memnr = fg_CmpMemNR;
+	FDatabaseCompare g_mdb_cmp_int = fg_CmpInt;
+	FDatabaseCompare g_mdb_cmp_cint = fg_CmpCInt;
+	FDatabaseCompare g_mdb_cmp_long = fg_CmpLong;
 }

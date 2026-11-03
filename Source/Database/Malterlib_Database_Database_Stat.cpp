@@ -74,7 +74,7 @@ namespace NMib::NDatabase
 		CMdbMeta *meta;
 		CDatabaseEnvironmentInfo Info;
 
-		meta = mdb_env_pick_meta();
+		meta = f_PickMeta();
 		Info.m_pMapAddress = meta->mm_address;
 		Info.m_LastPageID = meta->mm_last_pg;
 		Info.m_LastCommittedTransactionID = meta->mm_txnid.f_Load(NAtomic::gc_MemoryOrder_Relaxed);

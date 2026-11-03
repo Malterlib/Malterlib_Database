@@ -215,7 +215,7 @@ namespace NMib::NDatabase
 	{
 		EDatabaseWriteFlag_None                          = 0
 		, EDatabaseWriteFlag_NoOverwrite                 = 0x10    ///< For put: Don't write if the key already exists.
-		, EDatabaseWriteFlag_OverwriteAtCurrentCursorPos = 0x40    /// For mdb_cursor_put: overwrite the current key/data pair
+		, EDatabaseWriteFlag_OverwriteAtCurrentCursorPos = 0x40    /// For fg_CursorPut: overwrite the current key/data pair
 		, EDatabaseWriteFlag_ReserveSpace                = 0x10000 ///< For put: Just reserve space for data, don't copy it. Return a
 		                                                           ///<  pointer to the reserved space.
 		, EDatabaseWriteFlag_Append                      = 0x20000 ///< Data is being appended, don't split full pages.
@@ -223,7 +223,7 @@ namespace NMib::NDatabase
 		// Dup data options
 		, EDatabaseWriteFlag_NoDuplicateData     = 0x20    ///< Only for #EDatabaseSubFlag_SortedDuplicates<br>
 		                                                   ///< For put: Don't write if the key and data pair already exist.<br>
-		                                                   ///< For mdb_cursor_del: Remove all duplicate data items.
+		                                                   ///< For fg_CursorDel: Remove all duplicate data items.
 		, EDatabaseWriteFlag_AppendDuplicateData = 0x40000 ///< Duplicate data is being appended, don't split full pages.
 		, EDatabaseWriteFlag_BatchDuplicateData  = 0x80000 ///< Store multiple data items in one call. Only for #EDatabaseSubFlag_SortedDuplicatesFixedSize.
 	};
@@ -439,10 +439,10 @@ namespace NMib::NDatabase
 #	ifdef MDB_USE_POSIX_SEM
 
 		typedef sem_t *CMdbMutexType, *CMdbMutexRef;
-#		define DLockMutex0(d_Mutex)		mdb_sem_wait(d_Mutex)
+#		define DLockMutex0(d_Mutex)		fg_SemWait(d_Mutex)
 #		define DUnlockMutex(d_Mutex)		sem_post(d_Mutex)
 
-		inline_always static int mdb_sem_wait(sem_t *sem)
+		inline_always static int fg_SemWait(sem_t *sem)
 		{
 			int rc;
 			while ((rc = sem_wait(sem)) && (rc = errno) == EINTR);
@@ -461,7 +461,7 @@ namespace NMib::NDatabase
 		using CMdbMutexRef = CMdbMutex *;
 		using CMdbMutexType = CMdbMutex[1];
 
-#		define DLockMutex0(d_Mutex)		mdb_sem_wait(d_Mutex)
+#		define DLockMutex0(d_Mutex)		fg_SemWait(d_Mutex)
 #		define DUnlockMutex(d_Mutex)		do { \
 				struct sembuf sb = { 0, 1, SEM_UNDO }; \
 				sb.sem_num = (d_Mutex)->semnum; \
@@ -469,7 +469,7 @@ namespace NMib::NDatabase
 				semop((d_Mutex)->semid, &sb, 1); \
 			} while(0)
 
-		inline_always static int mdb_sem_wait(CMdbMutexRef sem)
+		inline_always static int fg_SemWait(CMdbMutexRef sem)
 		{
 			int rc, *locked = sem->locked;
 			struct sembuf sb = {0, -1, SEM_UNDO};
@@ -500,7 +500,7 @@ namespace NMib::NDatabase
 		/** Reference to an #CMdbMutexType */
 		typedef pthread_mutex_t *CMdbMutexRef;
 		/** Lock the reader or writer mutex.
-		 *	Returns 0 or a code to give #mdb_mutex_failed(), as in #DLockMutex().
+		 *	Returns 0 or a code to give #f_MutexFailed(), as in #DLockMutex().
 		 */
 #		define DLockMutex0(d_Mutex)	pthread_mutex_lock(d_Mutex)
 		/** Unlock the reader or writer mutex.
@@ -552,7 +552,7 @@ namespace NMib::NDatabase
 		 */
 #	define DLockMutex(d_Rc, d_Env, d_Mutex) \
 		(((d_Rc) = DLockMutex0(d_Mutex)) && \
-		 ((d_Rc) = d_Env->mdb_mutex_failed(d_Mutex, d_Rc)))
+		 ((d_Rc) = d_Env->f_MutexFailed(d_Mutex, d_Rc)))
 #else
 #	define DLockMutex(d_Rc, d_Env, d_Mutex) ((d_Rc) = DLockMutex0(d_Mutex))
 #endif
@@ -737,7 +737,7 @@ namespace NMib::NDatabase
 		 *	@ingroup debug
 		 *	Invoke a function to display a key in hex.
 		 */
-#	define	DKey(d_Key)	mdb_dkey(d_Key, kbuf)
+#	define	DKey(d_Key)	fg_DKey(d_Key, kbuf)
 #else
 #	define	DKBuf
 #	define DKey(d_Key)	0
@@ -771,15 +771,15 @@ namespace NMib::NDatabase
 
 		typedef unsigned long long CMdbHash;
 
-		CMdbHash mdb_hash(void const *val, size_t len);
-		void mdb_env_mname_init(CMdbEnv *env);
+		CMdbHash fg_Hash(void const *val, size_t len);
+		void fg_EnvMNameInit(CMdbEnv *env);
 #define DMutexName(d_Env, d_Ch) ( \
 	(void) ((d_Env)->me_mutexname[sizeof(DMutexNamePrefix)-1] = (d_Ch)), \
 	(d_Env)->me_mutexname)
 
 #ifdef DPlatformFamily_Windows
 		/** @brief Map a result from an NTAPI call to WIN32. */
-		DWORD mdb_nt2win32(NTSTATUS st);
+		DWORD fg_Nt2Win32(NTSTATUS st);
 #endif
 
 		/**	Default size of memory map.
@@ -1102,7 +1102,7 @@ namespace NMib::NDatabase
 #define DFSubData	 0x02			/**< data is a sub-database */
 #define DFDupData	 0x04			/**< data has duplicates */
 
-			/** valid flags for #mdb_node_add() */
+			/** valid flags for #fg_NodeAdd() */
 #define	DNodeAddFlags	(DFDupData|DFSubData|EDatabaseWriteFlag_ReserveSpace|EDatabaseWriteFlag_Append)
 
 			/** @} */
@@ -1378,7 +1378,7 @@ namespace NMib::NDatabase
 		 *	@ingroup internal
 		 *	@{
 		 */
-		/** #mdb_txn_begin() flags */
+		/** #f_TxnBegin() flags */
 #define DMdbTxnBeginFlags	(EDatabaseEnvironmentFlag_NoMetaSync|EDatabaseEnvironmentFlag_NoSync|EDatabaseEnvironmentFlag_ReadOnly)
 #define DMdbTxnNoMetaSync	EDatabaseEnvironmentFlag_NoMetaSync	/**< don't sync meta for this txn on commit */
 #define DMdbTxnNoSync		EDatabaseEnvironmentFlag_NoSync	/**< don't sync this txn on commit */
@@ -1454,7 +1454,7 @@ namespace NMib::NDatabase
 #define DCUntrack	0x40		/**< Un-track cursor when closing */
 #define DCWriteMap	DMdbTxnWriteMap /**< Copy of txn flag */
 		/** Read-only cursor into the txn's original snapshot in the map.
-		 *	Set for read-only txns, and in #mdb_page_alloc() for #DFreeDbi when
+		 *	Set for read-only txns, and in #fg_PageAlloc() for #DFreeDbi when
 		 *	#DMdbDevel & 2. Only implements code which is necessary for this.
 		 */
 #define DCOrigReadOnly	DMdbTxnReadOnly
@@ -1545,7 +1545,7 @@ namespace NMib::NDatabase
 #	define DMdbCloExec		0
 #endif
 
-		/** File type, access mode etc. for #mdb_fopen() */
+		/** File type, access mode etc. for #f_FOpen() */
 		enum EMdbFOpenType
 		{
 #ifdef DPlatformFamily_Windows
@@ -1555,7 +1555,7 @@ namespace NMib::NDatabase
 			, EMdbFOpenType_Copy
 			, EMdbFOpenType_Locks
 #else
-			/* A comment in mdb_fopen() explains some O_* flag choices. */
+			/* A comment in f_FOpen() explains some O_* flag choices. */
 			EMdbFOpenType_ReadOnly = O_RDONLY ///< for RDONLY me_fd
 			, EMdbFOpenType_ReadWrite = O_RDWR | O_CREAT                          ///< for me_fd
 			, EMdbFOpenType_Meta      = O_WRONLY | DMdbDSync | DMdbCloExec        ///< for me_mfd
@@ -1653,9 +1653,9 @@ namespace NMib::NDatabase
 		umint m_LockedThreadID = 0;
 		NAtomic::TCAtomic<umint> m_nReferences = 0;
 		// Publics
-		NDatabase::CDatabaseTransactionCommon mdb_txn_begin(NPrivate::CMdbTxn *parent, uint32 flags);
-		void mdb_dbi_close(CDatabaseSubID dbi);
-		void mdb_txn_free(NPrivate::CMdbTxn *_pTransaction);
+		NDatabase::CDatabaseTransactionCommon f_TxnBegin(NPrivate::CMdbTxn *parent, uint32 flags);
+		void f_DbiClose(CDatabaseSubID dbi);
+		void f_TxnFree(NPrivate::CMdbTxn *_pTransaction);
 
 		// Privates
 		void f_CopyCompact(HANDLE fd);
@@ -1663,31 +1663,31 @@ namespace NMib::NDatabase
 		CDatabaseStatistics f_DatabaseStatistics(NPrivate::CMdbDb *db);
 		CDatabaseSizeStatistics f_SizeStatistics(NPrivate::CMdbDb *db);
 		CDatabaseEnvironmentInfo f_EnvironmentInfo();
-		bool mdb_env_read_header(int prev, NPrivate::CMdbMeta *meta);
-		NPrivate::CMdbMeta *mdb_env_pick_meta() const;
-		void mdb_env_close0(int excl);
-		umint mdb_leaf_size(CDatabaseValue *key, CDatabaseValue *data);
-		umint mdb_branch_size(CDatabaseValue *key);
+		bool f_ReadHeader(int prev, NPrivate::CMdbMeta *meta);
+		NPrivate::CMdbMeta *f_PickMeta() const;
+		void f_Close0(int excl);
+		umint f_LeafSize(CDatabaseValue *key, CDatabaseValue *data);
+		umint f_BranchSize(CDatabaseValue *key);
 #ifdef DMdbRobustSupported
-		void mdb_reader_check0(bool _bReadLock, umint *_pDead);
+		void f_ReaderCheck0(bool _bReadLock, umint *_pDead);
 #endif
-		void mdb_page_free(NPrivate::CMdbPage *mp);
-		void mdb_dpage_free(NPrivate::CMdbPage *dp);
-		void mdb_dpage_free_memory(NPrivate::CMdbPage *dp);
-		int mdb_reader_pid(NPrivate::EPidLockOp op, CProcessID pid);
-		void mdb_env_sync0(bool _bForce, NPrivate::CPgno numpgs);
-		void mdb_env_init_meta0(NPrivate::CMdbMeta *meta);
-		void mdb_env_init_meta(NPrivate::CMdbMeta *meta);
-		int mdb_env_map(void *addr);
-		void mdb_env_open2(int prev, uint32 _PageSize);
-		int mdb_env_share_locks(int *excl);
-		int mdb_env_excl_lock(int *excl);
-		void mdb_env_setup_locks(NStr::CStr const &_LockPath, int mode, int *excl);
+		void f_PageFree(NPrivate::CMdbPage *mp);
+		void f_DPageFree(NPrivate::CMdbPage *dp);
+		void f_DPageFreeMemory(NPrivate::CMdbPage *dp);
+		int f_ReaderPid(NPrivate::EPidLockOp op, CProcessID pid);
+		void f_Sync0(bool _bForce, NPrivate::CPgno numpgs);
+		void f_InitMeta0(NPrivate::CMdbMeta *meta);
+		void f_InitMeta(NPrivate::CMdbMeta *meta);
+		int f_Map(void *addr);
+		void f_Open2(int prev, uint32 _PageSize);
+		int f_ShareLocks(int *excl);
+		int f_ExclLock(int *excl);
+		void f_SetupLocks(NStr::CStr const &_LockPath, int mode, int *excl);
 #ifdef DMdbRobustSupported
-		int mdb_mutex_failed(NPrivate::CMdbMutexRef mutex, int rc);
+		int f_MutexFailed(NPrivate::CMdbMutexRef mutex, int rc);
 #endif
-		int mdb_fopen(NStr::CStr const &_FileName, NPrivate::EMdbFOpenType which, NPrivate::CMdbMode mode, HANDLE *res);
-		NStr::CStr mdb_getfilename(NStr::CStr const &_FileName, NPrivate::EMdbFOpenType which);
+		int f_FOpen(NStr::CStr const &_FileName, NPrivate::EMdbFOpenType which, NPrivate::CMdbMode mode, HANDLE *res);
+		NStr::CStr f_GetFileName(NStr::CStr const &_FileName, NPrivate::EMdbFOpenType which);
 		bool f_IsInsideMemoryMap(uint8 const *_pData);
 	};
 
@@ -1711,41 +1711,41 @@ namespace NMib::NDatabase
 #define DTxnDbiChanged(d_Txn, d_Dbi) \
 	((d_Txn)->mt_dbiseqs[d_Dbi] != (d_Txn)->mt_env->me_dbiseqs[d_Dbi])
 
-		int mdb_page_alloc(CMdbCursor *mc, int num, CMdbPage **mp);
-		int mdb_page_new(CMdbCursor *mc, uint32 flags, int num, CMdbPage **mp);
-		int mdb_page_touch(CMdbCursor *mc);
+		int fg_PageAlloc(CMdbCursor *mc, int num, CMdbPage **mp);
+		int fg_PageNew(CMdbCursor *mc, uint32 flags, int num, CMdbPage **mp);
+		int fg_PageTouch(CMdbCursor *mc);
 
-		CMdbPage *mdb_page_malloc(CMdbTxn *txn, unsigned num);
-		void mdb_dlist_free(CMdbTxn *txn);
-		int mdb_page_loose(CMdbCursor *mc, CMdbPage *mp);
-		int mdb_pages_xkeep(CMdbCursor *mc, unsigned pflags, int all);
-		int mdb_page_spill(CMdbCursor *m0, CDatabaseValue *key, CDatabaseValue *data);
+		CMdbPage *fg_PageMalloc(CMdbTxn *txn, unsigned num);
+		void fg_DListFree(CMdbTxn *txn);
+		int fg_PageLoose(CMdbCursor *mc, CMdbPage *mp);
+		int fg_PagesXKeep(CMdbCursor *mc, unsigned pflags, int all);
+		int fg_PageSpill(CMdbCursor *m0, CDatabaseValue *key, CDatabaseValue *data);
 
-		CTransactionID mdb_find_oldest(CMdbTxn *txn);
-		void mdb_page_dirty(CMdbTxn *txn, CMdbPage *mp);
-		void mdb_page_copy(CMdbPage *dst, CMdbPage *src, uint32 psize);
-		int mdb_page_unspill(CMdbTxn *txn, CMdbPage *mp, CMdbPage **ret);
+		CTransactionID fg_FindOldest(CMdbTxn *txn);
+		void fg_PageDirty(CMdbTxn *txn, CMdbPage *mp);
+		void fg_PageCopy(CMdbPage *dst, CMdbPage *src, uint32 psize);
+		int fg_PageUnspill(CMdbTxn *txn, CMdbPage *mp, CMdbPage **ret);
 
-		void mdb_cursor_shadow(CMdbTxn *src, CMdbTxn *dst);
-		void mdb_cursors_close(CMdbTxn *txn, unsigned merge);
-		void mdb_txn_renew0(CMdbTxn *txn);
-		void mdb_txn_commit(CMdbTxn *txn);
-		void mdb_dbis_update(CMdbTxn *txn, int keep);
-		int mdb_freelist_save(CMdbTxn *txn);
+		void fg_CursorShadow(CMdbTxn *src, CMdbTxn *dst);
+		void fg_CursorsClose(CMdbTxn *txn, unsigned merge);
+		void fg_TxnRenew0(CMdbTxn *txn);
+		void fg_TxnCommit(CMdbTxn *txn);
+		void fg_DbisUpdate(CMdbTxn *txn, int keep);
+		int fg_FreelistSave(CMdbTxn *txn);
 
-		CDatabaseOffset mdb_fsize(HANDLE fd);
-		void mdb_env_reader_dest(void *ptr);
-		int mdb_ovpage_free(CMdbCursor *mc, CMdbPage *mp);
-		int mdb_page_search_lowest(CMdbCursor *mc);
-		int mdb_cursor_touch(CMdbCursor *mc);
-		void mdb_cursor_copy(CMdbCursor const *csrc, CMdbCursor *cdst);
+		CDatabaseOffset fg_FSize(HANDLE fd);
+		void fg_EnvReaderDest(void *ptr);
+		int fg_OvPageFree(CMdbCursor *mc, CMdbPage *mp);
+		int fg_PageSearchLowest(CMdbCursor *mc);
+		int fg_CursorTouch(CMdbCursor *mc);
+		void fg_CursorCopy(CMdbCursor const *csrc, CMdbCursor *cdst);
 
 		/** State needed for a compacting copy. */
 		struct CCompactingCopyState;
 
-		int mdb_env_cthr_toggle(CCompactingCopyState &_CopyState);
-		int mdb_env_cwalk(CCompactingCopyState &_CopyState, CPgno *pg, int flags);
-		int mdb_pid_insert(CProcessID *ids, CProcessID pid);
+		int fg_EnvCThrToggle(CCompactingCopyState &_CopyState);
+		int fg_EnvCWalk(CCompactingCopyState &_CopyState, CPgno *pg, int flags);
+		int fg_PidInsert(CProcessID *ids, CProcessID pid);
 
 #define DMdbEndNames {"committed", "empty-commit", "abort", "reset", \
 	"reset-tmp", "fail-begin", "fail-beginchild"}
@@ -1757,48 +1757,48 @@ namespace NMib::NDatabase
 		constexpr aint gc_MDB_END_FAIL_BEGIN = gc_MDB_END_RESET_TMP + 1;
 		constexpr aint gc_MDB_END_FAIL_BEGINCHILD = gc_MDB_END_FAIL_BEGIN + 1;
 
-#define DMdbEndOpmask	0x0F	/**< mask for #mdb_txn_end() operation number */
+#define DMdbEndOpmask	0x0F	/**< mask for #fg_TxnEnd() operation number */
 #define DMdbEndUpdate	0x10	/**< update env state (DBIs) */
 #define DMdbEndFree	0x20	/**< free txn unless it is #CMdbEnv.%me_txn0 */
 #define DMdbEndSlot EDatabaseEnvironmentFlag_NoTls	/**< release any reader slot if #EDatabaseEnvironmentFlag_NoTls */
-		void mdb_txn_end(CMdbTxn *txn, unsigned mode);
-		void mdb_txn_abort(CMdbTxn *txn);
+		void fg_TxnEnd(CMdbTxn *txn, unsigned mode);
+		void fg_TxnAbort(CMdbTxn *txn);
 
-		NStr::CStr mdb_strerror(int _Error);
-		NStr::CStr mdb_strerror_system(int _Error);
+		NStr::CStr fg_StrError(int _Error);
+		NStr::CStr fg_StrErrorSystem(int _Error);
 
-		int mdb_page_get(CMdbCursor *mc, CPgno pgno, CMdbPage **mp, int *lvl);
-		int mdb_page_search_root(CMdbCursor *mc, CDatabaseValue const *key, int modify);
+		int fg_PageGet(CMdbCursor *mc, CPgno pgno, CMdbPage **mp, int *lvl);
+		int fg_PageSearchRoot(CMdbCursor *mc, CDatabaseValue const *key, int modify);
 #define DMdbPsModify	1
 #define DMdbPsRootonly	2
 #define DMdbPsFirst	4
 #define DMdbPsLast		8
-		int mdb_page_search(CMdbCursor *mc, CDatabaseValue const *key, int flags);
-		int mdb_page_merge(CMdbCursor *csrc, CMdbCursor *cdst);
+		int fg_PageSearch(CMdbCursor *mc, CDatabaseValue const *key, int flags);
+		int fg_PageMerge(CMdbCursor *csrc, CMdbCursor *cdst);
 
 #define DMdbSplitReplace	EDatabaseWriteFlag_AppendDuplicateData	/**< newkey is not new */
-		int mdb_page_split(CMdbCursor *mc, CDatabaseValue *newkey, CDatabaseValue *newdata, CPgno newpgno, uint32 nflags);
+		int fg_PageSplit(CMdbCursor *mc, CDatabaseValue *newkey, CDatabaseValue *newdata, CPgno newpgno, uint32 nflags);
 
-		int mdb_page_flush(CMdbTxn *txn, int keep);
+		int fg_PageFlush(CMdbTxn *txn, int keep);
 
-		int mdb_env_write_meta(CMdbTxn *txn);
+		int fg_EnvWriteMeta(CMdbTxn *txn);
 
-		CMdbNode *mdb_node_search(CMdbCursor *mc, CDatabaseValue const *key, int *exactp);
-		int mdb_node_add(CMdbCursor *mc, CIndx indx, CDatabaseValue *key, CDatabaseValue *data, CPgno pgno, uint32 flags);
-		void mdb_node_del(CMdbCursor *mc, int ksize);
-		void mdb_node_shrink(CMdbPage *mp, CIndx indx);
-		int mdb_node_move(CMdbCursor *csrc, CMdbCursor *cdst, int fromleft);
-		int mdb_node_read(CMdbCursor *mc, CMdbNode *leaf, CDatabaseValue *data);
+		CMdbNode *fg_NodeSearch(CMdbCursor *mc, CDatabaseValue const *key, int *exactp);
+		int fg_NodeAdd(CMdbCursor *mc, CIndx indx, CDatabaseValue *key, CDatabaseValue *data, CPgno pgno, uint32 flags);
+		void fg_NodeDel(CMdbCursor *mc, int ksize);
+		void fg_NodeShrink(CMdbPage *mp, CIndx indx);
+		int fg_NodeMove(CMdbCursor *csrc, CMdbCursor *cdst, int fromleft);
+		int fg_NodeRead(CMdbCursor *mc, CMdbNode *leaf, CDatabaseValue *data);
 
-		int mdb_rebalance(CMdbCursor *mc);
-		int mdb_update_key(CMdbCursor *mc, CDatabaseValue *key);
+		int fg_Rebalance(CMdbCursor *mc);
+		int fg_UpdateKey(CMdbCursor *mc, CDatabaseValue *key);
 
-		void mdb_cursor_pop(CMdbCursor *mc);
-		int mdb_cursor_push(CMdbCursor *mc, CMdbPage *mp);
+		void fg_CursorPop(CMdbCursor *mc);
+		int fg_CursorPush(CMdbCursor *mc, CMdbPage *mp);
 
-		int mdb_cursor_del0(CMdbCursor *mc);
-		int mdb_del0(CMdbTxn *txn, CDatabaseSubID dbi, CDatabaseValue const *key, CDatabaseValue const *data, EDatabaseWriteFlag _Flags);
-		int mdb_cursor_sibling(CMdbCursor *mc, int move_right);
+		int fg_CursorDel0(CMdbCursor *mc);
+		int fg_Del0(CMdbTxn *txn, CDatabaseSubID dbi, CDatabaseValue const *key, CDatabaseValue const *data, EDatabaseWriteFlag _Flags);
+		int fg_CursorSibling(CMdbCursor *mc, int move_right);
 
 		/** @brief Cursor Get operations.
 		 *
@@ -1832,26 +1832,26 @@ namespace NMib::NDatabase
 			, EDatabaseCursorGet_PrevMultiple ///< Position at previous page and return up to a page of duplicate data items. Only for #EDatabaseSubFlag_SortedDuplicatesFixedSize
 		};
 
-		int mdb_cursor_next(CMdbCursor *mc, CDatabaseValue *key, CDatabaseValue *data, EDatabaseCursorGet op);
-		int mdb_cursor_prev(CMdbCursor *mc, CDatabaseValue *key, CDatabaseValue *data, EDatabaseCursorGet op);
-		int mdb_cursor_set(CMdbCursor *mc, CDatabaseValue *key, CDatabaseValue *data, EDatabaseCursorGet op, int *exactp);
-		int mdb_cursor_first(CMdbCursor *mc, CDatabaseValue *key, CDatabaseValue *data);
-		int mdb_cursor_last(CMdbCursor *mc, CDatabaseValue *key, CDatabaseValue *data);
+		int fg_CursorNext(CMdbCursor *mc, CDatabaseValue *key, CDatabaseValue *data, EDatabaseCursorGet op);
+		int fg_CursorPrev(CMdbCursor *mc, CDatabaseValue *key, CDatabaseValue *data, EDatabaseCursorGet op);
+		int fg_CursorSet(CMdbCursor *mc, CDatabaseValue *key, CDatabaseValue *data, EDatabaseCursorGet op, int *exactp);
+		int fg_CursorFirst(CMdbCursor *mc, CDatabaseValue *key, CDatabaseValue *data);
+		int fg_CursorLast(CMdbCursor *mc, CDatabaseValue *key, CDatabaseValue *data);
 
-		void mdb_cursor_init(CMdbCursor *mc, CMdbTxn *txn, CDatabaseSubID dbi, CMdbXCursor *mx);
-		void mdb_xcursor_init0(CMdbCursor *mc);
-		void mdb_xcursor_init1(CMdbCursor *mc, CMdbNode *node);
-		void mdb_xcursor_init2(CMdbCursor *mc, CMdbXCursor *src_mx, int force);
+		void fg_CursorInit(CMdbCursor *mc, CMdbTxn *txn, CDatabaseSubID dbi, CMdbXCursor *mx);
+		void fg_XCursorInit0(CMdbCursor *mc);
+		void fg_XCursorInit1(CMdbCursor *mc, CMdbNode *node);
+		void fg_XCursorInit2(CMdbCursor *mc, CMdbXCursor *src_mx, int force);
 
-		int mdb_drop0(CMdbCursor *mc, int subs);
-		void mdb_default_cmp(CMdbTxn *txn, CDatabaseSubID dbi);
+		int fg_Drop0(CMdbCursor *mc, int subs);
+		void fg_DefaultCmp(CMdbTxn *txn, CDatabaseSubID dbi);
 
 		/** @cond */
-		int mdb_cmp_memn(CDatabaseValue const &_Left, CDatabaseValue const &_Right);
-		int mdb_cmp_memnr(CDatabaseValue const &_Left, CDatabaseValue const &_Right);
-		int mdb_cmp_int(CDatabaseValue const &_Left, CDatabaseValue const &_Right);
-		int mdb_cmp_cint(CDatabaseValue const &_Left, CDatabaseValue const &_Right);
-		int mdb_cmp_long(CDatabaseValue const &_Left, CDatabaseValue const &_Right);
+		int fg_CmpMemN(CDatabaseValue const &_Left, CDatabaseValue const &_Right);
+		int fg_CmpMemNR(CDatabaseValue const &_Left, CDatabaseValue const &_Right);
+		int fg_CmpInt(CDatabaseValue const &_Left, CDatabaseValue const &_Right);
+		int fg_CmpCInt(CDatabaseValue const &_Left, CDatabaseValue const &_Right);
+		int fg_CmpLong(CDatabaseValue const &_Left, CDatabaseValue const &_Right);
 
 		extern FDatabaseCompare g_mdb_cmp_memn;
 		extern FDatabaseCompare g_mdb_cmp_memnr;
@@ -1891,8 +1891,8 @@ namespace NMib::NDatabase
 #define DMdbNoSpill	0x8000
 
 #ifdef DMibDatabase_Always64BitSupport
-		void mdb_page_unref(CMdbTxn *txn, CMdbPage *mp);
-#	define DMdbPageUnref(d_Txn, d_Mp)	mdb_page_unref(d_Txn, d_Mp)
+		void fg_PageUnref(CMdbTxn *txn, CMdbPage *mp);
+#	define DMdbPageUnref(d_Txn, d_Mp)	fg_PageUnref(d_Txn, d_Mp)
 #else
 #	define DMdbPageUnref(d_Txn, d_Mp)
 #endif
@@ -1926,17 +1926,17 @@ namespace NMib::NDatabase
 		*tp = tracked->mc_next; \
 	} while (0)
 
-		void mdb_cursor_close(CMdbCursor *cursor);
-		int mdb_cursor_get(CMdbCursor *cursor, CDatabaseValue *key, CDatabaseValue *data, EDatabaseCursorGet op);
-		int mdb_cursor_put(CMdbCursor *cursor, CDatabaseValue *key, CDatabaseValue *data, EDatabaseWriteFlag _WriteFlags = EDatabaseWriteFlag_None);
-		int mdb_cursor_del(CMdbCursor *cursor, EDatabaseWriteFlag _WriteFlags = EDatabaseWriteFlag_None);
-		int mdb_cursor_count(CMdbCursor *cursor, CDatabaseOffset *countp);
+		void fg_CursorClose(CMdbCursor *cursor);
+		int fg_CursorGet(CMdbCursor *cursor, CDatabaseValue *key, CDatabaseValue *data, EDatabaseCursorGet op);
+		int fg_CursorPut(CMdbCursor *cursor, CDatabaseValue *key, CDatabaseValue *data, EDatabaseWriteFlag _WriteFlags = EDatabaseWriteFlag_None);
+		int fg_CursorDel(CMdbCursor *cursor, EDatabaseWriteFlag _WriteFlags = EDatabaseWriteFlag_None);
+		int fg_CursorCount(CMdbCursor *cursor, CDatabaseOffset *countp);
 
 #ifdef DMibDatabase_Always64BitSupport
-		void mdb_cursor_unref(CMdbCursor *mc);
+		void fg_CursorUnref(CMdbCursor *mc);
 #	define DMdbCursorUnref(d_Mc, d_Force) \
 		(((d_Force) || ((d_Mc)->mc_flags & DCInitialized)) \
-		 ? mdb_cursor_unref(d_Mc) \
+		 ? fg_CursorUnref(d_Mc) \
 		 : (void)0)
 
 #else

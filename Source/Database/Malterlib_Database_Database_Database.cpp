@@ -43,7 +43,7 @@ namespace NMib::NDatabase
 	 *
 	 * A database handle denotes the name and parameters of a database,
 	 * independently of whether such a database exists.
-	 * The database handle may be discarded by calling #mdb_dbi_close().
+	 * The database handle may be discarded by calling #f_DbiClose().
 	 * The old database handle is returned if the database was already open.
 	 * The handle may only be closed once.
 	 *
@@ -62,7 +62,7 @@ namespace NMib::NDatabase
 	 * must be called before opening the environment.  Database names are
 	 * keys in the unnamed database, and may be read but not written.
 	 *
-	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
+	 * @param[in] txn A transaction handle returned by #f_TxnBegin()
 	 * @param[in] name The name of the database to open. If only a single
 	 *	database is needed in the environment, this value may be nullptr.
 	 * @param[in] flags Special options for this database. This parameter
@@ -139,12 +139,12 @@ namespace NMib::NDatabase
 					txn->mt_flags |= DMdbTxnDirty;
 				}
 			}
-			mdb_default_cmp(txn, DMainDbi);
+			fg_DefaultCmp(txn, DMainDbi);
 			return DMainDbi;
 		}
 
 		if (txn->mt_dbxs[DMainDbi].m_fKeyCompare.f_IsEmpty())
-			mdb_default_cmp(txn, DMainDbi);
+			fg_DefaultCmp(txn, DMainDbi);
 
 		/* Is the DB already open? */
 		len = strlen(_pName);
@@ -181,8 +181,8 @@ namespace NMib::NDatabase
 		exact = 0;
 		key.m_Size = len;
 		key.m_pData = (uint8 *)_pName;
-		mdb_cursor_init(&mc, txn, DMainDbi, nullptr);
-		int rc = mdb_cursor_set(&mc, &key, &data, EDatabaseCursorGet_Set, &exact);
+		fg_CursorInit(&mc, txn, DMainDbi, nullptr);
+		int rc = fg_CursorSet(&mc, &key, &data, EDatabaseCursorGet_Set, &exact);
 		if (rc == DMdbSuccess)
 		{
 			/* make sure this is actually a DB */
@@ -191,7 +191,7 @@ namespace NMib::NDatabase
 				DMibError("Named record is not a database");
 		}
 		else if (!(rc == DMdbNotFound && (_Flags & EDatabaseSubFlag_Create)))
-			DMibError(NStr::fg_Format("Error looking for database record: {}", NPrivate::mdb_strerror(rc)));
+			DMibError(NStr::fg_Format("Error looking for database record: {}", NPrivate::fg_StrError(rc)));
 
 		/* Done here so we cannot fail after creating a new DB */
 		char *namedup;
@@ -214,9 +214,9 @@ namespace NMib::NDatabase
 			memset(&dummy, 0, sizeof(dummy));
 			dummy.md_root = DPInvalid;
 			dummy.md_flags = _Flags & DPersistentFlags;
-			rc = mdb_cursor_put(&mc, &key, &data, (EDatabaseWriteFlag)DFSubData);
+			rc = fg_CursorPut(&mc, &key, &data, (EDatabaseWriteFlag)DFSubData);
 			if (rc)
-				DMibError(NStr::fg_Format("Error creating database record: {}", NPrivate::mdb_strerror(rc)));
+				DMibError(NStr::fg_Format("Error creating database record: {}", NPrivate::fg_StrError(rc)));
 			dbflag |= DDbDirty;
 		}
 
@@ -234,7 +234,7 @@ namespace NMib::NDatabase
 			txn->mt_dbiseqs[slot] = seq;
 
 			memcpy(&txn->mt_dbs[slot], data.m_pData, sizeof(CMdbDb));
-			mdb_default_cmp(txn, slot);
+			fg_DefaultCmp(txn, slot);
 			if (!unused)
 				txn->mt_numdbs++;
 			return slot;
@@ -315,13 +315,13 @@ namespace NMib::NDatabase
 			CMdbCursor mc;
 			CMdbXCursor mx;
 			/* Stale, must read the DB's root. cursor_init does it for us. */
-			mdb_cursor_init(&mc, this, _DatabaseID, &mx);
+			fg_CursorInit(&mc, this, _DatabaseID, &mx);
 		}
 	}
 
 	/** @brief Retrieve statistics for a database.
 	 *
-	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
+	 * @param[in] txn A transaction handle returned by #f_TxnBegin()
 	 * @param[in] _DatabaseID A database handle returned by #f_OpenDatabase()
 	 * @param[out] stat The address of an #CDatabaseStatistics structure
 	 *	where the statistics will be copied
@@ -352,7 +352,7 @@ namespace NMib::NDatabase
 
 	/** @brief Retrieve the DB flags for a database handle.
 	 *
-	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
+	 * @param[in] txn A transaction handle returned by #f_TxnBegin()
 	 * @param[in] _DatabaseID A database handle returned by #f_OpenDatabase()
 	 * @param[out] flags Address where the flags will be returned.
 	 * @return A non-zero error value on failure and 0 on success.
@@ -403,7 +403,7 @@ namespace NMib::NDatabase
 	/** @brief Empty or delete+close a database.
 	 *
 	 * See #fp_CloseDatabase() for restrictions about closing the DB handle.
-	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
+	 * @param[in] txn A transaction handle returned by #f_TxnBegin()
 	 * @param[in] _DatabaseID A database handle returned by #f_OpenDatabase()
 	 * @param[in] del 0 to empty the DB, 1 to delete it from the
 	 * environment and close the DB handle.
@@ -427,32 +427,32 @@ namespace NMib::NDatabase
 
 		auto Cleanup = g_OnScopeExit / [&]()
 			{
-				mdb_cursor_close(mc);
+				fg_CursorClose(mc);
 			}
 		;
 
 		{
-			int rc = mdb_drop0(mc, mc->mc_db->md_flags & EDatabaseSubFlag_SortedDuplicates);
+			int rc = fg_Drop0(mc, mc->mc_db->md_flags & EDatabaseSubFlag_SortedDuplicates);
 			/* Invalidate the dropped DB's cursors */
 			for (m2 = mt_cursors[_DatabaseID]; m2; m2 = m2->mc_next)
 				m2->mc_flags &= ~(DCInitialized | DCEof);
 			if (rc)
-				DMibError(NStr::fg_Format("Error dropping database: {}", mdb_strerror(rc)));
+				DMibError(NStr::fg_Format("Error dropping database: {}", fg_StrError(rc)));
 		}
 
 		/* Can't delete the main DB */
 		if (_bDelete && _DatabaseID >= DCoreDbs)
 		{
-			int rc = mdb_del0(this, DMainDbi, &mc->mc_dbx->m_DatabaseName, nullptr, (EDatabaseWriteFlag)DFSubData);
+			int rc = fg_Del0(this, DMainDbi, &mc->mc_dbx->m_DatabaseName, nullptr, (EDatabaseWriteFlag)DFSubData);
 			if (!rc)
 			{
 				mt_dbflags[_DatabaseID] = DDbStale;
-				mt_env->mdb_dbi_close(_DatabaseID);
+				mt_env->f_DbiClose(_DatabaseID);
 			}
 			else
 			{
 				mt_flags |= DMdbTxnError;
-				DMibError(NStr::fg_Format("Error deleting database: {}", mdb_strerror(rc)));
+				DMibError(NStr::fg_Format("Error deleting database: {}", fg_StrError(rc)));
 			}
 		}
 		else
@@ -480,7 +480,7 @@ namespace NMib::NDatabase
 	 * @warning This function must be called before any data access functions are used,
 	 * otherwise data corruption may occur. The same comparison function must be used by every
 	 * program accessing the database, every time the database is used.
-	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
+	 * @param[in] txn A transaction handle returned by #f_TxnBegin()
 	 * @param[in] _DatabaseID A database handle returned by #f_OpenDatabase()
 	 * @param[in] cmp A #FDatabaseCompare function
 	 * @return A non-zero error value on failure and 0 on success. Some possible
@@ -509,7 +509,7 @@ namespace NMib::NDatabase
 	 * @warning This function must be called before any data access functions are used,
 	 * otherwise data corruption may occur. The same comparison function must be used by every
 	 * program accessing the database, every time the database is used.
-	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
+	 * @param[in] txn A transaction handle returned by #f_TxnBegin()
 	 * @param[in] _DatabaseID A database handle returned by #f_OpenDatabase()
 	 * @param[in] cmp A #FDatabaseCompare function
 	 * @return A non-zero error value on failure and 0 on success. Some possible

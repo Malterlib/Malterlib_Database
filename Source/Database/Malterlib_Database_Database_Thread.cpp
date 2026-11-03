@@ -42,7 +42,7 @@ namespace NMib::NDatabase
 	 *	This function is called automatically when a thread exits.
 	 * @param[in] ptr This points to the slot in the reader lock table.
 	 */
-	void NPrivate::mdb_env_reader_dest(void *ptr)
+	void NPrivate::fg_EnvReaderDest(void *ptr)
 	{
 		CMdbReader *reader = (CMdbReader *)ptr;
 
@@ -64,7 +64,7 @@ namespace NMib::NDatabase
 
 	namespace
 	{
-		void NTAPI mdb_tls_callback(PVOID module, DWORD reason, PVOID ptr)
+		void NTAPI fg_TlsCallback(PVOID module, DWORD reason, PVOID ptr)
 		{
 			int i;
 			switch (reason)
@@ -76,7 +76,7 @@ namespace NMib::NDatabase
 				{
 					NPrivate::CMdbReader *r = (NPrivate::CMdbReader *)pthread_getspecific(NPrivate::mdb_tls_keys[i]);
 					if (r)
-						mdb_env_reader_dest(r);
+						fg_EnvReaderDest(r);
 				}
 				break;
 			case DLL_PROCESS_DETACH: break;
@@ -89,9 +89,9 @@ namespace NMib::NDatabase
 #ifdef DPlatformFamily_Windows
 #	ifdef __GNUC__
 #		ifdef _WIN64
-extern "C" const PIMAGE_TLS_CALLBACK mdb_tls_cbp __attribute__((section(".CRT$XLB"))) = mdb_tls_callback;
+extern "C" const PIMAGE_TLS_CALLBACK mdb_tls_cbp __attribute__((section(".CRT$XLB"))) = fg_TlsCallback;
 #		else
-extern "C" PIMAGE_TLS_CALLBACK mdb_tls_cbp __attribute__((section(".CRT$XLB"))) = mdb_tls_callback;
+extern "C" PIMAGE_TLS_CALLBACK mdb_tls_cbp __attribute__((section(".CRT$XLB"))) = fg_TlsCallback;
 #		endif
 #	else
 #		ifdef _WIN64
@@ -103,13 +103,13 @@ extern "C" PIMAGE_TLS_CALLBACK mdb_tls_cbp __attribute__((section(".CRT$XLB"))) 
 #			pragma comment(linker, "/INCLUDE:mdb_tls_cbp")
 #			pragma const_seg(".CRT$XLB")
 extern "C" const PIMAGE_TLS_CALLBACK mdb_tls_cbp;
-extern "C" const PIMAGE_TLS_CALLBACK mdb_tls_cbp = NMib::NDatabase::mdb_tls_callback;
+extern "C" const PIMAGE_TLS_CALLBACK mdb_tls_cbp = NMib::NDatabase::fg_TlsCallback;
 #			pragma const_seg()
 #		else	/* DPlatformFamily_Windows */
 #			pragma comment(linker, "/INCLUDE:__tls_used")
 #			pragma comment(linker, "/INCLUDE:_mdb_tls_cbp")
 #			pragma data_seg(".CRT$XLB")
-extern "C" PIMAGE_TLS_CALLBACK mdb_tls_cbp = NMib::NDatabase::mdb_tls_callback;
+extern "C" PIMAGE_TLS_CALLBACK mdb_tls_cbp = NMib::NDatabase::fg_TlsCallback;
 #			pragma data_seg()
 #		endif	/* WIN 32/64 */
 #	endif	/* !__GNUC__ */

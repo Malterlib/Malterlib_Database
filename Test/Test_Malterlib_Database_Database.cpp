@@ -85,6 +85,7 @@ namespace
 {
 	struct CDatabase_Tests : public NMib::NTest::CTest
 	{
+	private:
 		void fp_PopulateEnvironment(CDatabaseEnvironment &_Environment, umint _nDatabases = 16, umint _nValuesPerDatabase = 4 * 1024)
 		{
 			_Environment.f_SetMapSize(_nDatabases * _nValuesPerDatabase * 256 * fg_Max(NSys::fg_Mem_PageSize() / 4096u, 1u));
@@ -204,6 +205,7 @@ namespace
 			DMibExpectTrue(fp_EnvironmentsSame(_Environment.m_Environment, EnvironmentCopy.m_Environment));
 		}
 
+	public:
 		void f_DoTests()
 		{
 			DMibTestSuite("Basics")

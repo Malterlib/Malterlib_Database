@@ -72,7 +72,7 @@ namespace NMib::NDatabase::NPrivate
 	 * @param[in] len	length of value
 	 * @return 64 bit hash
 	 */
-	CMdbHash mdb_hash(void const *val, size_t len)
+	CMdbHash fg_Hash(void const *val, size_t len)
 	{
 		unsigned char const *s = (unsigned char const *)val, *end = s + len;
 		CMdbHash hval = 0xcbf29ce484222325ULL;
@@ -98,7 +98,7 @@ namespace NMib::NDatabase::NPrivate
 		char const mdb_a85[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&()*+-;<=>?@^_`{|}~";
 	}
 
-	void DMibDatabaseInfrequentSection mdb_pack85(unsigned long long l, char *out)
+	void DMibDatabaseInfrequentSection fg_Pack85(unsigned long long l, char *out)
 	{
 		int i;
 
@@ -113,11 +113,11 @@ namespace NMib::NDatabase::NPrivate
 	/** Init #CMdbEnv.me_mutexname[] except the char which #DMutexName() will set.
 	 *	Changes to this code must be reflected in #DMdbLockFormat.
 	 */
-	void DMibDatabaseInfrequentSection mdb_env_mname_init(CMdbEnv *env)
+	void DMibDatabaseInfrequentSection fg_EnvMNameInit(CMdbEnv *env)
 	{
 		char *nm = env->me_mutexname;
 		strcpy(nm, DMutexNamePrefix);
-		mdb_pack85(env->m_pLocksMemoryMap->m_TransactionBody.mtb_mutexid, nm + sizeof(DMutexNamePrefix));
+		fg_Pack85(env->m_pLocksMemoryMap->m_TransactionBody.mtb_mutexid, nm + sizeof(DMutexNamePrefix));
 	}
 
 	/** Return env->me_mutexname after filling in ch ('r'/'w') for convenience */

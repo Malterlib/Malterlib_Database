@@ -41,7 +41,7 @@ namespace
 		}
 
 	private:
-		static fp32 fs_ReverseEncodeFloat(uint8 _1, uint8 _2, uint8 _3, uint8 _4)
+		static fp32 fsp_ReverseEncodeFloat(uint8 _1, uint8 _2, uint8 _3, uint8 _4)
 		{
 			TCVector<uint8> KeyData;
 			KeyData.f_Insert(_1);
@@ -89,13 +89,13 @@ namespace
 		, fNextOrder(iOrder) \
 	)
 
-			DInsertValue("float", (fs_ReverseEncodeFloat(0, 0, 0, 0)));
-			DInsertValue("float", (fs_ReverseEncodeFloat(0x0, 0x0, 0x0, 0x80)));
+			DInsertValue("float", (fsp_ReverseEncodeFloat(0, 0, 0, 0)));
+			DInsertValue("float", (fsp_ReverseEncodeFloat(0x0, 0x0, 0x0, 0x80)));
 			DInsertValue("float", (fp32::fs_NegQNan()));
 			DInsertValue("float", (fp32::fs_NegSNan()));
 			DInsertValue("float", (fp32::fs_NegInf()));
 			DInsertValue("float", (fp32::fs_LimitMin()));
-			DInsertValue("float", (fs_ReverseEncodeFloat(1, 0, 0, 0)));
+			DInsertValue("float", (fsp_ReverseEncodeFloat(1, 0, 0, 0)));
 			DInsertValue("float", (fp32(-2.0f)));
 			DInsertValue("float", (fp32(-1.0f)));
 			DInsertValue("float", (fp32(-0.5f)));
@@ -116,8 +116,8 @@ namespace
 			DInsertValue("float", (fp32::fs_Inf()));
 			DInsertValue("float", (fp32::fs_SNan()));
 			DInsertValue("float", (fp32::fs_QNan()));
-			DInsertValue("float", (fs_ReverseEncodeFloat(0xFF, 0xFF, 0xFF, 0x7F)));
-			DInsertValue("float", (fs_ReverseEncodeFloat(0xFF, 0xFF, 0xFF, 0xFF)));
+			DInsertValue("float", (fsp_ReverseEncodeFloat(0xFF, 0xFF, 0xFF, 0x7F)));
+			DInsertValue("float", (fsp_ReverseEncodeFloat(0xFF, 0xFF, 0xFF, 0xFF)));
 			DInsertValue("int  ", (-int32(2)));
 			DInsertValue("int  ", (-int32(1)));
 			DInsertValue("int  ", (int32(0)));
@@ -211,13 +211,13 @@ namespace
 			;
 #define DTestEncodingFloat(d_Value) fTestCodingFloat(#d_Value, d_Value)
 
-			DTestEncodingFloat(fs_ReverseEncodeFloat(0, 0, 0, 0));
-			DTestEncodingFloat(fs_ReverseEncodeFloat(0x0, 0x0, 0x0, 0x80));
+			DTestEncodingFloat(fsp_ReverseEncodeFloat(0, 0, 0, 0));
+			DTestEncodingFloat(fsp_ReverseEncodeFloat(0x0, 0x0, 0x0, 0x80));
 			DTestEncodingFloat(fp32::fs_NegQNan());
 			DTestEncodingFloat(fp32::fs_NegSNan());
 			DTestEncodingFloat(fp32::fs_NegInf());
 			DTestEncodingFloat(fp32::fs_LimitMin());
-			DTestEncodingFloat(fs_ReverseEncodeFloat(1, 0, 0, 0));
+			DTestEncodingFloat(fsp_ReverseEncodeFloat(1, 0, 0, 0));
 			DTestEncodingFloat(fp32(-2.0f));
 			DTestEncodingFloat(fp32(-1.0f));
 			DTestEncodingFloat(fp32(-0.5f));
@@ -238,8 +238,8 @@ namespace
 			DTestEncodingFloat(fp32::fs_Inf());
 			DTestEncodingFloat(fp32::fs_SNan());
 			DTestEncodingFloat(fp32::fs_QNan());
-			DTestEncodingFloat(fs_ReverseEncodeFloat(0xFF, 0xFF, 0xFF, 0x7F));
-			DTestEncodingFloat(fs_ReverseEncodeFloat(0xFF, 0xFF, 0xFF, 0xFF));
+			DTestEncodingFloat(fsp_ReverseEncodeFloat(0xFF, 0xFF, 0xFF, 0x7F));
+			DTestEncodingFloat(fsp_ReverseEncodeFloat(0xFF, 0xFF, 0xFF, 0xFF));
 
 			DTestEncoding(-int32(2));
 			DTestEncoding(-int32(1));

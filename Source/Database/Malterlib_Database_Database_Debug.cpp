@@ -43,7 +43,7 @@ namespace NMib::NDatabase::NPrivate
 	CTransactionID mdb_debug_start = -1;
 
 	/** Return the page number of \b mp which may be sub-page, for debug output */
-	CPgno mdb_dbg_pgno(CMdbPage const *mp)
+	CPgno fg_DbgPgno(CMdbPage const *mp)
 	{
 		CPgno ret;
 		DCopyPgno(ret, mp->mp_p.p_pgno);
@@ -55,7 +55,7 @@ namespace NMib::NDatabase::NPrivate
 	 * @param[in] buf the buffer to write into. Should always be #DKBuf.
 	 * @return The key in hexadecimal form.
 	 */
-	char const *mdb_dkey(CDatabaseValue const *key, char *buf)
+	char const *fg_DKey(CDatabaseValue const *key, char *buf)
 	{
 		char *ptr = buf;
 		unsigned char *c = (unsigned char *)key->m_pData;
@@ -84,16 +84,16 @@ namespace NMib::NDatabase::NPrivate
 		return buf;
 	}
 
-	char const *mdb_leafnode_type(CMdbNode const *n)
+	char const *fg_LeafNodeType(CMdbNode const *n)
 	{
 		static char const * const tp[2][2] = {{"", ": DB"}, {": sub-page", ": sub-DB"}};
 		return DFIsSet(n->mn_flags, DFBigData) ? ": overflow page" : tp[DFIsSet(n->mn_flags, DFDupData)][DFIsSet(n->mn_flags, DFSubData)];
 	}
 
 	/** Display all the keys in the page. */
-	void mdb_page_list(CMdbPage const *mp)
+	void fg_PageList(CMdbPage const *mp)
 	{
-		CPgno pgno = mdb_dbg_pgno(mp);
+		CPgno pgno = fg_DbgPgno(mp);
 		char const *type, *state = (mp->mp_flags & DPDirty) ? ", dirty" : "";
 		CMdbNode *node;
 		uint32 i, nkeys, nsize, total = 0;
@@ -148,14 +148,14 @@ namespace NMib::NDatabase::NPrivate
 					nsize += DNodeDataSize(node);
 				total += nsize;
 				nsize += sizeof(CIndx);
-				DMibConErrOut("key {}: nsize {}, {}{}\n", i, nsize, DKey(&key), mdb_leafnode_type(node));
+				DMibConErrOut("key {}: nsize {}, {}{}\n", i, nsize, DKey(&key), fg_LeafNodeType(node));
 			}
 			total = DEven(total);
 		}
 		DMibConErrOut("Total: header {} + contents {} + unused {}\n", DIsLeaf2(mp) ? DPageHeaderSize : DPageBase + mp->mp_lower, total, DSizeLeft(mp));
 	}
 
-	void mdb_cursor_chk(CMdbCursor const *mc)
+	void fg_CursorChk(CMdbCursor const *mc)
 	{
 		using namespace NPrivate;
 		uint32 i;
@@ -188,7 +188,7 @@ namespace NMib::NDatabase::NPrivate
 	 *  being used.
 	 *  All named DBs must be open for a correct count.
 	 */
-	void mdb_audit(CMdbTxn *txn)
+	void fg_Audit(CMdbTxn *txn)
 	{
 		CMdbCursor mc;
 		CDatabaseValue key, data;
@@ -197,8 +197,8 @@ namespace NMib::NDatabase::NPrivate
 		int rc;
 
 		freecount = 0;
-		mdb_cursor_init(&mc, txn, DFreeDbi, nullptr);
-		while ((rc = mdb_cursor_get(&mc, &key, &data, EDatabaseCursorGet_Next)) == 0)
+		fg_CursorInit(&mc, txn, DFreeDbi, nullptr);
+		while ((rc = fg_CursorGet(&mc, &key, &data, EDatabaseCursorGet_Next)) == 0)
 			freecount += *(CMdbId *)data.m_pData;
 		DMibCheck(rc == DMdbNotFound);
 
@@ -208,14 +208,14 @@ namespace NMib::NDatabase::NPrivate
 			CMdbXCursor mx;
 			if (!(txn->mt_dbflags[i] & DDbValid))
 				continue;
-			mdb_cursor_init(&mc, txn, i, &mx);
+			fg_CursorInit(&mc, txn, i, &mx);
 			if (txn->mt_dbs[i].md_root == DPInvalid)
 				continue;
 			count += txn->mt_dbs[i].md_branch_pages + txn->mt_dbs[i].md_leaf_pages + txn->mt_dbs[i].md_overflow_pages;
 			if (txn->mt_dbs[i].md_flags & EDatabaseSubFlag_SortedDuplicates)
 			{
-				rc = mdb_page_search(&mc, nullptr, DMdbPsFirst);
-				for (; rc == DMdbSuccess; rc = mdb_cursor_sibling(&mc, 1))
+				rc = fg_PageSearch(&mc, nullptr, DMdbPsFirst);
+				for (; rc == DMdbSuccess; rc = fg_CursorSibling(&mc, 1))
 				{
 					unsigned j;
 					CMdbPage *mp;

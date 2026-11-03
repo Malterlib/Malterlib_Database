@@ -31,7 +31,7 @@ namespace NMib::NDatabase::NPrivate
 	 */
 #define DCmp(d_Left,d_Right)	 ( (d_Left) < (d_Right) ? -1 : (d_Left) > (d_Right) )
 
-	unsigned mdb_midl_search(CMdbIdl ids, CMdbId id)
+	unsigned fg_MidlSearch(CMdbIdl ids, CMdbId id)
 	{
 		/*
 		 * binary search of id in ids
@@ -65,7 +65,7 @@ namespace NMib::NDatabase::NPrivate
 		return cursor;
 	}
 
-	CMdbIdl mdb_midl_alloc(int num)
+	CMdbIdl fg_MidlAlloc(int num)
 	{
 		CMdbIdl ids = (CMdbIdl)NMib::NMemory::fg_Alloc((num + 2) * sizeof(CMdbId));
 		*ids++ = num;
@@ -73,7 +73,7 @@ namespace NMib::NDatabase::NPrivate
 		return ids;
 	}
 
-	void mdb_midl_free(CMdbIdl ids)
+	void fg_MidlFree(CMdbIdl ids)
 	{
 		if (ids)
 		{
@@ -83,7 +83,7 @@ namespace NMib::NDatabase::NPrivate
 		}
 	}
 
-	void mdb_midl_shrink(CMdbIdl *idp)
+	void fg_MidlShrink(CMdbIdl *idp)
 	{
 		CMdbIdl ids = *idp;
 		umint NewSize = (DMdbIdlUmMax + 2) * sizeof(CMdbId);
@@ -94,7 +94,7 @@ namespace NMib::NDatabase::NPrivate
 		}
 	}
 
-	static void mdb_midl_grow(CMdbIdl *idp, int num)
+	static void fg_MidlGrow(CMdbIdl *idp, int num)
 	{
 		CMdbIdl idn = *idp - 1;
 		/* grow it */
@@ -104,7 +104,7 @@ namespace NMib::NDatabase::NPrivate
 		*idp = idn;
 	}
 
-	void mdb_midl_need(CMdbIdl *idp, unsigned num)
+	void fg_MidlNeed(CMdbIdl *idp, unsigned num)
 	{
 		CMdbIdl ids = *idp;
 		num += ids[0];
@@ -118,39 +118,39 @@ namespace NMib::NDatabase::NPrivate
 		}
 	}
 
-	void mdb_midl_append(CMdbIdl *idp, CMdbId id)
+	void fg_MidlAppend(CMdbIdl *idp, CMdbId id)
 	{
 		CMdbIdl ids = *idp;
 		/* Too big? */
 		if (ids[0] >= ids[-1])
 		{
-			mdb_midl_grow(idp, DMdbIdlUmMax);
+			fg_MidlGrow(idp, DMdbIdlUmMax);
 			ids = *idp;
 		}
 		ids[0]++;
 		ids[ids[0]] = id;
 	}
 
-	void mdb_midl_append_list(CMdbIdl *idp, CMdbIdl app)
+	void fg_MidlAppendList(CMdbIdl *idp, CMdbIdl app)
 	{
 		CMdbIdl ids = *idp;
 		/* Too big? */
 		if (ids[0] + app[0] >= ids[-1])
 		{
-			mdb_midl_grow(idp, app[0]);
+			fg_MidlGrow(idp, app[0]);
 			ids = *idp;
 		}
 		memcpy(&ids[ids[0] + 1], &app[1], app[0] * sizeof(CMdbId));
 		ids[0] += app[0];
 	}
 
-	void mdb_midl_append_range(CMdbIdl *idp, CMdbId id, unsigned n)
+	void fg_MidlAppendRange(CMdbIdl *idp, CMdbId id, unsigned n)
 	{
 		CMdbId *ids = *idp, len = ids[0];
 		/* Too big? */
 		if (len + n > ids[-1])
 		{
-			mdb_midl_grow(idp, n | DMdbIdlUmMax);
+			fg_MidlGrow(idp, n | DMdbIdlUmMax);
 			ids = *idp;
 		}
 		ids[0] = len + n;
@@ -159,7 +159,7 @@ namespace NMib::NDatabase::NPrivate
 			ids[n--] = id++;
 	}
 
-	void mdb_midl_xmerge(CMdbIdl idl, CMdbIdl merge)
+	void fg_MidlXMerge(CMdbIdl idl, CMdbIdl merge)
 	{
 		CMdbId old_id, merge_id, i = merge[0], j = idl[0], k = i + j, total = k;
 		idl[0] = (CMdbId)-1; // delimiter for idl scan below
@@ -179,7 +179,7 @@ namespace NMib::NDatabase::NPrivate
 #define DSmall	8
 #define	DMidlSwap(d_Left,d_Right)	{ itmp=(d_Left); (d_Left)=(d_Right); (d_Right)=itmp; }
 
-	void mdb_midl_sort(CMdbIdl ids)
+	void fg_MidlSort(CMdbIdl ids)
 	{
 		/* Max possible depth of int-indexed tree * 2 items/level */
 		int istack[sizeof(int) * 8 * 2];
@@ -253,7 +253,7 @@ namespace NMib::NDatabase::NPrivate
 		}
 	}
 
-	unsigned mdb_mid2l_search(CMdbId2L ids, CMdbId id)
+	unsigned fg_Mid2lSearch(CMdbId2L ids, CMdbId id)
 	{
 		/*
 		 * binary search of id in ids
@@ -287,11 +287,11 @@ namespace NMib::NDatabase::NPrivate
 		return cursor;
 	}
 
-	int mdb_mid2l_insert(CMdbId2L ids, CMdbId2 *id)
+	int fg_Mid2lInsert(CMdbId2L ids, CMdbId2 *id)
 	{
 		unsigned x, i;
 
-		x = mdb_mid2l_search(ids, id->mid);
+		x = fg_Mid2lSearch(ids, id->mid);
 
 		if (x < 1)
 		{
@@ -322,7 +322,7 @@ namespace NMib::NDatabase::NPrivate
 		return 0;
 	}
 
-	int mdb_mid2l_append(CMdbId2L ids, CMdbId2 *id)
+	int fg_Mid2lAppend(CMdbId2L ids, CMdbId2 *id)
 	{
 		/* Too big? */
 		if (ids[0].mid >= DMdbIdlUmMax)
@@ -333,7 +333,7 @@ namespace NMib::NDatabase::NPrivate
 	}
 
 #ifdef DMibDatabase_Always64BitSupport
-	unsigned mdb_mid3l_search(MDB_ID3L ids, CMdbId id)
+	unsigned fg_Mid3lSearch(MDB_ID3L ids, CMdbId id)
 	{
 		/*
 		 * binary search of id in ids
@@ -367,11 +367,11 @@ namespace NMib::NDatabase::NPrivate
 		return cursor;
 	}
 
-	int mdb_mid3l_insert(MDB_ID3L ids, MDB_ID3 *id)
+	int fg_Mid3lInsert(MDB_ID3L ids, MDB_ID3 *id)
 	{
 		unsigned x, i;
 
-		x = mdb_mid3l_search(ids, id->mid);
+		x = fg_Mid3lSearch(ids, id->mid);
 
 		if (x < 1)
 		{

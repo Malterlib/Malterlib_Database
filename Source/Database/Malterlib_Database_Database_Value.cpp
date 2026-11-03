@@ -45,7 +45,7 @@ namespace NMib::NDatabase
 	 * in the structure to which \b data refers.
 	 * If the database supports duplicate keys (#EDatabaseSubFlag_SortedDuplicates) then the
 	 * first data item for the key will be returned. Retrieval of other
-	 * items requires the use of #mdb_cursor_get().
+	 * items requires the use of #fg_CursorGet().
 	 *
 	 * @note The memory pointed to by the returned values is owned by the
 	 * database. The caller need not dispose of the memory, and may not
@@ -53,7 +53,7 @@ namespace NMib::NDatabase
 	 * any modification attempts will cause a SIGSEGV.
 	 * @note Values returned from the database are valid only until a
 	 * subsequent update operation, or the end of the transaction.
-	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
+	 * @param[in] txn A transaction handle returned by #f_TxnBegin()
 	 * @param[in] dbi A database handle returned by #f_OpenDatabase()
 	 * @param[in] key The key to search for in the database
 	 * @param[out] data The data corresponding to the key
@@ -82,14 +82,14 @@ namespace NMib::NDatabase
 
 		f_CheckBlocked();
 
-		mdb_cursor_init(&mc, this, dbi, &mx);
+		fg_CursorInit(&mc, this, dbi, &mx);
 		{
-			int rc = mdb_cursor_set(&mc, key, data, EDatabaseCursorGet_Set, &exact);
+			int rc = fg_CursorSet(&mc, key, data, EDatabaseCursorGet_Set, &exact);
 			if (rc)
 			{
 				if (rc == DMdbNotFound)
 					return false;
-				DMibError(NStr::fg_Format("Error setting data: {}", mdb_strerror(rc)));
+				DMibError(NStr::fg_Format("Error setting data: {}", fg_StrError(rc)));
 			}
 		}
 		/* unref all the pages when DMibDatabase_Always64BitSupport - caller must copy the data
@@ -105,7 +105,7 @@ namespace NMib::NDatabase
 	 * is to enter the new key/data pair, replacing any previously existing key
 	 * if duplicates are disallowed, or adding a duplicate data item if
 	 * duplicates are allowed (#EDatabaseSubFlag_SortedDuplicates).
-	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
+	 * @param[in] txn A transaction handle returned by #f_TxnBegin()
 	 * @param[in] dbi A database handle returned by #f_OpenDatabase()
 	 * @param[in] key The key to store in the database
 	 * @param[in,out] data The data to store
@@ -183,13 +183,13 @@ namespace NMib::NDatabase
 		CMdbCursor mc;
 		CMdbXCursor mx;
 
-		mdb_cursor_init(&mc, this, dbi, &mx);
+		fg_CursorInit(&mc, this, dbi, &mx);
 		mc.mc_next = mt_cursors[dbi];
 		mt_cursors[dbi] = &mc;
-		int rc = mdb_cursor_put(&mc, key, data, _WriteFlags);
+		int rc = fg_CursorPut(&mc, key, data, _WriteFlags);
 		mt_cursors[dbi] = mc.mc_next;
 		if (rc)
-			DMibError(NStr::fg_Format("Error putting data: {}", mdb_strerror(rc)));
+			DMibError(NStr::fg_Format("Error putting data: {}", fg_StrError(rc)));
 	}
 
 	/** @brief Delete items from a database.
@@ -203,7 +203,7 @@ namespace NMib::NDatabase
 	 * only the matching data item will be deleted.
 	 * This function will return #DMdbNotFound if the specified key/data
 	 * pair is not in the database.
-	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
+	 * @param[in] txn A transaction handle returned by #f_TxnBegin()
 	 * @param[in] dbi A database handle returned by #f_OpenDatabase()
 	 * @param[in] key The key to delete from the database
 	 * @param[in] data The data to delete
@@ -233,16 +233,16 @@ namespace NMib::NDatabase
 			data = nullptr;
 		}
 
-		int rc = mdb_del0(this, dbi, key, data, EDatabaseWriteFlag_None);
+		int rc = fg_Del0(this, dbi, key, data, EDatabaseWriteFlag_None);
 		if (rc)
-			DMibError(NStr::fg_Format("Error deleting: {}", mdb_strerror(rc)));
+			DMibError(NStr::fg_Format("Error deleting: {}", fg_StrError(rc)));
 	}
 
 	/** @brief Compare two data items according to a particular database.
 	 *
 	 * This returns a comparison as if the two data items were keys in the
 	 * specified database.
-	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
+	 * @param[in] txn A transaction handle returned by #f_TxnBegin()
 	 * @param[in] dbi A database handle returned by #f_OpenDatabase()
 	 * @param[in] a The first item to compare
 	 * @param[in] b The second item to compare
@@ -257,7 +257,7 @@ namespace NMib::NDatabase
 	 *
 	 * This returns a comparison as if the two items were data items of
 	 * the specified database. The database must have the #EDatabaseSubFlag_SortedDuplicates flag.
-	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
+	 * @param[in] txn A transaction handle returned by #f_TxnBegin()
 	 * @param[in] dbi A database handle returned by #f_OpenDatabase()
 	 * @param[in] a The first item to compare
 	 * @param[in] b The second item to compare
@@ -277,7 +277,7 @@ namespace NMib::NDatabase
 	// Private from here
 	// ---------------------------------------------------------------------------------------------------------------------------------------
 
-	int NPrivate::mdb_del0(CMdbTxn *txn, CDatabaseSubID dbi, CDatabaseValue const *key, CDatabaseValue const *data, EDatabaseWriteFlag _Flags)
+	int NPrivate::fg_Del0(CMdbTxn *txn, CDatabaseSubID dbi, CDatabaseValue const *key, CDatabaseValue const *data, EDatabaseWriteFlag _Flags)
 	{
 		CMdbCursor mc;
 		CMdbXCursor mx;
@@ -288,7 +288,7 @@ namespace NMib::NDatabase
 
 		DMibDatabaseTrace("====> delete db {} key [{}]", dbi, DKey(key));
 
-		mdb_cursor_init(&mc, txn, dbi, &mx);
+		fg_CursorInit(&mc, txn, dbi, &mx);
 
 		if (data)
 		{
@@ -303,10 +303,10 @@ namespace NMib::NDatabase
 			_Flags |= EDatabaseWriteFlag_NoDuplicateData;
 		}
 		auto Key = *key;
-		rc = mdb_cursor_set(&mc, &Key, xdata, op, &exact);
+		rc = fg_CursorSet(&mc, &Key, xdata, op, &exact);
 		if (rc == 0)
 		{
-			/* let mdb_page_split know about this cursor if needed:
+			/* let fg_PageSplit know about this cursor if needed:
 			 * delete will trigger a rebalance; if it needs to move
 			 * a node from one page to another, it will have to
 			 * update the parent's separator key(s). If the new sepkey
@@ -316,7 +316,7 @@ namespace NMib::NDatabase
 			 */
 			mc.mc_next = txn->mt_cursors[dbi];
 			txn->mt_cursors[dbi] = &mc;
-			rc = mdb_cursor_del(&mc, _Flags);
+			rc = fg_CursorDel(&mc, _Flags);
 			txn->mt_cursors[dbi] = mc.mc_next;
 		}
 		return rc;

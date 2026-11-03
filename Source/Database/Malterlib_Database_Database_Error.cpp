@@ -84,7 +84,7 @@ namespace NMib::NDatabase::NPrivate
 	 * @param[in] err The error code
 	 * @retval "error message" The description of the error
 	 */
-	NStr::CStr mdb_strerror(int _Error)
+	NStr::CStr fg_StrError(int _Error)
 	{
 		if (!_Error)
 			return "Successful return: 0";
@@ -120,7 +120,7 @@ namespace NMib::NDatabase::NPrivate
 #endif
 	}
 
-	NStr::CStr mdb_strerror_system(int _Error)
+	NStr::CStr fg_StrErrorSystem(int _Error)
 	{
 		if (!_Error)
 			return "Successful return: 0";

@@ -43,7 +43,7 @@ namespace NMib::NDatabase
 	 * Re-use old malloc'd pages first for singletons, otherwise just NMemory::fg_Alloc.
 	 * Set #DMdbTxnError on failure.
 	 */
-	NPrivate::CMdbPage *NPrivate::mdb_page_malloc(CMdbTxn *txn, unsigned num)
+	NPrivate::CMdbPage *NPrivate::fg_PageMalloc(CMdbTxn *txn, unsigned num)
 	{
 		CMdbEnv *env = txn->mt_env;
 		CMdbPage *ret = env->me_dpages;
@@ -84,13 +84,13 @@ namespace NMib::NDatabase
 	 * Saves single pages to a list, for future reuse.
 	 * (This is not used for multi-page overflow pages.)
 	 */
-	void CDatabaseEnvironment_Internal::mdb_page_free(CMdbPage *mp)
+	void CDatabaseEnvironment_Internal::f_PageFree(CMdbPage *mp)
 	{
 		mp->mp_p.p_next = me_dpages;
 		me_dpages = mp;
 	}
 
-	void CDatabaseEnvironment_Internal::mdb_dpage_free_memory(CMdbPage *dp)
+	void CDatabaseEnvironment_Internal::f_DPageFreeMemory(CMdbPage *dp)
 	{
 		if (!DIsOverflow(dp) || dp->mp_pages == 1)
 			NMemory::fg_Free(dp, me_psize);
@@ -99,10 +99,10 @@ namespace NMib::NDatabase
 	}
 
 	/** Free a dirty page */
-	void CDatabaseEnvironment_Internal::mdb_dpage_free(CMdbPage *dp)
+	void CDatabaseEnvironment_Internal::f_DPageFree(CMdbPage *dp)
 	{
 		if (!DIsOverflow(dp) || dp->mp_pages == 1)
-			mdb_page_free(dp);
+			f_PageFree(dp);
 		else
 		{
 			/* large pages just get freed directly */
@@ -111,19 +111,19 @@ namespace NMib::NDatabase
 	}
 
 	/**	Return all dirty pages to dpage list */
-	void NPrivate::mdb_dlist_free(CMdbTxn *txn)
+	void NPrivate::fg_DListFree(CMdbTxn *txn)
 	{
 		CMdbEnv *env = txn->mt_env;
 		CMdbId2L dl = txn->mt_u.dirty_list;
 		unsigned i, n = dl[0].mid;
 
 		for (i = 1; i <= n; i++)
-			env->mdb_dpage_free((CMdbPage *)(dl[i].mptr));
+			env->f_DPageFree((CMdbPage *)(dl[i].mptr));
 		dl[0].mid = 0;
 	}
 
 #ifdef DMibDatabase_Always64BitSupport
-	void NPrivate::mdb_page_unref(CMdbTxn *txn, CMdbPage *mp)
+	void NPrivate::fg_PageUnref(CMdbTxn *txn, CMdbPage *mp)
 	{
 		CPgno pgno;
 		MDB_ID3L tl = txn->mt_rpages;
@@ -132,7 +132,7 @@ namespace NMib::NDatabase
 			return;
 		rem = mp->mp_p.p_pgno & (DMdbRpageChunk - 1);
 		pgno = mp->mp_p.p_pgno ^ rem;
-		x = mdb_mid3l_search(tl, pgno);
+		x = fg_Mid3lSearch(tl, pgno);
 		if (x != tl[0].mid && tl[x + 1].mid == mp->mp_p.p_pgno)
 			x++;
 		if (tl[x].mref)
@@ -150,7 +150,7 @@ namespace NMib::NDatabase
 	 * If the page wasn't dirtied in this txn, just add it
 	 * to this txn's free list.
 	 */
-	int NPrivate::mdb_page_loose(CMdbCursor *mc, CMdbPage *mp)
+	int NPrivate::fg_PageLoose(CMdbCursor *mc, CMdbPage *mp)
 	{
 		int loose = 0;
 		CPgno pgno = mp->mp_p.p_pgno;
@@ -166,7 +166,7 @@ namespace NMib::NDatabase
 				 */
 				if (dl[0].mid)
 				{
-					unsigned x = mdb_mid2l_search(dl, pgno);
+					unsigned x = fg_Mid2lSearch(dl, pgno);
 					if (x <= dl[0].mid && dl[x].mid == pgno)
 					{
 						if (mp != dl[x].mptr)
@@ -195,7 +195,7 @@ namespace NMib::NDatabase
 			mp->mp_flags |= DPLoose;
 		}
 		else
-			mdb_midl_append(&txn->mt_free_pgs, pgno);
+			fg_MidlAppend(&txn->mt_free_pgs, pgno);
 
 		return DMdbSuccess;
 	}
@@ -204,10 +204,10 @@ namespace NMib::NDatabase
 	 * @param[in] mc A cursor handle for the current operation.
 	 * @param[in] pflags Flags of the pages to update:
 	 * DPDirty to set DPKeep, DPDirty|DPKeep to clear it.
-	 * @param[in] all No shortcuts. Needed except after a full #mdb_page_flush().
+	 * @param[in] all No shortcuts. Needed except after a full #fg_PageFlush().
 	 * @return 0 on success, non-zero on failure.
 	 */
-	int NPrivate::mdb_pages_xkeep(CMdbCursor *mc, unsigned pflags, int all)
+	int NPrivate::fg_PagesXKeep(CMdbCursor *mc, unsigned pflags, int all)
 	{
 		constexpr aint c_Mask = DPSubp | DPDirty | DPLoose | DPKeep;
 
@@ -263,7 +263,7 @@ namespace NMib::NDatabase
 					CPgno pgno = txn->mt_dbs[i].md_root;
 					if (pgno == DPInvalid)
 						continue;
-					if ((rc = NPrivate::mdb_page_get(m0, pgno, &dp, &level)) != DMdbSuccess)
+					if ((rc = NPrivate::fg_PageGet(m0, pgno, &dp, &level)) != DMdbSuccess)
 						break;
 					if ((dp->mp_flags & c_Mask) == pflags && level <= 1)
 						dp->mp_flags ^= DPKeep;
@@ -281,7 +281,7 @@ namespace NMib::NDatabase
 	 *	 seems unlikely, except with a large number of #EDatabaseWriteFlag_BatchDuplicateData items.
 	 *	2) child txns may run out of space if their parents dirtied a
 	 *	 lot of pages and never spilled them. TODO: we probably should do
-	 *	 a preemptive spill during #mdb_txn_begin() of a child txn, if
+	 *	 a preemptive spill during #f_TxnBegin() of a child txn, if
 	 *	 the parent's dirty_room is below a given threshold.
 	 *
 	 * Otherwise, if not using nested txns, it is expected that apps will
@@ -290,8 +290,8 @@ namespace NMib::NDatabase
 	 * If the txn never references them again, they can be left alone.
 	 * If the txn only reads them, they can be used without any fuss.
 	 * If the txn writes them again, they can be dirtied immediately without
-	 * going thru all of the work of #mdb_page_touch(). Such references are
-	 * handled by #mdb_page_unspill().
+	 * going thru all of the work of #fg_PageTouch(). Such references are
+	 * handled by #fg_PageUnspill().
 	 *
 	 * Also note, we never spill DB root pages, nor pages of active cursors,
 	 * because we'll need these back again soon anyway. And in nested txns,
@@ -306,7 +306,7 @@ namespace NMib::NDatabase
 	 * @param[in] data For a put operation, the data being stored.
 	 * @return 0 on success, non-zero on failure.
 	 */
-	int NPrivate::mdb_page_spill(CMdbCursor *m0, CDatabaseValue *key, CDatabaseValue *data)
+	int NPrivate::fg_PageSpill(CMdbCursor *m0, CDatabaseValue *key, CDatabaseValue *data)
 	{
 		CMdbTxn *txn = m0->mc_txn;
 		CMdbPage *dp;
@@ -333,7 +333,7 @@ namespace NMib::NDatabase
 
 		if (!txn->mt_spill_pgs)
 		{
-			txn->mt_spill_pgs = mdb_midl_alloc(DMdbIdlUmMax);
+			txn->mt_spill_pgs = fg_MidlAlloc(DMdbIdlUmMax);
 			if (!txn->mt_spill_pgs)
 				return ENOMEM;
 		}
@@ -352,7 +352,7 @@ namespace NMib::NDatabase
 		}
 
 		/* Preserve pages which may soon be dirtied again */
-		if ((rc = mdb_pages_xkeep(m0, DPDirty, 1)) != DMdbSuccess)
+		if ((rc = fg_PagesXKeep(m0, DPDirty, 1)) != DMdbSuccess)
 			goto done;
 
 		/* Less aggressive spill - we originally spilled the entire dirty list,
@@ -383,7 +383,7 @@ namespace NMib::NDatabase
 				{
 					if (tx2->mt_spill_pgs)
 					{
-						j = mdb_midl_search(tx2->mt_spill_pgs, pn);
+						j = fg_MidlSearch(tx2->mt_spill_pgs, pn);
 						if (j <= tx2->mt_spill_pgs[0] && tx2->mt_spill_pgs[j] == pn)
 						{
 							dp->mp_flags |= DPKeep;
@@ -394,17 +394,17 @@ namespace NMib::NDatabase
 				if (tx2)
 					continue;
 			}
-			mdb_midl_append(&txn->mt_spill_pgs, pn);
+			fg_MidlAppend(&txn->mt_spill_pgs, pn);
 			need--;
 		}
-		mdb_midl_sort(txn->mt_spill_pgs);
+		fg_MidlSort(txn->mt_spill_pgs);
 
 		/* Flush the spilled part of dirty list */
-		if ((rc = mdb_page_flush(txn, i)) != DMdbSuccess)
+		if ((rc = fg_PageFlush(txn, i)) != DMdbSuccess)
 			goto done;
 
 		/* Reset any dirty pages we kept that page_flush didn't see */
-		rc = mdb_pages_xkeep(m0, DPDirty | DPKeep, i);
+		rc = fg_PagesXKeep(m0, DPDirty | DPKeep, i);
 
 	done:
 		txn->mt_flags |= rc ? DMdbTxnError : DMdbTxnSpills;
@@ -412,7 +412,7 @@ namespace NMib::NDatabase
 	}
 
 	/** Find oldest txnid still referenced. Expects txn->mt_txnid > 0. */
-	NPrivate::CTransactionID NPrivate::mdb_find_oldest(CMdbTxn *txn)
+	NPrivate::CTransactionID NPrivate::fg_FindOldest(CMdbTxn *txn)
 	{
 		int i;
 		CTransactionID mr, oldest = txn->mt_txnid - 1;
@@ -433,16 +433,16 @@ namespace NMib::NDatabase
 	}
 
 	/** Add a page to the txn's dirty list */
-	void NPrivate::mdb_page_dirty(CMdbTxn *txn, CMdbPage *mp)
+	void NPrivate::fg_PageDirty(CMdbTxn *txn, CMdbPage *mp)
 	{
 		CMdbId2 mid;
 		[[maybe_unused]] int rc;
 		int (*insert)(CMdbId2L, CMdbId2 *);
 
 		if (txn->mt_flags & DMdbTxnWriteMap)
-			insert = mdb_mid2l_append;
+			insert = fg_Mid2lAppend;
 		else
-			insert = mdb_mid2l_insert;
+			insert = fg_Mid2lInsert;
 		mid.mid = mp->mp_p.p_pgno;
 		mid.mptr = mp;
 		rc = insert(txn->mt_u.dirty_list, &mid);
@@ -458,7 +458,7 @@ namespace NMib::NDatabase
 	 * Do not modify the freedB, just merge freeDB records into me_pgstate.mf_pghead[]
 	 * and move me_pgstate.mf_pglast to say which records were consumed.  Only this
 	 * function can create me_pgstate.mf_pghead and move me_pgstate.mf_pglast/mt_next_pgno.
-	 * When #DMdbDevel & 2, it is not affected by #mdb_freelist_save(): it
+	 * When #DMdbDevel & 2, it is not affected by #fg_FreelistSave(): it
 	 * then uses the transaction's original snapshot of the freeDB.
 	 * @param[in] mc cursor A cursor handle identifying the transaction and
 	 *	database for which we are allocating.
@@ -467,7 +467,7 @@ namespace NMib::NDatabase
 	 *  will always be satisfied by a single contiguous chunk of memory.
 	 * @return 0 on success, non-zero on failure.
 	 */
-	int NPrivate::mdb_page_alloc(CMdbCursor *mc, int num, CMdbPage **mp)
+	int NPrivate::fg_PageAlloc(CMdbCursor *mc, int num, CMdbPage **mp)
 	{
 #ifdef MDB_PARANOID	/* Seems like we can ignore this now */
 		/* Get at most <Max_retries> more freeDB records once me_pgstate.mf_pghead
@@ -541,7 +541,7 @@ namespace NMib::NDatabase
 				/* Prepare to fetch more and coalesce */
 				last = env->me_pgstate.mf_pglast;
 				oldest = env->me_pgoldest;
-				NPrivate::mdb_cursor_init(&m2, txn, DFreeDbi, nullptr);
+				NPrivate::fg_CursorInit(&m2, txn, DFreeDbi, nullptr);
 #if (DMdbDevel) & 2	/* "& 2" so DMdbDevel=1 won't hide bugs breaking freeDB */
 				/* Use original snapshot. TODO: Should need less care in code
 				 * which modifies the database. Maybe we can delete some code?
@@ -568,14 +568,14 @@ namespace NMib::NDatabase
 			{
 				if (!found_old)
 				{
-					oldest = mdb_find_oldest(txn);
+					oldest = fg_FindOldest(txn);
 					env->me_pgoldest = oldest;
 					found_old = 1;
 				}
 				if (oldest <= last)
 					break;
 			}
-			rc = mdb_cursor_get(&m2, &key, nullptr, op);
+			rc = fg_CursorGet(&m2, &key, nullptr, op);
 			if (rc)
 			{
 				if (rc == DMdbNotFound)
@@ -587,7 +587,7 @@ namespace NMib::NDatabase
 			{
 				if (!found_old)
 				{
-					oldest = mdb_find_oldest(txn);
+					oldest = fg_FindOldest(txn);
 					env->me_pgoldest = oldest;
 					found_old = 1;
 				}
@@ -596,14 +596,14 @@ namespace NMib::NDatabase
 			}
 			np = m2.mc_pg[m2.mc_top];
 			leaf = DNodePtr(np, m2.mc_ki[m2.mc_top]);
-			if ((rc = NPrivate::mdb_node_read(&m2, leaf, &data)) != DMdbSuccess)
+			if ((rc = NPrivate::fg_NodeRead(&m2, leaf, &data)) != DMdbSuccess)
 				goto fail;
 
 			idl = (CMdbId *)data.m_pData;
 			i = idl[0];
 			if (!mop)
 			{
-				if (!(env->me_pgstate.mf_pghead = mop = mdb_midl_alloc(i)))
+				if (!(env->me_pgstate.mf_pghead = mop = fg_MidlAlloc(i)))
 				{
 					rc = ENOMEM;
 					goto fail;
@@ -611,7 +611,7 @@ namespace NMib::NDatabase
 			}
 			else
 			{
-				mdb_midl_need(&env->me_pgstate.mf_pghead, i);
+				fg_MidlNeed(&env->me_pgstate.mf_pghead, i);
 				mop = env->me_pgstate.mf_pghead;
 			}
 			env->me_pgstate.mf_pglast = last;
@@ -621,7 +621,7 @@ namespace NMib::NDatabase
 				DMibDatabaseTrace("IDL {}", idl[j]);
 #endif
 			/* Merge in descending sorted order */
-			mdb_midl_xmerge(mop, idl);
+			fg_MidlXMerge(mop, idl);
 			mop_len = mop[0];
 		}
 
@@ -654,7 +654,7 @@ namespace NMib::NDatabase
 			np = (CMdbPage *)(env->me_map + env->me_psize * pgno);
 		else
 		{
-			if (!(np = mdb_page_malloc(txn, num)))
+			if (!(np = fg_PageMalloc(txn, num)))
 			{
 				rc = ENOMEM;
 				goto fail;
@@ -670,7 +670,7 @@ namespace NMib::NDatabase
 		else
 			txn->mt_next_pgno = pgno + num;
 		np->mp_p.p_pgno = pgno;
-		mdb_page_dirty(txn, np);
+		fg_PageDirty(txn, np);
 		*mp = np;
 
 		return DMdbSuccess;
@@ -685,7 +685,7 @@ namespace NMib::NDatabase
 	 * @param[in] src page to copy from
 	 * @param[in] psize size of a page
 	 */
-	void NPrivate::mdb_page_copy(CMdbPage *dst, CMdbPage *src, uint32 psize)
+	void NPrivate::fg_PageCopy(CMdbPage *dst, CMdbPage *src, uint32 psize)
 	{
 		constexpr aint c_Align = sizeof(CPgno);
 
@@ -712,7 +712,7 @@ namespace NMib::NDatabase
 	 * @param[out] ret the writable page, if any. ret is unchanged if
 	 * mp wasn't spilled.
 	 */
-	int NPrivate::mdb_page_unspill(CMdbTxn *txn, CMdbPage *mp, CMdbPage **ret)
+	int NPrivate::fg_PageUnspill(CMdbTxn *txn, CMdbPage *mp, CMdbPage **ret)
 	{
 		CMdbEnv *env = txn->mt_env;
 		CMdbTxn const *tx2;
@@ -723,7 +723,7 @@ namespace NMib::NDatabase
 		{
 			if (!tx2->mt_spill_pgs)
 				continue;
-			x = mdb_midl_search(tx2->mt_spill_pgs, pn);
+			x = fg_MidlSearch(tx2->mt_spill_pgs, pn);
 			if (x <= tx2->mt_spill_pgs[0] && tx2->mt_spill_pgs[x] == pn)
 			{
 				CMdbPage *np;
@@ -738,13 +738,13 @@ namespace NMib::NDatabase
 					np = mp;
 				else
 				{
-					np = mdb_page_malloc(txn, num);
+					np = fg_PageMalloc(txn, num);
 					if (!np)
 						return ENOMEM;
 					if (num > 1)
 						memcpy(np, mp, num * env->me_psize);
 					else
-						mdb_page_copy(np, mp, env->me_psize);
+						fg_PageCopy(np, mp, env->me_psize);
 				}
 				if (tx2 == txn)
 				{
@@ -759,7 +759,7 @@ namespace NMib::NDatabase
 				} // otherwise, if belonging to a parent txn, the
 				  // page remains spilled until child commits
 
-				mdb_page_dirty(txn, np);
+				fg_PageDirty(txn, np);
 				np->mp_flags |= DPDirty;
 				*ret = np;
 				break;
@@ -773,7 +773,7 @@ namespace NMib::NDatabase
 	 * @param[in] mc cursor pointing to the page to be touched
 	 * @return 0 on success, non-zero on failure.
 	 */
-	int NPrivate::mdb_page_touch(CMdbCursor *mc)
+	int NPrivate::fg_PageTouch(CMdbCursor *mc)
 	{
 		CMdbPage *mp = mc->mc_pg[mc->mc_top], *np;
 		CMdbTxn *txn = mc->mc_txn;
@@ -786,19 +786,19 @@ namespace NMib::NDatabase
 			if (txn->mt_flags & DMdbTxnSpills)
 			{
 				np = nullptr;
-				rc = mdb_page_unspill(txn, mp, &np);
+				rc = fg_PageUnspill(txn, mp, &np);
 				if (rc)
 					goto fail;
 				if (np)
 					goto done;
 			}
-			mdb_midl_need(&txn->mt_free_pgs, 1);
-			if ((rc = mdb_page_alloc(mc, 1, &np)))
+			fg_MidlNeed(&txn->mt_free_pgs, 1);
+			if ((rc = fg_PageAlloc(mc, 1, &np)))
 				goto fail;
 			pgno = np->mp_p.p_pgno;
 			DMibDatabaseTrace("touched db {} page {} -> {}", DDbi(mc), mp->mp_p.p_pgno, pgno);
 			DMibCheck(mp->mp_p.p_pgno != pgno);
-			mdb_midl_xappend(txn->mt_free_pgs, mp->mp_p.p_pgno);
+			fg_MidlXAppend(txn->mt_free_pgs, mp->mp_p.p_pgno);
 			/* Update the parent page, if any, to point to the new page */
 			if (mc->mc_top)
 			{
@@ -818,7 +818,7 @@ namespace NMib::NDatabase
 			 */
 			if (dl[0].mid)
 			{
-				unsigned x = mdb_mid2l_search(dl, pgno);
+				unsigned x = fg_Mid2lSearch(dl, pgno);
 				if (x <= dl[0].mid && dl[x].mid == pgno)
 				{
 					if (mp != dl[x].mptr)
@@ -832,18 +832,18 @@ namespace NMib::NDatabase
 			}
 			DMibCheck(dl[0].mid < DMdbIdlUmMax);
 			/* No - copy it */
-			np = mdb_page_malloc(txn, 1);
+			np = fg_PageMalloc(txn, 1);
 			if (!np)
 				return ENOMEM;
 			mid.mid = pgno;
 			mid.mptr = np;
-			rc = mdb_mid2l_insert(dl, &mid);
+			rc = fg_Mid2lInsert(dl, &mid);
 			DMibCheck(rc == 0);
 		}
 		else
 			return 0;
 
-		mdb_page_copy(np, mp, txn->mt_env->me_psize);
+		fg_PageCopy(np, mp, txn->mt_env->me_psize);
 		np->mp_p.p_pgno = pgno;
 		np->mp_flags |= DPDirty;
 
@@ -891,7 +891,7 @@ namespace NMib::NDatabase
 	 * @param[in] keep number of initial pages in dirty_list to keep dirty.
 	 * @return 0 on success, non-zero on failure.
 	 */
-	int NPrivate::mdb_page_flush(CMdbTxn *txn, int keep)
+	int NPrivate::fg_PageFlush(CMdbTxn *txn, int keep)
 	{
 		CMdbEnv *env = txn->mt_env;
 		CMdbId2L dl = txn->mt_u.dirty_list;
@@ -993,7 +993,7 @@ namespace NMib::NDatabase
 							rc = DErrCode();
 							if (rc == EINTR)
 								goto retry_seek;
-							DMibDatabaseTrace("lseek: {}", mdb_strerror(rc));
+							DMibDatabaseTrace("lseek: {}", fg_StrError(rc));
 							return rc;
 						}
 						wres = writev(env->me_fd, iov, n);
@@ -1006,7 +1006,7 @@ namespace NMib::NDatabase
 							rc = DErrCode();
 							if (rc == EINTR)
 								goto retry_write;
-							DMibDatabaseTrace("Write error: {}", mdb_strerror(rc));
+							DMibDatabaseTrace("Write error: {}", fg_StrError(rc));
 						}
 						else
 						{
@@ -1051,7 +1051,7 @@ namespace NMib::NDatabase
 				dl[j].mid = dp->mp_p.p_pgno;
 				continue;
 			}
-			env->mdb_dpage_free(dp);
+			env->f_DPageFree(dp);
 		}
 
 	done:
@@ -1111,7 +1111,7 @@ namespace NMib::NDatabase
 	 * @param[out] ret address of a pointer where the page's address will be stored.
 	 * @return 0 on success, non-zero on failure.
 	 */
-	int mdb_rpage_get(CMdbTxn *txn, CPgno pg0, CMdbPage **ret)
+	int fg_RPageGet(CMdbTxn *txn, CPgno pg0, CMdbPage **ret)
 	{
 		CMdbEnv *env = txn->mt_env;
 		CMdbPage *p;
@@ -1129,7 +1129,7 @@ namespace NMib::NDatabase
 			d_Addr = nullptr; \
 			d_Rc = g_fDatabase_NtMapViewOfSection(d_Env->me_fmh, GetCurrentProcess(), &d_Addr, 0, \
 				d_Len, &d_Off, &d_Len, ViewUnmap, (d_Env->me_flags & EDatabaseEnvironmentFlag_ReadOnly) ? 0 : MEM_RESERVE, PAGE_READONLY); \
-			if (d_Rc) d_Rc = mdb_nt2win32(d_Rc)
+			if (d_Rc) d_Rc = fg_Nt2Win32(d_Rc)
 #	else
 		off_t off;
 		umint len;
@@ -1146,7 +1146,7 @@ namespace NMib::NDatabase
 		pgno = pg0 ^ rem;
 
 		id3.mid = 0;
-		x = mdb_mid3l_search(tl, pgno);
+		x = fg_Mid3lSearch(tl, pgno);
 		if (x <= tl[0].mid && tl[x].mid == pgno)
 		{
 			if (x != tl[0].mid && tl[x + 1].mid == pg0)
@@ -1182,7 +1182,7 @@ namespace NMib::NDatabase
 					{
 						unsigned i;
 						pthread_mutex_lock(&env->me_rpmutex);
-						i = mdb_mid3l_search(el, tl[x].mid);
+						i = fg_Mid3lSearch(el, tl[x].mid);
 						if (el[i].mref == 1)
 						{
 							/* just us, replace it */
@@ -1225,7 +1225,7 @@ namespace NMib::NDatabase
 						munmap(tl[i].mptr, tl[i].mcnt * env->me_psize);
 						continue;
 					}
-					x = mdb_mid3l_search(el, tl[i].mid);
+					x = fg_Mid3lSearch(el, tl[i].mid);
 					el[x].mref--;
 				}
 			}
@@ -1273,7 +1273,7 @@ namespace NMib::NDatabase
 
 			/* search for page in env */
 			pthread_mutex_lock(&env->me_rpmutex);
-			x = mdb_mid3l_search(el, pgno);
+			x = fg_Mid3lSearch(el, pgno);
 			if (x <= el[0].mid && el[x].mid == pgno)
 			{
 				id3.mptr = el[x].mptr;
@@ -1367,10 +1367,10 @@ namespace NMib::NDatabase
 				if (rc)
 					goto fail;
 			}
-			mdb_mid3l_insert(el, &id3);
+			fg_Mid3lInsert(el, &id3);
 			pthread_mutex_unlock(&env->me_rpmutex);
 		found:
-			mdb_mid3l_insert(tl, &id3);
+			fg_Mid3lInsert(tl, &id3);
 		}
 		else
 			return DMdbTxnFull;
@@ -1393,7 +1393,7 @@ namespace NMib::NDatabase
 	 * @param[out] lvl dirty_list inheritance level of found page. 1=current txn, 0=mapped page.
 	 * @return 0 on success, non-zero on failure.
 	 */
-	int NPrivate::mdb_page_get(CMdbCursor *mc, CPgno pgno, CMdbPage **ret, int *lvl)
+	int NPrivate::fg_PageGet(CMdbCursor *mc, CPgno pgno, CMdbPage **ret, int *lvl)
 	{
 		CMdbTxn *txn = mc->mc_txn;
 		CMdbPage *p = nullptr;
@@ -1415,13 +1415,13 @@ namespace NMib::NDatabase
 				if (tx2->mt_spill_pgs)
 				{
 					CMdbId pn = pgno << 1;
-					x = mdb_midl_search(tx2->mt_spill_pgs, pn);
+					x = fg_MidlSearch(tx2->mt_spill_pgs, pn);
 					if (x <= tx2->mt_spill_pgs[0] && tx2->mt_spill_pgs[x] == pn)
 						goto mapped;
 				}
 				if (dl[0].mid)
 				{
-					unsigned x = mdb_mid2l_search(dl, pgno);
+					unsigned x = fg_Mid2lSearch(dl, pgno);
 					if (x <= dl[0].mid && dl[x].mid == pgno)
 					{
 						p = (CMdbPage *)dl[x].mptr;
@@ -1445,7 +1445,7 @@ namespace NMib::NDatabase
 	mapped:
 		{
 #ifdef DMibDatabase_Always64BitSupport
-			int rc = mdb_rpage_get(txn, pgno, &p);
+			int rc = fg_RPageGet(txn, pgno, &p);
 			if (rc)
 			{
 				txn->mt_flags |= DMdbTxnError;
@@ -1464,10 +1464,10 @@ namespace NMib::NDatabase
 		return DMdbSuccess;
 	}
 
-	/** Finish #mdb_page_search() / #mdb_page_search_lowest().
+	/** Finish #fg_PageSearch() / #fg_PageSearchLowest().
 	 *	The cursor is at the root page, set up the rest of it.
 	 */
-	int NPrivate::mdb_page_search_root(CMdbCursor *mc, CDatabaseValue const *key, int flags)
+	int NPrivate::fg_PageSearchRoot(CMdbCursor *mc, CDatabaseValue const *key, int flags)
 	{
 		CMdbPage *mp = mc->mc_pg[mc->mc_top];
 		int rc;
@@ -1507,7 +1507,7 @@ namespace NMib::NDatabase
 			else
 			{
 				int exact;
-				node = mdb_node_search(mc, key, &exact);
+				node = fg_NodeSearch(mc, key, &exact);
 				if (node == nullptr)
 					i = DNumKeys(mp) - 1;
 				else
@@ -1525,17 +1525,17 @@ namespace NMib::NDatabase
 			DMibCheck(i < DNumKeys(mp));
 			node = DNodePtr(mp, i);
 
-			if ((rc = mdb_page_get(mc, DNodePgno(node), &mp, nullptr)) != 0)
+			if ((rc = fg_PageGet(mc, DNodePgno(node), &mp, nullptr)) != 0)
 				return rc;
 
 			mc->mc_ki[mc->mc_top] = i;
-			if ((rc = mdb_cursor_push(mc, mp)))
+			if ((rc = fg_CursorPush(mc, mp)))
 				return rc;
 
 		ready:
 			if (flags & DMdbPsModify)
 			{
-				if ((rc = mdb_page_touch(mc)) != 0)
+				if ((rc = fg_PageTouch(mc)) != 0)
 					return rc;
 				mp = mc->mc_pg[mc->mc_top];
 			}
@@ -1557,23 +1557,23 @@ namespace NMib::NDatabase
 
 	/** Search for the lowest key under the current branch page.
 	 * This just bypasses a DNumKeys check in the current page
-	 * before calling mdb_page_search_root(), because the callers
+	 * before calling fg_PageSearchRoot(), because the callers
 	 * are all in situations where the current page is known to
 	 * be underfilled.
 	 */
-	int NPrivate::mdb_page_search_lowest(CMdbCursor *mc)
+	int NPrivate::fg_PageSearchLowest(CMdbCursor *mc)
 	{
 		CMdbPage *mp = mc->mc_pg[mc->mc_top];
 		CMdbNode *node = DNodePtr(mp, 0);
 		int rc;
 
-		if ((rc = mdb_page_get(mc, DNodePgno(node), &mp, nullptr)) != 0)
+		if ((rc = fg_PageGet(mc, DNodePgno(node), &mp, nullptr)) != 0)
 			return rc;
 
 		mc->mc_ki[mc->mc_top] = 0;
-		if ((rc = mdb_cursor_push(mc, mp)))
+		if ((rc = fg_CursorPush(mc, mp)))
 			return rc;
-		return mdb_page_search_root(mc, nullptr, DMdbPsFirst);
+		return fg_PageSearchRoot(mc, nullptr, DMdbPsFirst);
 	}
 
 	/** Search for the page a given key should be in.
@@ -1583,11 +1583,11 @@ namespace NMib::NDatabase
 	 * @param[in] flags If DMdbPsModify is set, visited pages in the DB
 	 *   are touched (updated with new page numbers).
 	 *   If DMdbPsFirst or DMdbPsLast is set, find first or last leaf.
-	 *   This is used by #mdb_cursor_first() and #mdb_cursor_last().
+	 *   This is used by #fg_CursorFirst() and #fg_CursorLast().
 	 *   If DMdbPsRootonly set, just fetch root node, no further lookups.
 	 * @return 0 on success, non-zero on failure.
 	 */
-	int NPrivate::mdb_page_search(CMdbCursor *mc, CDatabaseValue const *key, int flags)
+	int NPrivate::fg_PageSearch(CMdbCursor *mc, CDatabaseValue const *key, int flags)
 	{
 		int rc;
 		CPgno root;
@@ -1604,20 +1604,20 @@ namespace NMib::NDatabase
 				CMdbCursor mc2;
 				if (DTxnDbiChanged(mc->mc_txn, mc->mc_dbi))
 					DMibError("Stale write transaction");
-				mdb_cursor_init(&mc2, mc->mc_txn, DMainDbi, nullptr);
-				rc = mdb_page_search(&mc2, &mc->mc_dbx->m_DatabaseName, 0);
+				fg_CursorInit(&mc2, mc->mc_txn, DMainDbi, nullptr);
+				rc = fg_PageSearch(&mc2, &mc->mc_dbx->m_DatabaseName, 0);
 				if (rc)
 					return rc;
 				{
 					CDatabaseValue data;
 					int exact = 0;
 					uint16 flags;
-					CMdbNode *leaf = mdb_node_search(&mc2, &mc->mc_dbx->m_DatabaseName, &exact);
+					CMdbNode *leaf = fg_NodeSearch(&mc2, &mc->mc_dbx->m_DatabaseName, &exact);
 					if (!exact)
 						return DMdbNotFound;
 					if ((leaf->mn_flags & (DFDupData | DFSubData)) != DFSubData)
 						return DMdbIncompatible; // not a named DB
-					rc = mdb_node_read(&mc2, leaf, &data);
+					rc = fg_NodeRead(&mc2, leaf, &data);
 					if (rc)
 						return rc;
 					memcpy(&flags, ((char *)data.m_pData + offsetof(CMdbDb, md_flags)), sizeof(uint16));
@@ -1646,7 +1646,7 @@ namespace NMib::NDatabase
 			if (mc->mc_pg[0])
 				DMdbPageUnref(mc->mc_txn, mc->mc_pg[0]);
 #endif
-			if ((rc = mdb_page_get(mc, root, &mc->mc_pg[0], nullptr)) != 0)
+			if ((rc = fg_PageGet(mc, root, &mc->mc_pg[0], nullptr)) != 0)
 				return rc;
 		}
 
@@ -1664,17 +1664,17 @@ namespace NMib::NDatabase
 
 		if (flags & DMdbPsModify)
 		{
-			if ((rc = mdb_page_touch(mc)))
+			if ((rc = fg_PageTouch(mc)))
 				return rc;
 		}
 
 		if (flags & DMdbPsRootonly)
 			return DMdbSuccess;
 
-		return mdb_page_search_root(mc, key, flags);
+		return fg_PageSearchRoot(mc, key, flags);
 	}
 
-	int NPrivate::mdb_ovpage_free(CMdbCursor *mc, CMdbPage *mp)
+	int NPrivate::fg_OvPageFree(CMdbCursor *mc, CMdbPage *mp)
 	{
 		CMdbTxn *txn = mc->mc_txn;
 		CPgno pg = mp->mp_p.p_pgno;
@@ -1692,12 +1692,12 @@ namespace NMib::NDatabase
 		 * Unsupported in nested txns: They would need to hide the page
 		 * range in ancestor txns' dirty and spilled lists.
 		 */
-		if (env->me_pgstate.mf_pghead && !txn->mt_parent && ((mp->mp_flags & DPDirty) || (sl && (x = mdb_midl_search(sl, pn)) <= sl[0] && sl[x] == pn)))
+		if (env->me_pgstate.mf_pghead && !txn->mt_parent && ((mp->mp_flags & DPDirty) || (sl && (x = fg_MidlSearch(sl, pn)) <= sl[0] && sl[x] == pn)))
 		{
 			unsigned i, j;
 			CPgno *mop;
 			CMdbId2 *dl, ix, iy;
-			mdb_midl_need(&env->me_pgstate.mf_pghead, ovpages);
+			fg_MidlNeed(&env->me_pgstate.mf_pghead, ovpages);
 			if (!(mp->mp_flags & DPDirty))
 			{
 				/* This page is no longer spilled */
@@ -1729,7 +1729,7 @@ namespace NMib::NDatabase
 			}
 			txn->mt_dirty_room++;
 			if (!(env->me_flags & EDatabaseEnvironmentFlag_WriteMap))
-				env->mdb_dpage_free(mp);
+				env->f_DPageFree(mp);
 		release:
 			/* Insert in me_pgstate.mf_pghead */
 			mop = env->me_pgstate.mf_pghead;
@@ -1741,7 +1741,7 @@ namespace NMib::NDatabase
 			mop[0] += ovpages;
 		}
 		else
-			mdb_midl_append_range(&txn->mt_free_pgs, pg, ovpages);
+			fg_MidlAppendRange(&txn->mt_free_pgs, pg, ovpages);
 #ifdef DMibDatabase_Always64BitSupport
 		if (mc->mc_ovpg == mp)
 			mc->mc_ovpg = NULL;
@@ -1759,12 +1759,12 @@ namespace NMib::NDatabase
 	 * @param[out] mp Address of a page, or nullptr on failure.
 	 * @return 0 on success, non-zero on failure.
 	 */
-	int NPrivate::mdb_page_new(CMdbCursor *mc, uint32 flags, int num, CMdbPage **mp)
+	int NPrivate::fg_PageNew(CMdbCursor *mc, uint32 flags, int num, CMdbPage **mp)
 	{
 		CMdbPage *np;
 		int rc;
 
-		if ((rc = mdb_page_alloc(mc, num, &np)))
+		if ((rc = fg_PageAlloc(mc, num, &np)))
 			return rc;
 		DMibDatabaseTrace("allocated new mpage {}, page size {}", np->mp_p.p_pgno, mc->mc_txn->mt_env->me_psize);
 		np->mp_flags = flags | DPDirty;
@@ -1793,7 +1793,7 @@ namespace NMib::NDatabase
 	 * @param[in] cdst Cursor pointing to the destination page.
 	 * @return 0 on success, non-zero on failure.
 	 */
-	int NPrivate::mdb_page_merge(CMdbCursor *csrc, CMdbCursor *cdst)
+	int NPrivate::fg_PageMerge(CMdbCursor *csrc, CMdbCursor *cdst)
 	{
 		CMdbPage *psrc, *pdst;
 		CMdbNode *srcnode;
@@ -1811,7 +1811,7 @@ namespace NMib::NDatabase
 		DMibCheck(cdst->mc_snum > 1);
 
 		/* Mark dst as dirty. */
-		if ((rc = mdb_page_touch(cdst)))
+		if ((rc = fg_PageTouch(cdst)))
 			return rc;
 
 		/* get dst page again now that we've touched it. */
@@ -1826,7 +1826,7 @@ namespace NMib::NDatabase
 			key.m_pData = DMetaData(psrc);
 			for (i = 0; i < DNumKeys(psrc); i++, j++)
 			{
-				rc = mdb_node_add(cdst, j, &key, nullptr, 0, 0);
+				rc = fg_NodeAdd(cdst, j, &key, nullptr, 0, 0);
 				if (rc != DMdbSuccess)
 					return rc;
 				key.m_pData = (uint8 *)key.m_pData + key.m_Size;
@@ -1841,10 +1841,10 @@ namespace NMib::NDatabase
 				{
 					CMdbCursor mn;
 					CMdbNode *s2;
-					mdb_cursor_copy(csrc, &mn);
+					fg_CursorCopy(csrc, &mn);
 					mn.mc_xcursor = nullptr;
 					/* must find the lowest key below src */
-					rc = mdb_page_search_lowest(&mn);
+					rc = fg_PageSearchLowest(&mn);
 					if (rc)
 						return rc;
 					if (DIsLeaf2(mn.mc_pg[mn.mc_top]))
@@ -1867,7 +1867,7 @@ namespace NMib::NDatabase
 
 				data.m_Size = DNodeDataSize(srcnode);
 				data.m_pData = (uint8 *)(CMdbPage *)DNodeData(srcnode);
-				rc = mdb_node_add(cdst, j, &key, &data, DNodePgno(srcnode), srcnode->mn_flags);
+				rc = fg_NodeAdd(cdst, j, &key, &data, DNodePgno(srcnode), srcnode->mn_flags);
 				if (rc != DMdbSuccess)
 					return rc;
 			}
@@ -1878,11 +1878,11 @@ namespace NMib::NDatabase
 		/* Unlink the src page from parent and add to free list.
 		*/
 		csrc->mc_top--;
-		mdb_node_del(csrc, 0);
+		fg_NodeDel(csrc, 0);
 		if (csrc->mc_ki[csrc->mc_top] == 0)
 		{
 			key.m_Size = 0;
-			rc = mdb_update_key(csrc, &key);
+			rc = fg_UpdateKey(csrc, &key);
 			if (rc)
 			{
 				csrc->mc_top++;
@@ -1895,7 +1895,7 @@ namespace NMib::NDatabase
 		/* If not operating on FreeDB, allow this page to be reused
 		 * in this txn. Otherwise just add to free list.
 		 */
-		rc = mdb_page_loose(csrc, psrc);
+		rc = fg_PageLoose(csrc, psrc);
 		if (rc)
 			return rc;
 		if (DIsLeaf(psrc))
@@ -1933,8 +1933,8 @@ namespace NMib::NDatabase
 		{
 			uint32 snum = cdst->mc_snum;
 			uint16 depth = cdst->mc_db->md_depth;
-			mdb_cursor_pop(cdst);
-			rc = mdb_rebalance(cdst);
+			fg_CursorPop(cdst);
+			rc = fg_Rebalance(cdst);
 			/* Did the tree height change? */
 			if (depth != cdst->mc_db->md_depth)
 				snum += cdst->mc_db->md_depth - depth;
@@ -1955,7 +1955,7 @@ namespace NMib::NDatabase
 	 * @param[in] nflags The #DNodeAddFlags for the new node.
 	 * @return 0 on success, non-zero on failure.
 	 */
-	int NPrivate::mdb_page_split(CMdbCursor *mc, CDatabaseValue *newkey, CDatabaseValue *newdata, CPgno newpgno, uint32 nflags)
+	int NPrivate::fg_PageSplit(CMdbCursor *mc, CDatabaseValue *newkey, CDatabaseValue *newdata, CPgno newpgno, uint32 nflags)
 	{
 		uint32 flags;
 		int rc = DMdbSuccess, new_root = 0, did_split = 0;
@@ -1978,19 +1978,19 @@ namespace NMib::NDatabase
 		DMibDatabaseTrace("-----> splitting {} page {} and adding [{}] at index {}/{}", DIsLeaf(mp) ? "leaf" : "branch", mp->mp_p.p_pgno, DKey(newkey), mc->mc_ki[mc->mc_top], nkeys);
 
 		/* Create a right sibling. */
-		if ((rc = mdb_page_new(mc, mp->mp_flags, 1, &rp)))
+		if ((rc = fg_PageNew(mc, mp->mp_flags, 1, &rp)))
 			return rc;
 		rp->mp_pad = mp->mp_pad;
 		DMibDatabaseTrace("new right sibling: page {}", rp->mp_p.p_pgno);
 
 		/* Usually when splitting the root page, the cursor
-		 * height is 1. But when called from mdb_update_key,
+		 * height is 1. But when called from fg_UpdateKey,
 		 * the cursor height may be greater because it walks
 		 * up the stack while finding the branch slot to update.
 		 */
 		if (mc->mc_top < 1)
 		{
-			if ((rc = mdb_page_new(mc, DPBranch, 1, &pp)))
+			if ((rc = fg_PageNew(mc, DPBranch, 1, &pp)))
 				goto done;
 			/* shift current top to make room for new parent */
 			for (i = mc->mc_snum; i > 0; i--)
@@ -2005,7 +2005,7 @@ namespace NMib::NDatabase
 			new_root = mc->mc_db->md_depth++;
 
 			/* Add left (implicit) pointer. */
-			if ((rc = mdb_node_add(mc, 0, nullptr, nullptr, mp->mp_p.p_pgno, 0)) != DMdbSuccess)
+			if ((rc = fg_NodeAdd(mc, 0, nullptr, nullptr, mp->mp_p.p_pgno, 0)) != DMdbSuccess)
 			{
 				/* undo the pre-push */
 				mc->mc_pg[0] = mc->mc_pg[1];
@@ -2024,7 +2024,7 @@ namespace NMib::NDatabase
 			DMibDatabaseTrace("parent branch page is {}", mc->mc_pg[ptop]->mp_p.p_pgno);
 		}
 
-		mdb_cursor_copy(mc, &mn);
+		fg_CursorCopy(mc, &mn);
 		mn.mc_xcursor = nullptr;
 		mn.mc_pg[mn.mc_top] = rp;
 		mn.mc_ki[ptop] = mc->mc_ki[ptop] + 1;
@@ -2088,13 +2088,13 @@ namespace NMib::NDatabase
 				/* Maximum free space in an empty page */
 				pmax = env->me_psize - DPageHeaderSize;
 				if (DIsLeaf(mp))
-					nsize = env->mdb_leaf_size(newkey, newdata);
+					nsize = env->f_LeafSize(newkey, newdata);
 				else
-					nsize = env->mdb_branch_size(newkey);
+					nsize = env->f_BranchSize(newkey);
 				nsize = DEven(nsize);
 
 				/* grab a page to hold a temporary copy */
-				copy = mdb_page_malloc(mc->mc_txn, 1);
+				copy = fg_PageMalloc(mc->mc_txn, 1);
 				if (copy == nullptr)
 				{
 					rc = ENOMEM;
@@ -2115,7 +2115,7 @@ namespace NMib::NDatabase
 
 				/* When items are relatively large the split point needs
 				 * to be checked, because being off-by-one will make the
-				 * difference between success or failure in mdb_node_add.
+				 * difference between success or failure in fg_NodeAdd.
 				 *
 				 * It's also relevant if a page happens to be laid out
 				 * such that one half of its nodes are all "small" and
@@ -2189,14 +2189,14 @@ namespace NMib::NDatabase
 
 		/* Copy separator key to the parent.
 		*/
-		if (DSizeLeft(mn.mc_pg[ptop]) < env->mdb_branch_size(&sepkey))
+		if (DSizeLeft(mn.mc_pg[ptop]) < env->f_BranchSize(&sepkey))
 		{
 			int snum = mc->mc_snum;
 			mn.mc_snum--;
 			mn.mc_top--;
 			did_split = 1;
 			/* We want other splits to find mn when doing fixups */
-			DWithCursorTracking(mn, rc = mdb_page_split(&mn, &sepkey, nullptr, rp->mp_p.p_pgno, 0));
+			DWithCursorTracking(mn, rc = fg_PageSplit(&mn, &sepkey, nullptr, rp->mp_p.p_pgno, 0));
 			if (rc)
 				goto done;
 
@@ -2220,19 +2220,19 @@ namespace NMib::NDatabase
 				{
 					/* find right page's left sibling */
 					mc->mc_ki[ptop] = mn.mc_ki[ptop];
-					rc = mdb_cursor_sibling(mc, 0);
+					rc = fg_CursorSibling(mc, 0);
 				}
 			}
 		}
 		else
 		{
 			mn.mc_top--;
-			rc = mdb_node_add(&mn, mn.mc_ki[ptop], &sepkey, nullptr, rp->mp_p.p_pgno, 0);
+			rc = fg_NodeAdd(&mn, mn.mc_ki[ptop], &sepkey, nullptr, rp->mp_p.p_pgno, 0);
 			mn.mc_top++;
 		}
 		if (rc != DMdbSuccess)
 		{
-			if (rc == DMdbNotFound) // improper mdb_cursor_sibling() result
+			if (rc == DMdbNotFound) // improper fg_CursorSibling() result
 				rc = DMdbProblem;
 			goto done;
 		}
@@ -2240,7 +2240,7 @@ namespace NMib::NDatabase
 		{
 			mc->mc_pg[mc->mc_top] = rp;
 			mc->mc_ki[mc->mc_top] = 0;
-			rc = mdb_node_add(mc, 0, newkey, newdata, newpgno, nflags);
+			rc = fg_NodeAdd(mc, 0, newkey, newdata, newpgno, nflags);
 			if (rc)
 				goto done;
 			for (i = 0; i < mc->mc_top; i++)
@@ -2289,7 +2289,7 @@ namespace NMib::NDatabase
 					rkey.m_Size = 0;
 				}
 
-				rc = mdb_node_add(mc, j, &rkey, rdata, pgno, flags);
+				rc = fg_NodeAdd(mc, j, &rkey, rdata, pgno, flags);
 				if (rc)
 					goto done;
 				if (i == nkeys)
@@ -2418,7 +2418,7 @@ namespace NMib::NDatabase
 
 	done:
 		if (copy) // tmp page
-			env->mdb_page_free(copy);
+			env->f_PageFree(copy);
 		if (rc)
 			mc->mc_txn->mt_flags |= DMdbTxnError;
 		return rc;

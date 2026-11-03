@@ -47,7 +47,7 @@ namespace NMib::NDatabase
 	 * of the process with the given pid. On POSIX we use a single byte
 	 * lock on the lockfile, set at an offset equal to the pid.
 	 */
-	int CDatabaseEnvironment_Internal::mdb_reader_pid(EPidLockOp op, CProcessID pid)
+	int CDatabaseEnvironment_Internal::f_ReaderPid(EPidLockOp op, CProcessID pid)
 	{
 #if !(DMdbPidLock)		/* Currently the same as defined(DPlatformFamily_Windows) */
 		int ret = 0;
@@ -88,7 +88,7 @@ namespace NMib::NDatabase
 	/** Insert pid into list if not already present.
 	 * return -1 if already present.
 	 */
-	int DMibDatabaseInfrequentSection NPrivate::mdb_pid_insert(CProcessID *ids, CProcessID pid)
+	int DMibDatabaseInfrequentSection NPrivate::fg_PidInsert(CProcessID *ids, CProcessID pid)
 	{
 		/* binary search of pid in list */
 		unsigned base = 0;
@@ -127,7 +127,7 @@ namespace NMib::NDatabase
 
 #ifdef DMdbRobustSupported
 	/** As #mdb_reader_check(). bReadLock = <caller locked the reader mutex>. */
-	void DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::mdb_reader_check0(bool _bReadLock, umint *_pDead)
+	void DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_ReaderCheck0(bool _bReadLock, umint *_pDead)
 	{
 		using namespace NPrivate;
 		CMdbMutexRef rmutex = _bReadLock ? nullptr : me_rmutex;
@@ -150,9 +150,9 @@ namespace NMib::NDatabase
 			pid = mr[i].m_OwningProcessID.f_Load(NAtomic::gc_MemoryOrder_Relaxed);
 			if (pid && pid != me_pid)
 			{
-				if (mdb_pid_insert(pids, pid) == 0)
+				if (fg_PidInsert(pids, pid) == 0)
 				{
-					if (!mdb_reader_pid(EPidLockOp_Check, pid))
+					if (!f_ReaderPid(EPidLockOp_Check, pid))
 					{
 						/* Stale reader found */
 						j = i;
@@ -161,14 +161,14 @@ namespace NMib::NDatabase
 							int rc;
 							if ((rc = DLockMutex0(rmutex)) != 0)
 							{
-								if ((rc = mdb_mutex_failed(rmutex, rc)))
-									DMibError(NStr::fg_Format("Failed to lock mutex: {}", mdb_strerror(rc)));
+								if ((rc = f_MutexFailed(rmutex, rc)))
+									DMibError(NStr::fg_Format("Failed to lock mutex: {}", fg_StrError(rc)));
 								rdrs = 0; // the above checked all readers
 							}
 							else
 							{
 								/* Recheck, a new process may have reused pid */
-								if (mdb_reader_pid(EPidLockOp_Check, pid))
+								if (f_ReaderPid(EPidLockOp_Check, pid))
 									j = rdrs;
 							}
 						}
@@ -200,7 +200,7 @@ namespace NMib::NDatabase
 	 * @param[in] rc	DLockMutex0() error (nonzero)
 	 * @return 0 on success with the mutex locked, or an error code on failure.
 	 */
-	int DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::mdb_mutex_failed(NPrivate::CMdbMutexRef mutex, int rc)
+	int DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_MutexFailed(NPrivate::CMdbMutexRef mutex, int rc)
 	{
 #	ifdef DPlatformFamily_macOS
 		if (rc == EINVAL)
@@ -229,7 +229,7 @@ namespace NMib::NDatabase
 				/* Keep m_TransactionBody.m_TransactionID updated, otherwise next writer can
 				 * overwrite data which latest meta page refers to.
 				 */
-				meta = mdb_env_pick_meta();
+				meta = f_PickMeta();
 				m_pLocksMemoryMap->m_TransactionBody.m_TransactionID.f_Store(meta->mm_txnid.f_Load(NAtomic::gc_MemoryOrder_Relaxed), NAtomic::gc_MemoryOrder_Release);
 				/* env is hosed if the dead thread was ours */
 				if (me_txn)
@@ -242,7 +242,7 @@ namespace NMib::NDatabase
 			DMibDatabaseTrace("{}mutex owner died, {}", (bReadLock ? "r" : "w"), (rc ? "this process' env is hosed" : "recovering"));
 			try
 			{
-				mdb_reader_check0(bReadLock, nullptr);
+				f_ReaderCheck0(bReadLock, nullptr);
 			}
 			catch (NException::CException const &)
 			{
@@ -251,7 +251,7 @@ namespace NMib::NDatabase
 			mdb_mutex_consistent(mutex);
 			if (rc)
 			{
-				DMibDatabaseTrace("LOCK_MUTEX recovery failed, {}", mdb_strerror(rc));
+				DMibDatabaseTrace("LOCK_MUTEX recovery failed, {}", fg_StrError(rc));
 				DUnlockMutex(mutex);
 			}
 		}
@@ -260,7 +260,7 @@ namespace NMib::NDatabase
 #	ifdef DPlatformFamily_Windows
 			rc = DErrCode();
 #	endif
-			DMibDatabaseTrace("LOCK_MUTEX failed, {}", mdb_strerror(rc));
+			DMibDatabaseTrace("LOCK_MUTEX failed, {}", fg_StrError(rc));
 		}
 		return rc;
 	}
@@ -278,7 +278,7 @@ namespace NMib::NDatabase
 	int NPrivate::mdb_sec_inited;
 #endif
 
-	void DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::mdb_env_setup_locks(NStr::CStr const &_LockPath, int mode, int *excl)
+	void DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_SetupLocks(NStr::CStr const &_LockPath, int mode, int *excl)
 	{
 #ifdef DPlatformFamily_Windows
 #	define DMdbErrcodeRofs	ERROR_WRITE_PROTECT
@@ -292,29 +292,29 @@ namespace NMib::NDatabase
 		off_t size, rsize;
 		int error_location = 0;
 
-		NStr::CStr LockPath = mdb_getfilename(_LockPath, EMdbFOpenType_Locks);
+		NStr::CStr LockPath = f_GetFileName(_LockPath, EMdbFOpenType_Locks);
 		{
-			int rc = mdb_fopen(_LockPath, EMdbFOpenType_Locks, mode, &me_lfd);
+			int rc = f_FOpen(_LockPath, EMdbFOpenType_Locks, mode, &me_lfd);
 			if (rc)
 			{
 				/* Omit lockfile if read-only env on read-only filesystem */
 				if (rc == DMdbErrcodeRofs && (me_flags & EDatabaseEnvironmentFlag_ReadOnly))
 					return;
 
-				DMibError(NStr::fg_Format("Error opening lock file: {}", mdb_strerror(rc)));
+				DMibError(NStr::fg_Format("Error opening lock file: {}", fg_StrError(rc)));
 			}
 		}
 
 		if (!(me_flags & EDatabaseEnvironmentFlag_NoTls))
 		{
-			int rc = pthread_key_create(&me_txkey, mdb_env_reader_dest);
+			int rc = pthread_key_create(&me_txkey, fg_EnvReaderDest);
 			if (rc)
-				DMibError(NStr::fg_Format("Error creating pthread key: {}", mdb_strerror(rc)));
+				DMibError(NStr::fg_Format("Error creating pthread key: {}", fg_StrError(rc)));
 			me_flags |= DMdbEnvTxkey;
 #ifdef DPlatformFamily_Windows
 			/* Windows TLS callbacks need help finding their TLS info. */
 			if (mdb_tls_nkeys >= DMaxTlsKeys)
-				DMibError(NStr::fg_Format("Out of tls keys: {}", mdb_strerror(DMdbTlsFull)));
+				DMibError(NStr::fg_Format("Out of tls keys: {}", fg_StrError(DMdbTlsFull)));
 			mdb_tls_keys[mdb_tls_nkeys++] = me_txkey;
 #endif
 		}
@@ -323,9 +323,9 @@ namespace NMib::NDatabase
 		 * nobody is using the lock region and we should initialize it.
 		 */
 		{
-			int rc = mdb_env_excl_lock(excl);
+			int rc = f_ExclLock(excl);
 			if (rc)
-				DMibError(NStr::fg_Format("Failed to get exclusive lock: {}", mdb_strerror(rc)));
+				DMibError(NStr::fg_Format("Failed to get exclusive lock: {}", fg_StrError(rc)));
 		}
 
 #ifdef DPlatformFamily_Windows
@@ -416,8 +416,8 @@ namespace NMib::NDatabase
 			idbuf.volume = stbuf.dwVolumeSerialNumber;
 			idbuf.nhigh = stbuf.nFileIndexHigh;
 			idbuf.nlow = stbuf.nFileIndexLow;
-			m_pLocksMemoryMap->m_TransactionBody.mtb_mutexid = mdb_hash(&idbuf, sizeof(idbuf));
-			mdb_env_mname_init(this);
+			m_pLocksMemoryMap->m_TransactionBody.mtb_mutexid = fg_Hash(&idbuf, sizeof(idbuf));
+			fg_EnvMNameInit(this);
 			me_rmutex = CreateMutexExA(&mdb_all_sa, DMutexName(this, 'r'), 0, SYNCHRONIZE);
 			if (!me_rmutex)
 			{
@@ -461,15 +461,15 @@ namespace NMib::NDatabase
 			memset(&idbuf, 0, sizeof(idbuf));
 			idbuf.dev = stbuf.st_dev;
 			idbuf.ino = stbuf.st_ino;
-			m_pLocksMemoryMap->m_TransactionBody.mtb_mutexid = mdb_hash(&idbuf, sizeof(idbuf))
+			m_pLocksMemoryMap->m_TransactionBody.mtb_mutexid = fg_Hash(&idbuf, sizeof(idbuf))
 #	ifdef DMdbShortSemnames
 				/* Max 9 base85-digits.  We truncate here instead of in
-				 * mdb_env_mname_init() to keep the latter portable.
+				 * fg_EnvMNameInit() to keep the latter portable.
 				 */
 				% ((CMdbHash)85 * 85 * 85 * 85 * 85 * 85 * 85 * 85 * 85)
 #	endif
 				;
-			mdb_env_mname_init(this);
+			fg_EnvMNameInit(this);
 			/* Clean up after a previous run, if needed:  Try to
 			 * remove both semaphores before doing anything else.
 			 */
@@ -548,7 +548,7 @@ namespace NMib::NDatabase
 
 			int rc;
 			if ((rc = pthread_mutexattr_init(&mattr)) != 0)
-				DMibError(NStr::fg_Format("Error initializing mutex attributes: {}", mdb_strerror(rc)));
+				DMibError(NStr::fg_Format("Error initializing mutex attributes: {}", fg_StrError(rc)));
 			rc = pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
 #	ifdef DMdbRobustSupported
 			if (!rc)
@@ -560,7 +560,7 @@ namespace NMib::NDatabase
 				rc = pthread_mutex_init(m_pLocksMemoryMap->m_WriteLock, &mattr);
 			pthread_mutexattr_destroy(&mattr);
 			if (rc)
-				DMibError(NStr::fg_Format("Error initializing mutex: {}", mdb_strerror(rc)));
+				DMibError(NStr::fg_Format("Error initializing mutex: {}", fg_StrError(rc)));
 #endif	/* DPlatformFamily_Windows || ... */
 
 			m_pLocksMemoryMap->m_TransactionBody.mtb_magic = DMdbMagic;
@@ -588,10 +588,10 @@ namespace NMib::NDatabase
 			{
 				int rc = DErrCode();
 				if (rc && rc != EACCES && rc != EAGAIN)
-					DMibError(NStr::fg_Format("Error setting up locks (non-exclusive): {}", mdb_strerror(rc)));
+					DMibError(NStr::fg_Format("Error setting up locks (non-exclusive): {}", fg_StrError(rc)));
 			}
 #ifdef DPlatformFamily_Windows
-			mdb_env_mname_init(this);
+			fg_EnvMNameInit(this);
 			me_rmutex = OpenMutexA(SYNCHRONIZE, FALSE, DMutexName(this, 'r'));
 			if (!me_rmutex)
 			{
@@ -605,7 +605,7 @@ namespace NMib::NDatabase
 				goto fail_errno;
 			}
 #elif defined(MDB_USE_POSIX_SEM)
-			mdb_env_mname_init(this);
+			fg_EnvMNameInit(this);
 			me_rmutex = sem_open(DMutexName(this, 'r'), 0);
 			if (me_rmutex == SEM_FAILED)
 			{
@@ -649,12 +649,12 @@ namespace NMib::NDatabase
 	fail_errno:
 		{
 			int rc = DErrCode();
-			DMibError(NStr::fg_Format("Error setting up locks ({}): {}", error_location, mdb_strerror_system(rc)));
+			DMibError(NStr::fg_Format("Error setting up locks ({}): {}", error_location, fg_StrErrorSystem(rc)));
 		}
 	}
 
 	/** Downgrade the exclusive lock on the region back to shared */
-	int DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::mdb_env_share_locks(int *excl)
+	int DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_ShareLocks(int *excl)
 	{
 		int rc = 0;
 
@@ -693,7 +693,7 @@ namespace NMib::NDatabase
 	/** Try to get exclusive lock, otherwise shared.
 	 *	Maintain *excl = -1: no/unknown lock, 0: shared, 1: exclusive.
 	 */
-	int DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::mdb_env_excl_lock(int *excl)
+	int DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_ExclLock(int *excl)
 	{
 		int rc = 0;
 #ifdef DPlatformFamily_Windows
