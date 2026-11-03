@@ -133,10 +133,7 @@ namespace NMib::NDatabase
 	struct CDatabaseReaderInfo
 	{
 		template <typename tf_CStr>
-		void f_Format(tf_CStr &o_Str) const
-		{
-			o_Str += typename tf_CStr::CFormat("{}: {}") << m_iReaderSlot << m_Description;
-		}
+		void f_Format(tf_CStr &o_Str) const;
 
 		umint m_iReaderSlot;
 		NStr::CStr m_Description;
@@ -195,6 +192,7 @@ namespace NMib::NDatabase
 #include "Malterlib_Database_Database_Cursor.hpp"
 #include "Malterlib_Database_Database_CursorDuplicateData.hpp"
 #include "Malterlib_Database_Database_SubTransaction.hpp"
+#include "Malterlib_Database_Database.hpp"
 
 #ifndef DMibPNoShortCuts
 using namespace NMib::NDatabase;

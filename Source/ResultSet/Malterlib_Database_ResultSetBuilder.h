@@ -177,7 +177,7 @@ namespace NMib::NDatabase
 			template <typename tf_CType>
 			inline CColumn &f_AddValue(tf_CType &&_Value);
 
-			inline CColumn &f_AddValue(std::nullptr_t _pNull);
+			CColumn &f_AddValue(std::nullptr_t _pNull);
 
 		private:
 			CResultSetBuilder *mp_pBuilder;

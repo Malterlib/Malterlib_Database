@@ -463,12 +463,7 @@ namespace NMib::NDatabase
 #		define DLockMutex0(d_Mutex)		fg_SemWait(d_Mutex)
 #		define DUnlockMutex(d_Mutex)		sem_post(d_Mutex)
 
-		inline_always static int fg_SemWait(sem_t *_pSemaphore)
-		{
-			int Result;
-			while ((Result = sem_wait(_pSemaphore)) && (Result = errno) == EINTR);
-			return Result;
-		}
+		inline_always static int fg_SemWait(sem_t *_pSemaphore);
 
 #	elif defined DMdbUseSysvSem
 
@@ -490,23 +485,7 @@ namespace NMib::NDatabase
 				semop((d_Mutex)->m_SemaphoreID, &SemaphoreOperation, 1); \
 			} while(0)
 
-		inline_always static int fg_SemWait(CMdbMutexRef _pSemaphore)
-		{
-			int Result, *pLocked = _pSemaphore->m_pLocked;
-			struct sembuf SemaphoreOperation = {0, -1, SEM_UNDO};
-			SemaphoreOperation.sem_num = _pSemaphore->m_SemaphoreNumber;
-			do
-			{
-				if (!semop(_pSemaphore->m_SemaphoreID, &SemaphoreOperation, 1))
-				{
-					Result = *pLocked ? DMdbOwnerdead : DMdbSuccess;
-					*pLocked = 1;
-					break;
-				}
-			}
-			while ((Result = errno) == EINTR);
-			return Result;
-		}
+		inline_always static int fg_SemWait(CMdbMutexRef _pSemaphore);
 
 #		define mdb_mutex_consistent(d_Mutex)	0
 
@@ -1973,3 +1952,4 @@ namespace NMib::NDatabase
 }
 
 #include "Malterlib_Database_Database_Debug.h"
+#include "Malterlib_Database_Database_Internal.hpp"

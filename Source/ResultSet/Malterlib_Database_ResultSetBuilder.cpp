@@ -498,4 +498,51 @@ namespace NMib::NDatabase
 		if (mp_pBuilder)
 			--mp_pBuilder->mp_nColumnWiseActive;
 	}
+
+	CResultSetBuilder::CColumn &CResultSetBuilder::CColumn::f_AddValue(std::nullptr_t _pNull)
+	{
+		if (mp_iCurRow == 0)
+		{
+			auto const &ArrayVariant = mp_pBuilder->mp_Columns[mp_iColumn];
+
+			switch (ArrayVariant.f_GetTypeID())
+			{
+			case EResultDataType_CStr:
+				if (!ArrayVariant.f_Get<EResultDataType_CStr>().f_IsEmpty())
+					mp_iCurRow = ArrayVariant.f_Get<EResultDataType_CStr>().f_GetLast().m_iRow;
+				break;
+			case EResultDataType_fp64:
+				if (!ArrayVariant.f_Get<EResultDataType_fp64>().f_IsEmpty())
+					mp_iCurRow = ArrayVariant.f_Get<EResultDataType_fp64>().f_GetLast().m_iRow;
+				break;
+			case EResultDataType_uint64:
+				if (!ArrayVariant.f_Get<EResultDataType_uint64>().f_IsEmpty())
+					mp_iCurRow = ArrayVariant.f_Get<EResultDataType_uint64>().f_GetLast().m_iRow;
+				break;
+			case EResultDataType_Binary:
+				if (!ArrayVariant.f_Get<EResultDataType_Binary>().f_IsEmpty())
+					mp_iCurRow = ArrayVariant.f_Get<EResultDataType_Binary>().f_GetLast().m_iRow;
+				break;
+				/* Deprecated:
+				case EResultDataType_int32:
+					if (!ArrayVariant.f_Get<EResultDataType_int32>().f_IsEmpty())
+						mp_iCurRow = ArrayVariant.f_Get<EResultDataType_int32>().f_GetLast().m_iRow;
+					break;
+				case EResultDataType_int64:
+					if (!ArrayVariant.f_Get<EResultDataType_int64>().f_IsEmpty())
+						mp_iCurRow = ArrayVariant.f_Get<EResultDataType_int64>().f_GetLast().m_iRow;
+					break;
+				case EResultDataType_fp32:
+					if (!ArrayVariant.f_Get<EResultDataType_fp32>().f_IsEmpty())
+						mp_iCurRow = ArrayVariant.f_Get<EResultDataType_fp32>().f_GetLast().m_iRow;
+					break;
+				*/
+			}
+		}
+
+		DMibCheck(mp_iCurRow < mp_pBuilder->mp_nRows)("Attempting to add a column value for a row that has no key parts specified.");
+
+		++mp_iCurRow;
+		return *this;
+	}
 }

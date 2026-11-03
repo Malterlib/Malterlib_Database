@@ -66,13 +66,7 @@ namespace NMib::NDatabase::NPrivate
 	/** Current max length of an #fg_MidlAlloc()ed IDL */
 #define DMdbIdlAlloclen( d_Ids )	( (d_Ids)[-1] )
 
-	/** Append ID to IDL. The IDL must be big enough. */
-	inline_always void fg_MidlXAppend(CMdbIdl _pIDs, CMdbId _ID)
-	{
-		CMdbId *pIDs = _pIDs;
-		CMdbId nIDs = ++pIDs[0];
-		pIDs[nIDs] = _ID;
-	}
+	inline_always void fg_MidlXAppend(CMdbIdl _pIDs, CMdbId _ID);
 
 	/** Search for an ID in an IDL.
 	 * @param[in] _pIDs	The IDL to search.
@@ -192,3 +186,5 @@ namespace NMib::NDatabase::NPrivate
 	/** @} */
 	/** @} */
 }
+
+#include "Malterlib_Database_Database_IDList.hpp"
