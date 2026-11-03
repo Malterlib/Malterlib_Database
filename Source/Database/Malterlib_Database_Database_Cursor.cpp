@@ -46,9 +46,9 @@ namespace NMib::NDatabase
 			NPrivate::fg_CursorClose(mp_pInternal.f_Detach());
 	}
 
-	CDatabaseCursorCommon::CDatabaseCursorCommon(CDatabaseCursorCommon &&_Other) = default;
+	CDatabaseCursorCommon::CDatabaseCursorCommon(CDatabaseCursorCommon &&_iOther) = default;
 
-	CDatabaseCursorCommon &CDatabaseCursorCommon::operator = (CDatabaseCursorCommon &&_Other) = default;
+	CDatabaseCursorCommon &CDatabaseCursorCommon::operator = (CDatabaseCursorCommon &&_iOther) = default;
 
 	CDatabaseCursorCommon::CDatabaseCursorCommon(NStorage::TCUniquePointer<CInternal> &&_pInternal)
 		: mp_pInternal(fg_Move(_pInternal))

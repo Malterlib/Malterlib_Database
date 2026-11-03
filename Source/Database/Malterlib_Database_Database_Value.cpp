@@ -265,12 +265,12 @@ namespace NMib::NDatabase
 	 */
 	int CDatabaseTransactionCommon::CInternal::f_DataCompare(CDatabaseSubID _DatabaseID, CDatabaseValue const *_pLeft, CDatabaseValue const *_pRight)
 	{
-		FDatabaseCompare const &DataCompare = m_pDatabaseInfos[_DatabaseID].m_fDataCompare;
+		FDatabaseCompare const &fDataCompare = m_pDatabaseInfos[_DatabaseID].m_fDataCompare;
 #if DMibPPtrBits > 32 || defined(DMibDatabase_Always64BitSupport)
-		if (_pLeft->m_Size == sizeof(CDatabaseOffset) && DataCompare == NPrivate::g_fCompareInt)
+		if (_pLeft->m_Size == sizeof(CDatabaseOffset) && fDataCompare == NPrivate::g_fCompareInt)
 			return NPrivate::g_mdb_cmp_clong(*_pLeft, *_pRight);
 #endif
-		return DataCompare(*_pLeft, *_pRight);
+		return fDataCompare(*_pLeft, *_pRight);
 	}
 
 	// ---------------------------------------------------------------------------------------------------------------------------------------

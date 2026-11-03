@@ -806,7 +806,7 @@ namespace NMib::NDatabase
 				else
 				{
 					CProcessID ProcessID = pEnvironment->m_ProcessID;
-					CThreadID ThreadID = pthread_self();
+					CThreadID ThreadID = pthread_self(); // NOLINT(malterlib-conceptual-prefix): pthread_t is a pointer on macOS and an integer on Linux
 					CMdbMutexRef pReaderMutex = pEnvironment->m_ReaderMutex;
 
 					if (!pEnvironment->m_bLiveReader)

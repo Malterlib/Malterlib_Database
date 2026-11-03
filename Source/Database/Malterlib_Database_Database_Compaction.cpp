@@ -45,7 +45,7 @@ namespace NMib::NDatabase::NPrivate
 
 	struct CCompactingCopyState
 	{
-		CCompactingCopyState(CMdbEnv *_pEnvironment, HANDLE _DestinationFile)
+		CCompactingCopyState(CMdbEnv *_pEnvironment, HANDLE _DestinationFile) // NOLINT(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
 			: m_pEnvironment{_pEnvironment}
 			, m_OutputFileHandle{_DestinationFile}
 			, m_BlockingActorCheckout(fg_BlockingActor())
@@ -74,7 +74,7 @@ namespace NMib::NDatabase::NPrivate
 		CMdbEnv *m_pEnvironment = nullptr;
 		CMdbTxn *m_pInternalTransaction = nullptr;
 		CPgno m_NextPageNo = DNumMetas;
-		HANDLE m_OutputFileHandle = INVALID_HANDLE_VALUE;
+		HANDLE m_OutputFileHandle = INVALID_HANDLE_VALUE; // NOLINT(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
 		int m_Status = 0;
 		int m_iBuffer = 0;
 	};
@@ -349,6 +349,7 @@ namespace NMib::NDatabase::NPrivate
 namespace NMib::NDatabase
 {
 	/** Copy environment with compaction. */
+	// NOLINTNEXTLINE(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
 	void DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_CopyCompact(HANDLE _FileHandle)
 	{
 		using namespace NPrivate;

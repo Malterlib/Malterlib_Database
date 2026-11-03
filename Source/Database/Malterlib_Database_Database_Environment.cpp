@@ -384,7 +384,7 @@ namespace NMib::NDatabase
 
 		auto &Environment = *mp_pEnvironment;
 
-		HANDLE NewFileHandle = INVALID_HANDLE_VALUE;
+		HANDLE NewFileHandle = INVALID_HANDLE_VALUE; // NOLINT(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
 		int Result = Environment.f_FOpen(_Path, EMdbFOpenType_Copy, 0666, &NewFileHandle);
 
 		if (Result)
@@ -416,15 +416,15 @@ namespace NMib::NDatabase
 	 * See #f_Copy() for options.
 	 * @return A non-zero error value on failure and 0 on success.
 	 */
-	void DMibDatabaseInfrequentSection CDatabaseEnvironment::f_Copy(void *_FileHandle, EDatabaseEnvironmentCopyFlag _Flags)
+	void DMibDatabaseInfrequentSection CDatabaseEnvironment::f_Copy(void *_pFileHandle, EDatabaseEnvironmentCopyFlag _Flags)
 	{
 		fp_CheckOpened();
 
 		auto &Environment = *mp_pEnvironment;
 		if (_Flags & EDatabaseEnvironmentCopyFlag_Compact)
-			Environment.f_CopyCompact((HANDLE)(umint)_FileHandle);
+			Environment.f_CopyCompact((HANDLE)(umint)_pFileHandle);
 		else
-			Environment.f_Copy((HANDLE)(umint)_FileHandle);
+			Environment.f_Copy((HANDLE)(umint)_pFileHandle);
 	}
 
 	/** @brief Return statistics about the LMDB environment.
@@ -1046,7 +1046,7 @@ namespace NMib::NDatabase
 		off_t Offset;
 		int Result, Length, iMeta;
 		char *pBuffer;
-		HANDLE MetaFileHandle;
+		HANDLE MetaFileHandle; // NOLINT(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
 #ifdef DPlatformFamily_Windows
 		OVERLAPPED Overlapped;
 #else
@@ -1207,7 +1207,7 @@ namespace NMib::NDatabase
 #ifdef DPlatformFamily_Windows
 		int Status;
 		int Access = SECTION_MAP_READ;
-		HANDLE Section;
+		HANDLE pSection;
 		void *pView;
 		SIZE_T ViewSize;
 		ULONG PageProtection = PAGE_READONLY, SectionProtection, AllocationType;
@@ -1230,18 +1230,18 @@ namespace NMib::NDatabase
 			AllocationType = MEM_RESERVE;
 		}
 
-		Status = g_fDatabase_NtCreateSection(&Section, Access, nullptr, nullptr, SectionProtection, SEC_RESERVE, m_FileHandle);
+		Status = g_fDatabase_NtCreateSection(&pSection, Access, nullptr, nullptr, SectionProtection, SEC_RESERVE, m_FileHandle);
 		if (Status)
 			return fg_Nt2Win32(Status);
 		pView = _pAddress;
 #	ifdef DMibDatabase_Always64BitSupport
 		ViewSize = DNumMetas * m_PageSize;
 #	endif
-		Status = g_fDatabase_NtMapViewOfSection(Section, GetCurrentProcess(), &pView, 0, 0, nullptr, &ViewSize, ViewUnmap, AllocationType, PageProtection);
+		Status = g_fDatabase_NtMapViewOfSection(pSection, GetCurrentProcess(), &pView, 0, 0, nullptr, &ViewSize, ViewUnmap, AllocationType, PageProtection);
 #	ifdef DMibDatabase_Always64BitSupport
-		m_FileMappingHandle = Section;
+		m_FileMappingHandle = pSection;
 #	else
-		g_fDatabase_NtClose(Section);
+		g_fDatabase_NtClose(pSection);
 #	endif
 		if (Status)
 			return fg_Nt2Win32(Status);
@@ -1323,7 +1323,7 @@ namespace NMib::NDatabase
 	int DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_FOpen(NStr::CStr const &_FileName, NPrivate::EMdbFOpenType _FileType, NPrivate::CMdbMode _Mode, HANDLE *o_pFileHandle)
 	{
 		int Result = DMdbSuccess;
-		HANDLE FileHandle;
+		HANDLE FileHandle; // NOLINT(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
 #ifdef DPlatformFamily_Windows
 		DWORD Access, ShareMode, Disposition, Attributes;
 #endif
@@ -1425,16 +1425,16 @@ namespace NMib::NDatabase
 		/* Grab functions we need from NTDLL */
 		if (!g_fDatabase_NtCreateSection)
 		{
-			HMODULE NtDll = GetModuleHandleW(L"NTDLL.DLL");
-			if (!NtDll)
+			HMODULE pNtDll = GetModuleHandleW(L"NTDLL.DLL");
+			if (!pNtDll)
 				DMibError("Could not find NTDLL.DLL");
-			g_fDatabase_NtClose = (NtCloseFunc *)GetProcAddress(NtDll, "NtClose");
+			g_fDatabase_NtClose = (NtCloseFunc *)GetProcAddress(pNtDll, "NtClose");
 			if (!g_fDatabase_NtClose)
 				DMibError("Could not find NtClose");
-			g_fDatabase_NtMapViewOfSection = (NtMapViewOfSectionFunc *)GetProcAddress(NtDll, "NtMapViewOfSection");
+			g_fDatabase_NtMapViewOfSection = (NtMapViewOfSectionFunc *)GetProcAddress(pNtDll, "NtMapViewOfSection");
 			if (!g_fDatabase_NtMapViewOfSection)
 				DMibError("Could not find NtMapViewOfSection");
-			g_fDatabase_NtCreateSection = (NtCreateSectionFunc *)GetProcAddress(NtDll, "NtCreateSection");
+			g_fDatabase_NtCreateSection = (NtCreateSectionFunc *)GetProcAddress(pNtDll, "NtCreateSection");
 			if (!g_fDatabase_NtCreateSection)
 				DMibError("Could not find NtCreateSection");
 		}
@@ -1696,7 +1696,7 @@ namespace NMib::NDatabase
 	}
 
 	/** Copy environment as-is. */
-	void DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_Copy(HANDLE _FileHandle)
+	void DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_Copy(HANDLE _FileHandle) // NOLINT(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
 	{
 #ifdef DMibDatabase_Always64BitSupport
 		DMibError("Not supported on 32 bit");

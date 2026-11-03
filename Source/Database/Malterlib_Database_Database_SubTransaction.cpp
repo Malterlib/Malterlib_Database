@@ -99,16 +99,16 @@ namespace NMib::NDatabase
 
 	CDatabaseCursor CDatabaseSubReadTransaction::f_ReadCursor(CDatabaseValue const &_Prefix)
 	{
-		auto Cursor = f_ReadCursor();
-		Cursor.f_SetPrefix(_Prefix);
-		return Cursor;
+		auto iCursor = f_ReadCursor();
+		iCursor.f_SetPrefix(_Prefix);
+		return iCursor;
 	}
 
 	CDatabaseCursorDuplicateData CDatabaseSubReadTransaction::f_ReadCursorDuplicateData(CDatabaseValue const &_Prefix)
 	{
-		auto Cursor = f_ReadCursorDuplicateData();
-		Cursor.f_SetPrefix(_Prefix);
-		return Cursor;
+		auto iCursor = f_ReadCursorDuplicateData();
+		iCursor.f_SetPrefix(_Prefix);
+		return iCursor;
 	}
 
 	CDatabaseSubReadTransaction::CDatabaseSubReadTransaction(CDatabaseTransactionCommon::CInternal *_pTransaction, CDatabaseSubID _DatabaseID)
@@ -198,15 +198,15 @@ namespace NMib::NDatabase
 
 	CDatabaseCursorWrite CDatabaseSubWriteTransaction::f_WriteCursor(CDatabaseValue const &_Prefix)
 	{
-		auto Cursor = f_WriteCursor();
-		Cursor.f_SetPrefix(_Prefix);
-		return Cursor;
+		auto iCursor = f_WriteCursor();
+		iCursor.f_SetPrefix(_Prefix);
+		return iCursor;
 	}
 
 	CDatabaseCursorDuplicateDataWrite CDatabaseSubWriteTransaction::f_WriteCursorDuplicateData(CDatabaseValue const &_Prefix)
 	{
-		auto Cursor = f_WriteCursorDuplicateData();
-		Cursor.f_SetPrefix(_Prefix);
-		return Cursor;
+		auto iCursor = f_WriteCursorDuplicateData();
+		iCursor.f_SetPrefix(_Prefix);
+		return iCursor;
 	}
 }

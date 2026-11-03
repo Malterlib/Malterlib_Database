@@ -160,7 +160,7 @@ namespace NMib::NDatabase
 		EDatabaseEnvironmentFlag f_GetFlags();
 
 		void f_Copy(NStr::CStr const &_Path, EDatabaseEnvironmentCopyFlag _Flags = EDatabaseEnvironmentCopyFlag_None);
-		void f_Copy(void *_FileHandle, EDatabaseEnvironmentCopyFlag _Flags = EDatabaseEnvironmentCopyFlag_None);
+		void f_Copy(void *_pFileHandle, EDatabaseEnvironmentCopyFlag _Flags = EDatabaseEnvironmentCopyFlag_None);
 
 		CDatabaseStatistics f_Statistics();
 		CDatabaseSizeStatistics f_SizeStatistics();

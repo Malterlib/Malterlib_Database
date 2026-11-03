@@ -505,9 +505,9 @@ namespace
 					{
 						auto ReadTransaction = TestEnvironment.m_Environment.f_BeginReadTransaction();
 						auto DatabaseSubTransaction = ReadTransaction.f_OpenDatabaseTransaction();
-						auto ReadCursor = DatabaseSubTransaction.f_ReadCursor();
-						ReadCursor.f_First();
-						DMibExpectFalse(ReadCursor);
+						auto iReadCursor = DatabaseSubTransaction.f_ReadCursor();
+						iReadCursor.f_First();
+						DMibExpectFalse(iReadCursor);
 					}
 
 					{
@@ -521,9 +521,9 @@ namespace
 						{
 							auto ReadBackTransaction = TestEnvironment.m_Environment.f_BeginReadTransaction();
 							auto DatabaseSubTransactionVerify = ReadBackTransaction.f_OpenDatabaseTransaction();
-							auto ReadCursorVerify = DatabaseSubTransactionVerify.f_ReadCursor();
-							DMibExpectTrue(ReadCursorVerify.f_FindEqual("Key"));
-							DMibExpect(ReadCursorVerify.f_Value<NStr::CStr>(), ==, NStr::CStr("Value"));
+							auto iReadCursorVerify = DatabaseSubTransactionVerify.f_ReadCursor();
+							DMibExpectTrue(iReadCursorVerify.f_FindEqual("Key"));
+							DMibExpect(iReadCursorVerify.f_Value<NStr::CStr>(), ==, NStr::CStr("Value"));
 						}
 					}
 
@@ -538,9 +538,9 @@ namespace
 						{
 							auto ReadBackTransaction = TestEnvironment.m_Environment.f_BeginReadTransaction();
 							auto DatabaseSubTransactionVerify = ReadBackTransaction.f_OpenDatabaseTransaction();
-							auto ReadCursorVerify = DatabaseSubTransactionVerify.f_ReadCursor();
-							DMibExpectTrue(ReadCursorVerify.f_FindEqual("Key2"));
-							DMibExpect(ReadCursorVerify.f_Value<NStr::CStr>(), ==, NStr::CStr("Value2"));
+							auto iReadCursorVerify = DatabaseSubTransactionVerify.f_ReadCursor();
+							DMibExpectTrue(iReadCursorVerify.f_FindEqual("Key2"));
+							DMibExpect(iReadCursorVerify.f_Value<NStr::CStr>(), ==, NStr::CStr("Value2"));
 						}
 					}
 
@@ -555,9 +555,9 @@ namespace
 						{
 							auto ReadBackTransaction = TestEnvironment.m_Environment.f_BeginReadTransaction();
 							auto DatabaseSubTransactionVerify = ReadBackTransaction.f_OpenDatabaseTransaction();
-							auto ReadCursorVerify = DatabaseSubTransactionVerify.f_ReadCursor();
-							DMibExpectTrue(ReadCursorVerify.f_FindEqual("Key3"));
-							DMibExpect(ReadCursorVerify.f_Value<NStr::CStr>(), ==, NStr::CStr("Value3"));
+							auto iReadCursorVerify = DatabaseSubTransactionVerify.f_ReadCursor();
+							DMibExpectTrue(iReadCursorVerify.f_FindEqual("Key3"));
+							DMibExpect(iReadCursorVerify.f_Value<NStr::CStr>(), ==, NStr::CStr("Value3"));
 						}
 					}
 				};

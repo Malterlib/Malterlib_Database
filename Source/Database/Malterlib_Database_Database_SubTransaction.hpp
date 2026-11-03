@@ -134,32 +134,32 @@ namespace NMib::NDatabase
 	template <typename ...tfp_CKeys>
 	CDatabaseCursor CDatabaseSubReadTransaction::f_ReadCursor(tfp_CKeys const & ...p_Prefixes)
 	{
-		auto Cursor = f_ReadCursor();
-		Cursor.f_SetPrefix(p_Prefixes...);
-		return Cursor;
+		auto iCursor = f_ReadCursor();
+		iCursor.f_SetPrefix(p_Prefixes...);
+		return iCursor;
 	}
 
 	template <typename ...tfp_CKeys>
 	CDatabaseCursorDuplicateData CDatabaseSubReadTransaction::f_ReadCursorDuplicateData(tfp_CKeys const & ...p_Prefixes)
 	{
-		auto Cursor = f_ReadCursorDuplicateData();
-		Cursor.f_SetPrefix(p_Prefixes...);
-		return Cursor;
+		auto iCursor = f_ReadCursorDuplicateData();
+		iCursor.f_SetPrefix(p_Prefixes...);
+		return iCursor;
 	}
 
 	template <typename ...tfp_CKeys>
 	CDatabaseCursorWrite CDatabaseSubWriteTransaction::f_WriteCursor(tfp_CKeys const & ...p_Prefixes)
 	{
-		auto Cursor = f_WriteCursor();
-		Cursor.f_SetPrefix(p_Prefixes...);
-		return Cursor;
+		auto iCursor = f_WriteCursor();
+		iCursor.f_SetPrefix(p_Prefixes...);
+		return iCursor;
 	}
 
 	template <typename ...tfp_CKeys>
 	CDatabaseCursorDuplicateDataWrite CDatabaseSubWriteTransaction::f_WriteCursorDuplicateData(tfp_CKeys const & ...p_Prefixes)
 	{
-		auto Cursor = f_WriteCursorDuplicateData();
-		Cursor.f_SetPrefix(p_Prefixes...);
-		return Cursor;
+		auto iCursor = f_WriteCursorDuplicateData();
+		iCursor.f_SetPrefix(p_Prefixes...);
+		return iCursor;
 	}
 }

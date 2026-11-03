@@ -42,8 +42,8 @@ namespace NMib::NDatabase
 	{
 		CDatabaseCursorCommon();
 		~CDatabaseCursorCommon();
-		CDatabaseCursorCommon(CDatabaseCursorCommon &&_Other);
-		CDatabaseCursorCommon &operator = (CDatabaseCursorCommon &&_Other);
+		CDatabaseCursorCommon(CDatabaseCursorCommon &&_iOther);
+		CDatabaseCursorCommon &operator = (CDatabaseCursorCommon &&_iOther);
 
 		struct CInternal;
 

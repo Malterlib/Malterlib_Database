@@ -43,7 +43,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 namespace NMib::NDatabase::NPrivate
 {
-	CDatabaseOffset DMibDatabaseInfrequentSection fg_FSize(HANDLE _FileHandle)
+	CDatabaseOffset DMibDatabaseInfrequentSection fg_FSize(HANDLE _FileHandle) // NOLINT(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
 	{
 #ifdef DPlatformFamily_Windows
 		LARGE_INTEGER FileSize;
@@ -62,6 +62,7 @@ namespace NMib::NDatabase::NPrivate
 #endif
 	}
 
+	// NOLINTNEXTLINE(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
 	bool DMibDatabaseInfrequentSection fg_BrokenFSync(CMdbEnv *_pEnvironment, HANDLE _FileDescriptor)
 	{
 		bool bBroken = false;

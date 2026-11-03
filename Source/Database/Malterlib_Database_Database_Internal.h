@@ -876,7 +876,7 @@ namespace NMib::NDatabase
 			/** The process ID of the process owning this reader txn. */
 			NAtomic::TCAtomic<CProcessID> m_OwningProcessID;
 			/** The thread ID of the thread owning this txn. */
-			NAtomic::TCAtomic<CThreadID> m_OwningThreadID;
+			NAtomic::TCAtomic<CThreadID> m_OwningThreadID; // NOLINT(malterlib-conceptual-prefix): pthread_t is a pointer on macOS and an integer on Linux
 		};
 
 		/** The header for the reader table.
@@ -1599,8 +1599,11 @@ namespace NMib::NDatabase
 	/** The database environment. */
 	struct CDatabaseEnvironment_Internal
 	{
-		HANDLE m_FileHandle;     ///< The main data file
+		// NOLINTNEXTLINE(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
+		HANDLE m_FileHandle; ///< The main data file
+		// NOLINTNEXTLINE(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
 		HANDLE m_LockFileHandle; ///< The lock file
+		// NOLINTNEXTLINE(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
 		HANDLE m_MetaFileHandle; ///< For writing and syncing the meta pages
 #if defined(DMibDatabase_Always64BitSupport) && defined(DPlatformFamily_Windows)
 		HANDLE m_FileMappingHandle; ///< File Mapping handle
@@ -1660,8 +1663,8 @@ namespace NMib::NDatabase
 		// NOLINTNEXTLINE(malterlib-macro-naming): stands in for the member that holds the mutex on the other platforms
 #	define		m_WriterMutex	m_pLocksMemoryMap->m_WriteLock /**< Shared writer lock */
 #else
-		NPrivate::CMdbMutexType m_ReaderMutex;
-		NPrivate::CMdbMutexType m_WriterMutex;
+		NPrivate::CMdbMutexType m_ReaderMutex; // NOLINT(malterlib-conceptual-prefix): a HANDLE on Windows, and a pointer, an array or a macro with the other mutex setups
+		NPrivate::CMdbMutexType m_WriterMutex; // NOLINT(malterlib-conceptual-prefix): a HANDLE on Windows, and a pointer, an array or a macro with the other mutex setups
 #	if defined(DPlatformFamily_Windows) || defined(MDB_USE_POSIX_SEM)
 		/** Half-initialized name of mutexes, to be completed by #DMutexName() */
 		char m_MutexName[sizeof(DMutexNamePrefix) + 11];
@@ -1682,8 +1685,8 @@ namespace NMib::NDatabase
 		void f_TxnFree(NPrivate::CMdbTxn *_pTransaction);
 
 		// Privates
-		void f_CopyCompact(HANDLE _FileHandle);
-		void f_Copy(HANDLE _FileHandle);
+		void f_CopyCompact(HANDLE _FileHandle); // NOLINT(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
+		void f_Copy(HANDLE _FileHandle); // NOLINT(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
 		CDatabaseStatistics f_DatabaseStatistics(NPrivate::CMdbDb *_pDatabase);
 		CDatabaseSizeStatistics f_SizeStatistics(NPrivate::CMdbDb *_pDatabase);
 		CDatabaseEnvironmentInfo f_EnvironmentInfo();
@@ -1757,7 +1760,7 @@ namespace NMib::NDatabase
 		void fg_DbisUpdate(CMdbTxn *_pTransaction, int _bKeep);
 		int fg_FreelistSave(CMdbTxn *_pTransaction);
 
-		CDatabaseOffset fg_FSize(HANDLE _FileHandle);
+		CDatabaseOffset fg_FSize(HANDLE _FileHandle); // NOLINT(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
 		void fg_EnvReaderDest(void *_pReader);
 		int fg_OvPageFree(CMdbCursor *_pCursor, CMdbPage *_pPage);
 		int fg_PageSearchLowest(CMdbCursor *_pCursor);
@@ -1932,7 +1935,7 @@ namespace NMib::NDatabase
 			)
 		;
 
-		bool fg_BrokenFSync(CMdbEnv *_pEnvironment, HANDLE _FileDescriptor);
+		bool fg_BrokenFSync(CMdbEnv *_pEnvironment, HANDLE _FileDescriptor); // NOLINT(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
 
 		/** Perform \b act while tracking temporary cursor \b mn */
 #define DWithCursorTracking(d_Mn, d_Act) do { \

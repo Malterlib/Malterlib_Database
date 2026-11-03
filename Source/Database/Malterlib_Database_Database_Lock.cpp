@@ -51,16 +51,16 @@ namespace NMib::NDatabase
 	{
 #if !(DMdbPidLock)		/* Currently the same as defined(DPlatformFamily_Windows) */
 		int Result = 0;
-		HANDLE Process;
+		HANDLE pProcess;
 		if (_Operation == EPidLockOp_Check)
 		{
-			Process = OpenProcess(m_ProcessIDQuery, FALSE, _ProcessID);
+			pProcess = OpenProcess(m_ProcessIDQuery, FALSE, _ProcessID);
 			/* No documented "no such process" code, but other program use this: */
-			if (!Process)
+			if (!pProcess)
 				return DErrCode() != ERROR_INVALID_PARAMETER;
 			/* A process exists until all handles to it close. Has it exited? */
-			Result = WaitForSingleObject(Process, 0) != 0;
-			CloseHandle(Process);
+			Result = WaitForSingleObject(pProcess, 0) != 0;
+			CloseHandle(pProcess);
 		}
 		return Result;
 #else
@@ -363,15 +363,15 @@ namespace NMib::NDatabase
 		}
 		{
 #ifdef DPlatformFamily_Windows
-			HANDLE FileMapping;
-			FileMapping = CreateFileMapping(m_LockFileHandle, nullptr, PAGE_READWRITE, 0, 0, nullptr);
-			if (!FileMapping)
+			HANDLE pFileMapping;
+			pFileMapping = CreateFileMapping(m_LockFileHandle, nullptr, PAGE_READWRITE, 0, 0, nullptr);
+			if (!pFileMapping)
 			{
 				ErrorLocation = 4;
 				goto fail_errno;
 			}
-			m_pLocksMemoryMap = (NPrivate::CLocksMemoryMap *)MapViewOfFileEx(FileMapping, FILE_MAP_WRITE, 0, 0, ReaderTableSize, nullptr);
-			CloseHandle(FileMapping);
+			m_pLocksMemoryMap = (NPrivate::CLocksMemoryMap *)MapViewOfFileEx(pFileMapping, FILE_MAP_WRITE, 0, 0, ReaderTableSize, nullptr);
+			CloseHandle(pFileMapping);
 			if (!m_pLocksMemoryMap)
 			{
 				ErrorLocation = 5;

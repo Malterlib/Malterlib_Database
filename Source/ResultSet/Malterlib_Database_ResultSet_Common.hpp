@@ -151,7 +151,17 @@ namespace NMib::NDatabase::NResultSet
 		}
 	};
 
-	DAODB_DefineTypeToDataType(char const *, NStr::CStr, EResultDataType_CStr);
+	template <>
+	struct TCTypeToDataType<char const *>
+	{
+		using CDataType = NStr::CStr;
+		static constexpr EResultDataType mc_Type = EResultDataType_CStr;
+		static NStr::CStr fs_Convert(char const *_pValue)
+		{
+			return NStr::CStr(_pValue);
+		}
+	};
+
 	DAODB_DefineTypeToDataType(uint32, fp64, EResultDataType_fp64);
 	DAODB_DefineTypeToDataType(int32, fp64, EResultDataType_fp64);
 	DAODB_DefineTypeToDataType(fp32, fp64, EResultDataType_fp64);
