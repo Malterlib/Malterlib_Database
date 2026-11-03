@@ -9,7 +9,7 @@ namespace NMib::NDatabase::NPrivate
 	auto fg_ConsumeLexicographicByteArrayImpl(CDatabaseValue const &_Value, NMeta::TCIndices<tfp_Indices...> _Dummy)
 		-> NStorage::TCTuple<typename TCGetDescending<NTraits::TCRemoveQualifiers<tfp_CValue>>::CType...>
 	{
-		NStream::CBinaryStreamMemoryPtr<NStream::CBinaryStreamBigEndian> Stream;
+		NStream::TCBinaryStreamMemoryPtr<NStream::CBinaryStreamBigEndian> Stream;
 		Stream.f_OpenRead(_Value.m_pData, _Value.m_Size);
 		NStorage::TCTuple<typename TCGetDescending<NTraits::TCRemoveQualifiers<tfp_CValue>>::CType...> Values;
 

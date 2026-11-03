@@ -70,8 +70,8 @@ namespace NMib::NDatabase
 		DMibRequire(data);
 
 		using namespace NPrivate;
-		MDB_cursor mc;
-		MDB_xcursor mx;
+		CMdbCursor mc;
+		CMdbXCursor mx;
 		int exact = 0;
 		DKBuf;
 
@@ -84,7 +84,7 @@ namespace NMib::NDatabase
 
 		mdb_cursor_init(&mc, this, dbi, &mx);
 		{
-			int rc = mdb_cursor_set(&mc, key, data, MDB_SET, &exact);
+			int rc = mdb_cursor_set(&mc, key, data, EDatabaseCursorGet_Set, &exact);
 			if (rc)
 			{
 				if (rc == DMdbNotFound)
@@ -180,8 +180,8 @@ namespace NMib::NDatabase
 		if (mt_flags & (DMdbTxnReadOnly))
 			DMibError("Trying to write to read only transaction");
 
-		MDB_cursor mc;
-		MDB_xcursor mx;
+		CMdbCursor mc;
+		CMdbXCursor mx;
 
 		mdb_cursor_init(&mc, this, dbi, &mx);
 		mc.mc_next = mt_cursors[dbi];
@@ -277,10 +277,10 @@ namespace NMib::NDatabase
 	// Private from here
 	// ---------------------------------------------------------------------------------------------------------------------------------------
 
-	int NPrivate::mdb_del0(MDB_txn *txn, CDatabaseSubID dbi, CDatabaseValue const *key, CDatabaseValue const *data, EDatabaseWriteFlag _Flags)
+	int NPrivate::mdb_del0(CMdbTxn *txn, CDatabaseSubID dbi, CDatabaseValue const *key, CDatabaseValue const *data, EDatabaseWriteFlag _Flags)
 	{
-		MDB_cursor mc;
-		MDB_xcursor mx;
+		CMdbCursor mc;
+		CMdbXCursor mx;
 		EDatabaseCursorGet op;
 		CDatabaseValue rdata, *xdata;
 		int rc, exact = 0;
@@ -292,13 +292,13 @@ namespace NMib::NDatabase
 
 		if (data)
 		{
-			op = MDB_GET_BOTH;
+			op = EDatabaseCursorGet_GetBoth;
 			rdata = *data;
 			xdata = &rdata;
 		}
 		else
 		{
-			op = MDB_SET;
+			op = EDatabaseCursorGet_Set;
 			xdata = nullptr;
 			_Flags |= EDatabaseWriteFlag_NoDuplicateData;
 		}

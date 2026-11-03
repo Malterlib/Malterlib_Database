@@ -297,14 +297,19 @@ namespace NMib::NDatabase
 
 	void CDatabaseCursorCommon::fp_SetToCurrent()
 	{
-		fp_CheckValidityIgnoringPrefix(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_GET_CURRENT), "Error setting cursor to current: {}");
+		fp_CheckValidityIgnoringPrefix(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::EDatabaseCursorGet_GetCurrent), "Error setting cursor to current: {}");
 	}
 
 	bool CDatabaseCursorCommon::fp_FindLowerBoundIgnoringPrefix(CDatabaseValue const &_Key)
 	{
 		mp_Key = _Key;
 
-		return fp_CheckValidityIgnoringPrefix(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_SET_RANGE), "Error setting cursor to lower bound: {}");
+		return fp_CheckValidityIgnoringPrefix
+			(
+				NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::EDatabaseCursorGet_SetRange)
+				, "Error setting cursor to lower bound: {}"
+			)
+		;
 	}
 
 	bool CDatabaseCursorCommon::fp_CheckValidityIgnoringPrefix(int _Result, ch8 const *_pErrorFormat)
@@ -345,7 +350,7 @@ namespace NMib::NDatabase
 			return mp_bValid;
 		}
 
-		return fp_CheckValidityIgnoringPrefix(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_FIRST), "Error setting cursor to first: {}");
+		return fp_CheckValidityIgnoringPrefix(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::EDatabaseCursorGet_First), "Error setting cursor to first: {}");
 	}
 
 	bool CDatabaseCursorCommon::f_Last()
@@ -363,7 +368,7 @@ namespace NMib::NDatabase
 			PrefixReverse = mp_PrefixReverseCache;
 			if (!fp_FindLowerBoundIgnoringPrefix(PrefixReverse))
 			{
-				int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_LAST);
+				int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::EDatabaseCursorGet_Last);
 				if (Result == DMdbNotFound)
 				{
 					mp_bValid = false;
@@ -388,35 +393,35 @@ namespace NMib::NDatabase
 			return mp_bValid;
 		}
 
-		return fp_CheckValidityIgnoringPrefix(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_LAST), "Error setting cursor to last: {}");
+		return fp_CheckValidityIgnoringPrefix(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::EDatabaseCursorGet_Last), "Error setting cursor to last: {}");
 	}
 
-	bool CDatabaseCursorCommon::f_FindEqual(CDatabaseValue const &_Key) // MDB_SET, MDB_SET_KEY
+	bool CDatabaseCursorCommon::f_FindEqual(CDatabaseValue const &_Key) // EDatabaseCursorGet_Set, EDatabaseCursorGet_SetKey
 	{
 		DMibRequire(!mp_Prefix.f_IsValid() || _Key.f_HasPrefix(mp_Prefix));
 
 		mp_Key = _Key;
 
-		return fp_CheckValidity(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_SET_KEY), "Error setting cursor to key: {}");
+		return fp_CheckValidity(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::EDatabaseCursorGet_SetKey), "Error setting cursor to key: {}");
 	}
 
-	bool CDatabaseCursorCommon::f_FindLowerBound(CDatabaseValue const &_Key) // MDB_SET_RANGE
+	bool CDatabaseCursorCommon::f_FindLowerBound(CDatabaseValue const &_Key) // EDatabaseCursorGet_SetRange
 	{
 		DMibRequire(!mp_Prefix.f_IsValid() || _Key.f_HasPrefix(mp_Prefix));
 
 		mp_Key = _Key;
 
-		return fp_CheckValidity(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_SET_RANGE), "Error setting cursor to lower bound: {}");
+		return fp_CheckValidity(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::EDatabaseCursorGet_SetRange), "Error setting cursor to lower bound: {}");
 	}
 
 	void CDatabaseCursorCommon::operator ++ ()
 	{
-		fp_CheckValidity(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_NEXT_NODUP), "Error setting cursor to next: {}");
+		fp_CheckValidity(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::EDatabaseCursorGet_NextNoDup), "Error setting cursor to next: {}");
 	}
 
 	void CDatabaseCursorCommon::operator -- ()
 	{
-		fp_CheckValidity(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_PREV_NODUP), "Error setting cursor to previous: {}");
+		fp_CheckValidity(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::EDatabaseCursorGet_PrevNoDup), "Error setting cursor to previous: {}");
 	}
 
 	CDatabaseOffset CDatabaseCursorDuplicateData::f_DataCount()
@@ -427,12 +432,12 @@ namespace NMib::NDatabase
 
 	bool CDatabaseCursorDuplicateData::f_NextData()
 	{
-		return fp_CheckValidity(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_NEXT_DUP), "Error setting cursor to next data: {}");
+		return fp_CheckValidity(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::EDatabaseCursorGet_NextDup), "Error setting cursor to next data: {}");
 	}
 
 	bool CDatabaseCursorDuplicateData::f_PrevData()
 	{
-		return fp_CheckValidity(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_PREV_DUP), "Error setting cursor to prev data: {}");
+		return fp_CheckValidity(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::EDatabaseCursorGet_PrevDup), "Error setting cursor to prev data: {}");
 	}
 
 	bool CDatabaseCursorDuplicateData::fp_FindLowerBoundIgnoringPrefix(CDatabaseValue const &_Key, CDatabaseValue const &_Value)
@@ -442,7 +447,7 @@ namespace NMib::NDatabase
 
 		return fp_CheckValidityIgnoringPrefix
 			(
-				NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_GET_BOTH_RANGE)
+				NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::EDatabaseCursorGet_GetBothRange)
 				, "Error setting cursor to lower bound key and data: {}"
 			)
 		;
@@ -461,7 +466,12 @@ namespace NMib::NDatabase
 			return mp_bValid;
 		}
 
-		return fp_CheckValidityIgnoringPrefix(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_FIRST_DUP), "Error setting cursor to first data: {}");
+		return fp_CheckValidityIgnoringPrefix
+			(
+				NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::EDatabaseCursorGet_FirstDup)
+				, "Error setting cursor to first data: {}"
+			)
+		;
 	}
 
 	bool CDatabaseCursorDuplicateData::f_LastData()
@@ -479,7 +489,7 @@ namespace NMib::NDatabase
 			PrefixReverse = mp_PrefixReverseCache;
 			if (!fp_FindLowerBoundIgnoringPrefix(PrefixReverse, CDatabaseValue()))
 			{
-				int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_LAST_DUP);
+				int Result = NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::EDatabaseCursorGet_LastDup);
 				if (Result == DMdbNotFound)
 				{
 					mp_bValid = false;
@@ -504,7 +514,12 @@ namespace NMib::NDatabase
 			return mp_bValid;
 		}
 
-		return fp_CheckValidityIgnoringPrefix(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_LAST_DUP), "Error setting cursor to last data: {}");
+		return fp_CheckValidityIgnoringPrefix
+			(
+				NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::EDatabaseCursorGet_LastDup)
+				, "Error setting cursor to last data: {}"
+			)
+		;
 	}
 
 	bool CDatabaseCursorDuplicateData::f_FindEqual(CDatabaseValue const &_Key, CDatabaseValue const &_Data)
@@ -514,7 +529,7 @@ namespace NMib::NDatabase
 		mp_Key = _Key;
 		mp_Value = _Data;
 
-		return fp_CheckValidity(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_GET_BOTH), "Error setting cursor to key and data: {}");
+		return fp_CheckValidity(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::EDatabaseCursorGet_GetBoth), "Error setting cursor to key and data: {}");
 	}
 
 	bool CDatabaseCursorDuplicateData::f_FindLowerBound(CDatabaseValue const &_Key, CDatabaseValue const &_Data)
@@ -524,7 +539,12 @@ namespace NMib::NDatabase
 		mp_Key = _Key;
 		mp_Value = _Data;
 
-		return fp_CheckValidity(NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::MDB_GET_BOTH_RANGE), "Error setting cursor to lower bound key and data: {}");
+		return fp_CheckValidity
+			(
+				NPrivate::mdb_cursor_get(mp_pInternal.f_Get(), &mp_Key, &mp_Value, NPrivate::EDatabaseCursorGet_GetBothRange)
+				, "Error setting cursor to lower bound key and data: {}"
+			)
+		;
 	}
 
 	/** @brief Create a cursor handle.
@@ -541,19 +561,19 @@ namespace NMib::NDatabase
 	 * were closed when the transaction committed or aborted.
 	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
 	 * @param[in] dbi A database handle returned by #f_OpenDatabase()
-	 * @param[out] cursor Address where the new #MDB_cursor handle will be stored
+	 * @param[out] cursor Address where the new #CMdbCursor handle will be stored
 	 * @return A non-zero error value on failure and 0 on success. Some possible
 	 * errors are:
 	 * <ul>
 	 *	<li>EINVAL - an invalid parameter was specified.
 	 * </ul>
 	 */
-	NPrivate::MDB_cursor *CDatabaseTransactionCommon::CInternal::f_Cursor(CDatabaseSubID dbi)
+	NPrivate::CMdbCursor *CDatabaseTransactionCommon::CInternal::f_Cursor(CDatabaseSubID dbi)
 	{
 		using namespace NPrivate;
 
-		MDB_cursor *mc;
-		umint size = sizeof(MDB_cursor);
+		CMdbCursor *mc;
+		umint size = sizeof(CMdbCursor);
 
 		if (!DTxnDbiExist(this, dbi, DDbValid))
 			DMibError("Database does not exists");
@@ -564,15 +584,15 @@ namespace NMib::NDatabase
 			DMibError("Cannot open free database as read/write");
 
 		if (mt_dbs[dbi].md_flags & EDatabaseSubFlag_SortedDuplicates)
-			size += sizeof(MDB_xcursor);
+			size += sizeof(CMdbXCursor);
 
-		mc = (MDB_cursor *)NMemory::fg_Alloc(size);
+		mc = (CMdbCursor *)NMemory::fg_Alloc(size);
 		auto Cleanup = g_OnScopeExit / [&]()
 			{
 				mdb_cursor_close(mc);
 			}
 		;
-		mdb_cursor_init(mc, this, dbi, (MDB_xcursor *)(mc + 1));
+		mdb_cursor_init(mc, this, dbi, (CMdbXCursor *)(mc + 1));
 		if (mt_cursors)
 		{
 			mc->mc_next = mt_cursors[dbi];
@@ -593,7 +613,7 @@ namespace NMib::NDatabase::NPrivate
 	 * Its transaction must still be live if it is a write-transaction.
 	 * @param[in] cursor A cursor handle returned by #f_Cursor()
 	 */
-	void mdb_cursor_close(MDB_cursor *mc)
+	void mdb_cursor_close(CMdbCursor *mc)
 	{
 		if (mc)
 			DMdbCursorUnref(mc, 0);
@@ -605,15 +625,15 @@ namespace NMib::NDatabase::NPrivate
 			 */
 			if ((mc->mc_flags & DCUntrack) && mc->mc_txn->mt_cursors)
 			{
-				MDB_cursor **prev = &mc->mc_txn->mt_cursors[mc->mc_dbi];
+				CMdbCursor **prev = &mc->mc_txn->mt_cursors[mc->mc_dbi];
 				while (*prev && *prev != mc)
 					prev = &(*prev)->mc_next;
 				if (*prev == mc)
 					*prev = mc->mc_next;
 			}
-			umint Size = sizeof(MDB_cursor);
+			umint Size = sizeof(CMdbCursor);
 			if (mc->mc_xcursor)
-				Size += sizeof(MDB_xcursor);
+				Size += sizeof(CMdbXCursor);
 
 			NMemory::fg_Free(mc, Size);
 		}
@@ -623,7 +643,7 @@ namespace NMib::NDatabase::NPrivate
 	 *
 	 * This function retrieves key/data pairs from the database. The address and length
 	 * of the key are returned in the object to which \b key refers (except for the
-	 * case of the #MDB_SET option, in which the \b key object is unchanged), and
+	 * case of the #EDatabaseCursorGet_Set option, in which the \b key object is unchanged), and
 	 * the address and length of the data are returned in the object to which \b data
 	 * refers.
 	 * See #f_Get() for restrictions on using the output values.
@@ -638,13 +658,13 @@ namespace NMib::NDatabase::NPrivate
 	 *	<li>EINVAL - an invalid parameter was specified.
 	 * </ul>
 	 */
-	int mdb_cursor_get(MDB_cursor *mc, CDatabaseValue *key, CDatabaseValue *data, EDatabaseCursorGet op)
+	int mdb_cursor_get(CMdbCursor *mc, CDatabaseValue *key, CDatabaseValue *data, EDatabaseCursorGet op)
 	{
 		using namespace NPrivate;
 
 		int rc;
 		int exact = 0;
-		int (*mfunc)(MDB_cursor *mc, CDatabaseValue *key, CDatabaseValue *data);
+		int (*mfunc)(CMdbCursor *mc, CDatabaseValue *key, CDatabaseValue *data);
 
 		if (mc == nullptr)
 			return EINVAL;
@@ -653,12 +673,12 @@ namespace NMib::NDatabase::NPrivate
 
 		switch (op)
 		{
-		case MDB_GET_CURRENT:
+		case EDatabaseCursorGet_GetCurrent:
 			if (!(mc->mc_flags & DCInitialized))
 				rc = EINVAL;
 			else
 			{
-				MDB_page *mp = mc->mc_pg[mc->mc_top];
+				CMdbPage *mp = mc->mc_pg[mc->mc_top];
 				int nkeys = DNumKeys(mp);
 				if (!nkeys || mc->mc_ki[mc->mc_top] >= nkeys)
 				{
@@ -674,20 +694,20 @@ namespace NMib::NDatabase::NPrivate
 				}
 				else
 				{
-					MDB_node *leaf = DNodePtr(mp, mc->mc_ki[mc->mc_top]);
+					CMdbNode *leaf = DNodePtr(mp, mc->mc_ki[mc->mc_top]);
 					DMdbGetKey(leaf, key);
 					if (data)
 					{
 						if (DFIsSet(leaf->mn_flags, DFDupData))
-							rc = mdb_cursor_get(&mc->mc_xcursor->mx_cursor, data, nullptr, MDB_GET_CURRENT);
+							rc = mdb_cursor_get(&mc->mc_xcursor->mx_cursor, data, nullptr, EDatabaseCursorGet_GetCurrent);
 						else
 							rc = mdb_node_read(mc, leaf, data);
 					}
 				}
 			}
 			break;
-		case MDB_GET_BOTH:
-		case MDB_GET_BOTH_RANGE:
+		case EDatabaseCursorGet_GetBoth:
+		case EDatabaseCursorGet_GetBothRange:
 			if (data == nullptr)
 			{
 				rc = EINVAL;
@@ -699,15 +719,15 @@ namespace NMib::NDatabase::NPrivate
 				break;
 			}
 			/* FALLTHRU */
-		case MDB_SET:
-		case MDB_SET_KEY:
-		case MDB_SET_RANGE:
+		case EDatabaseCursorGet_Set:
+		case EDatabaseCursorGet_SetKey:
+		case EDatabaseCursorGet_SetRange:
 			if (key == nullptr)
 				rc = EINVAL;
 			else
-				rc = mdb_cursor_set(mc, key, data, op, op == MDB_SET_RANGE ? nullptr : &exact);
+				rc = mdb_cursor_set(mc, key, data, op, op == EDatabaseCursorGet_SetRange ? nullptr : &exact);
 			break;
-		case MDB_GET_MULTIPLE:
+		case EDatabaseCursorGet_GetMultiple:
 			if (data == nullptr || !(mc->mc_flags & DCInitialized))
 			{
 				rc = EINVAL;
@@ -722,7 +742,7 @@ namespace NMib::NDatabase::NPrivate
 			if (!(mc->mc_xcursor->mx_cursor.mc_flags & DCInitialized) || (mc->mc_xcursor->mx_cursor.mc_flags & DCEof))
 				break;
 			goto fetchm;
-		case MDB_NEXT_MULTIPLE:
+		case EDatabaseCursorGet_NextMultiple:
 			if (data == nullptr)
 			{
 				rc = EINVAL;
@@ -733,12 +753,12 @@ namespace NMib::NDatabase::NPrivate
 				rc = DMdbIncompatible;
 				break;
 			}
-			rc = mdb_cursor_next(mc, key, data, MDB_NEXT_DUP);
+			rc = mdb_cursor_next(mc, key, data, EDatabaseCursorGet_NextDup);
 			if (rc == DMdbSuccess)
 			{
 				if (mc->mc_xcursor->mx_cursor.mc_flags & DCInitialized)
 				{
-					MDB_cursor *mx;
+					CMdbCursor *mx;
 				fetchm:
 					mx = &mc->mc_xcursor->mx_cursor;
 					data->m_Size = DNumKeys(mx->mc_pg[mx->mc_top]) * mx->mc_db->md_pad;
@@ -749,7 +769,7 @@ namespace NMib::NDatabase::NPrivate
 					rc = DMdbNotFound;
 			}
 			break;
-		case MDB_PREV_MULTIPLE:
+		case EDatabaseCursorGet_PrevMultiple:
 			if (data == nullptr)
 			{
 				rc = EINVAL;
@@ -766,7 +786,7 @@ namespace NMib::NDatabase::NPrivate
 				rc = DMdbSuccess;
 			if (rc == DMdbSuccess)
 			{
-				MDB_cursor *mx = &mc->mc_xcursor->mx_cursor;
+				CMdbCursor *mx = &mc->mc_xcursor->mx_cursor;
 				if (mx->mc_flags & DCInitialized)
 				{
 					rc = mdb_cursor_sibling(mx, 0);
@@ -777,18 +797,18 @@ namespace NMib::NDatabase::NPrivate
 					rc = DMdbNotFound;
 			}
 			break;
-		case MDB_NEXT:
-		case MDB_NEXT_DUP:
-		case MDB_NEXT_NODUP:
+		case EDatabaseCursorGet_Next:
+		case EDatabaseCursorGet_NextDup:
+		case EDatabaseCursorGet_NextNoDup:
 			rc = mdb_cursor_next(mc, key, data, op);
 			break;
-		case MDB_PREV:
-		case MDB_PREV_DUP:
-		case MDB_PREV_NODUP:
+		case EDatabaseCursorGet_Prev:
+		case EDatabaseCursorGet_PrevDup:
+		case EDatabaseCursorGet_PrevNoDup:
 			rc = mdb_cursor_prev(mc, key, data, op);
 			break;
-		case MDB_FIRST: rc = mdb_cursor_first(mc, key, data); break;
-		case MDB_FIRST_DUP: mfunc = mdb_cursor_first;
+		case EDatabaseCursorGet_First: rc = mdb_cursor_first(mc, key, data); break;
+		case EDatabaseCursorGet_FirstDup: mfunc = mdb_cursor_first;
 		mmove:
 			if (data == nullptr || !(mc->mc_flags & DCInitialized))
 			{
@@ -807,7 +827,7 @@ namespace NMib::NDatabase::NPrivate
 				break;
 			}
 			{
-				MDB_node *leaf = DNodePtr(mc->mc_pg[mc->mc_top], mc->mc_ki[mc->mc_top]);
+				CMdbNode *leaf = DNodePtr(mc->mc_pg[mc->mc_top], mc->mc_ki[mc->mc_top]);
 				if (!DFIsSet(leaf->mn_flags, DFDupData))
 				{
 					DMdbGetKey(leaf, key);
@@ -822,8 +842,8 @@ namespace NMib::NDatabase::NPrivate
 			}
 			rc = mfunc(&mc->mc_xcursor->mx_cursor, data, nullptr);
 			break;
-		case MDB_LAST: rc = mdb_cursor_last(mc, key, data); break;
-		case MDB_LAST_DUP:
+		case EDatabaseCursorGet_Last: rc = mdb_cursor_last(mc, key, data); break;
+		case EDatabaseCursorGet_LastDup:
 			mfunc = mdb_cursor_last;
 			goto mmove;
 		default:
@@ -897,16 +917,16 @@ namespace NMib::NDatabase::NPrivate
 	 *	<li>EINVAL - an invalid parameter was specified.
 	 * </ul>
 	 */
-	int mdb_cursor_put(MDB_cursor *mc, CDatabaseValue *key, CDatabaseValue *data, EDatabaseWriteFlag _Flags)
+	int mdb_cursor_put(CMdbCursor *mc, CDatabaseValue *key, CDatabaseValue *data, EDatabaseWriteFlag _Flags)
 	{
 		uint32 flags = _Flags;
 		using namespace NPrivate;
-		MDB_env *env;
-		MDB_node *leaf = nullptr;
-		MDB_page *fp, *mp, *sub_root = nullptr;
+		CMdbEnv *env;
+		CMdbNode *leaf = nullptr;
+		CMdbPage *fp, *mp, *sub_root = nullptr;
 		uint16 fp_flags;
 		CDatabaseValue xdata, *rdata, dkey, olddata;
-		MDB_db dummy;
+		CMdbDb dummy;
 		int do_sub = 0, insert_key, insert_data;
 		uint32 mcount = 0, dcount = 0, nospill;
 		umint nsize;
@@ -991,7 +1011,7 @@ namespace NMib::NDatabase::NPrivate
 				}
 			}
 			else
-				rc = mdb_cursor_set(mc, key, &d2, MDB_SET, &exact);
+				rc = mdb_cursor_set(mc, key, &d2, EDatabaseCursorGet_Set, &exact);
 			if ((flags & EDatabaseWriteFlag_NoOverwrite) && rc == 0)
 			{
 				DMibDatabaseTrace("duplicate key [{}]", DKey(key));
@@ -1021,7 +1041,7 @@ namespace NMib::NDatabase::NPrivate
 
 		if (rc == DMdbNoRoot)
 		{
-			MDB_page *np;
+			CMdbPage *np;
 			/* new database, write a root leaf page */
 			DPuts("allocating new root leaf page");
 			if ((rc2 = mdb_page_new(mc, DPLeaf, 1, &np)))
@@ -1055,7 +1075,7 @@ namespace NMib::NDatabase::NPrivate
 				 * "old sub-page" for prep_subDB to expand to a full page.
 				 */
 				fp_flags = DPLeaf | DPDirty;
-				fp = (MDB_page *)env->me_pbuf;
+				fp = (CMdbPage *)env->me_pbuf;
 				fp->mp_pad = data->m_Size; // used if EDatabaseSubFlag_SortedDuplicatesFixedSize
 				fp->mp_lower = fp->mp_upper = (DPageHeaderSize - DPageBase);
 				olddata.m_Size = DPageHeaderSize;
@@ -1114,7 +1134,7 @@ namespace NMib::NDatabase::NPrivate
 				 * size.  xdata: node data with new page or DB.
 				 */
 				unsigned i;
-				mp = fp = (MDB_page *)(xdata.m_pData = (uint8 *)env->me_pbuf);
+				mp = fp = (CMdbPage *)(xdata.m_pData = (uint8 *)env->me_pbuf);
 				mp->mp_p.p_pgno = mc->mc_pg[mc->mc_top]->mp_p.p_pgno;
 
 				/* Was a single item before, must convert now */
@@ -1151,7 +1171,7 @@ namespace NMib::NDatabase::NPrivate
 						xdata.m_Size += 2 * data->m_Size; // leave space for 2 more
 					}
 					else
-						xdata.m_Size += 2 * (sizeof(indx_t) + DNodeSize) + (dkey.m_Size & 1) + (data->m_Size & 1);
+						xdata.m_Size += 2 * (sizeof(CIndx) + DNodeSize) + (dkey.m_Size & 1) + (data->m_Size & 1);
 					fp->mp_upper = xdata.m_Size - DPageBase;
 					olddata.m_Size = xdata.m_Size; // pretend olddata is fp
 				}
@@ -1164,13 +1184,13 @@ namespace NMib::NDatabase::NPrivate
 				else
 				{
 					/* Data is on sub-page */
-					fp = (MDB_page *)olddata.m_pData;
+					fp = (CMdbPage *)olddata.m_pData;
 					switch (flags)
 					{
 					default:
 						if (!(mc->mc_db->md_flags & EDatabaseSubFlag_SortedDuplicatesFixedSize))
 						{
-							offset = DEven(DNodeSize + sizeof(indx_t) + data->m_Size);
+							offset = DEven(DNodeSize + sizeof(CIndx) + data->m_Size);
 							break;
 						}
 						offset = fp->mp_pad;
@@ -1214,7 +1234,7 @@ namespace NMib::NDatabase::NPrivate
 					dummy.md_leaf_pages = 1;
 					dummy.md_overflow_pages = 0;
 					dummy.md_entries = DNumKeys(fp);
-					xdata.m_Size = sizeof(MDB_db);
+					xdata.m_Size = sizeof(CMdbDb);
 					xdata.m_pData = (uint8 *)&dummy;
 					if ((rc = mdb_page_alloc(mc, 1, &mp)))
 						return rc;
@@ -1254,8 +1274,8 @@ namespace NMib::NDatabase::NPrivate
 			/* overflow page overwrites need special handling */
 			if (DFIsSet(leaf->mn_flags, DFBigData))
 			{
-				MDB_page *omp;
-				pgno_t pg;
+				CMdbPage *omp;
+				CPgno pg;
 				int level, ovpages, dpages = DOverflowPages(data->m_Size, env->me_psize);
 
 				memcpy(&pg, olddata.m_pData, sizeof(pg));
@@ -1284,8 +1304,8 @@ namespace NMib::NDatabase::NPrivate
 						{
 							/* It is writable only in a parent txn */
 							umint sz = (umint)env->me_psize * ovpages, off;
-							MDB_page *np = mdb_page_malloc(mc->mc_txn, ovpages);
-							MDB_ID2 id2;
+							CMdbPage *np = mdb_page_malloc(mc->mc_txn, ovpages);
+							CMdbId2 id2;
 							id2.mid = pg;
 							id2.mptr = np;
 							/* Note - this page is already counted in parent's dirty_room */
@@ -1359,10 +1379,10 @@ namespace NMib::NDatabase::NPrivate
 			if (rc == 0)
 			{
 				/* Adjust other cursors pointing to mp */
-				MDB_cursor *m2, *m3;
+				CMdbCursor *m2, *m3;
 				CDatabaseSubID dbi = mc->mc_dbi;
 				unsigned i = mc->mc_top;
-				MDB_page *mp = mc->mc_pg[i];
+				CMdbPage *mp = mc->mc_pg[i];
 
 				for (m2 = mc->mc_txn->mt_cursors[dbi]; m2; m2 = m2->mc_next)
 				{
@@ -1416,10 +1436,10 @@ namespace NMib::NDatabase::NPrivate
 				if (!(leaf->mn_flags & DFSubData) || sub_root)
 				{
 					/* Adjust other cursors pointing to mp */
-					MDB_cursor *m2;
-					MDB_xcursor *mx = mc->mc_xcursor;
+					CMdbCursor *m2;
+					CMdbXCursor *mx = mc->mc_xcursor;
 					unsigned i = mc->mc_top;
-					MDB_page *mp = mc->mc_pg[i];
+					CMdbPage *mp = mc->mc_pg[i];
 
 					for (m2 = mc->mc_txn->mt_cursors[mc->mc_dbi]; m2; m2 = m2->mc_next)
 					{
@@ -1443,7 +1463,7 @@ namespace NMib::NDatabase::NPrivate
 				if (flags & DFSubData)
 				{
 					void *db = DNodeData(leaf);
-					memcpy(db, &mc->mc_xcursor->mx_db, sizeof(MDB_db));
+					memcpy(db, &mc->mc_xcursor->mx_db, sizeof(CMdbDb));
 				}
 				insert_data = mc->mc_xcursor->mx_db.md_entries - ecount;
 			}
@@ -1487,9 +1507,9 @@ namespace NMib::NDatabase::NPrivate
 	/** @brief Delete current key/data pair
 	 *
 	 * This function deletes the key/data pair to which the cursor refers.
-	 * This does not invalidate the cursor, so operations such as MDB_NEXT
+	 * This does not invalidate the cursor, so operations such as EDatabaseCursorGet_Next
 	 * can still be used on it.
-	 * Both MDB_NEXT and MDB_GET_CURRENT will return the same record after
+	 * Both EDatabaseCursorGet_Next and EDatabaseCursorGet_GetCurrent will return the same record after
 	 * this operation.
 	 * @param[in] cursor A cursor handle returned by #f_Cursor()
 	 * @param[in] flags Options for this operation. This parameter
@@ -1505,13 +1525,13 @@ namespace NMib::NDatabase::NPrivate
 	 *	<li>EINVAL - an invalid parameter was specified.
 	 * </ul>
 	 */
-	int mdb_cursor_del(MDB_cursor *mc, EDatabaseWriteFlag _Flags)
+	int mdb_cursor_del(CMdbCursor *mc, EDatabaseWriteFlag _Flags)
 	{
 		uint32 flags = _Flags;
 		using namespace NPrivate;
 
-		MDB_node *leaf;
-		MDB_page *mp;
+		CMdbNode *leaf;
+		CMdbPage *mp;
 		int rc;
 
 		mc->mc_txn->f_CheckBlocked();
@@ -1548,7 +1568,7 @@ namespace NMib::NDatabase::NPrivate
 			else
 			{
 				if (!DFIsSet(leaf->mn_flags, DFSubData))
-					mc->mc_xcursor->mx_cursor.mc_pg[0] = (MDB_page *)DNodeData(leaf);
+					mc->mc_xcursor->mx_cursor.mc_pg[0] = (CMdbPage *)DNodeData(leaf);
 				rc = mdb_cursor_del(&mc->mc_xcursor->mx_cursor, (EDatabaseWriteFlag)DMdbNoSpill);
 				if (rc)
 					return rc;
@@ -1558,16 +1578,16 @@ namespace NMib::NDatabase::NPrivate
 					if (leaf->mn_flags & DFSubData)
 					{
 						/* update subDB info */
-						void *db = (MDB_page *)DNodeData(leaf);
-						memcpy(db, &mc->mc_xcursor->mx_db, sizeof(MDB_db));
+						void *db = (CMdbPage *)DNodeData(leaf);
+						memcpy(db, &mc->mc_xcursor->mx_db, sizeof(CMdbDb));
 					}
 					else
 					{
-						MDB_cursor *m2;
+						CMdbCursor *m2;
 						/* shrink fake page */
 						mdb_node_shrink(mp, mc->mc_ki[mc->mc_top]);
 						leaf = DNodePtr(mp, mc->mc_ki[mc->mc_top]);
-						mc->mc_xcursor->mx_cursor.mc_pg[0] = (MDB_page *)DNodeData(leaf);
+						mc->mc_xcursor->mx_cursor.mc_pg[0] = (CMdbPage *)DNodeData(leaf);
 						/* fix other sub-DB cursors pointed at fake pages on this page */
 						for (m2 = mc->mc_txn->mt_cursors[mc->mc_dbi]; m2; m2 = m2->mc_next)
 						{
@@ -1605,8 +1625,8 @@ namespace NMib::NDatabase::NPrivate
 		/* add overflow pages to free list */
 		if (DFIsSet(leaf->mn_flags, DFBigData))
 		{
-			MDB_page *omp;
-			pgno_t pg;
+			CMdbPage *omp;
+			CPgno pg;
 
 			memcpy(&pg, DNodeData(leaf), sizeof(pg));
 			if ((rc = mdb_page_get(mc, pg, &omp, nullptr)) || (rc = mdb_ovpage_free(mc, omp)))
@@ -1633,12 +1653,12 @@ namespace NMib::NDatabase::NPrivate
 	 *	<li>EINVAL - cursor is not initialized, or an invalid parameter was specified.
 	 * </ul>
 	 */
-	int mdb_cursor_count(MDB_cursor *mc, CDatabaseOffset *countp)
+	int mdb_cursor_count(CMdbCursor *mc, CDatabaseOffset *countp)
 	{
 		using namespace NPrivate;
 
 		// Return the count of duplicate data items for the current key
-		MDB_node *leaf;
+		CMdbNode *leaf;
 
 		if (mc == nullptr || countp == nullptr)
 			return EINVAL;
@@ -1679,7 +1699,7 @@ namespace NMib::NDatabase::NPrivate
 	// ---------------------------------------------------------------------------------------------------------------------------------------
 
 #ifdef DMibDatabase_Always64BitSupport
-	void mdb_cursor_unref(MDB_cursor *mc)
+	void mdb_cursor_unref(CMdbCursor *mc)
 	{
 		int i;
 		if (mc->mc_txn->mt_rpages[0].mid)
@@ -1701,10 +1721,10 @@ namespace NMib::NDatabase::NPrivate
 #endif /* DMibDatabase_Always64BitSupport */
 
 	/** Back up parent txn's cursors, then grab the originals for tracking */
-	void mdb_cursor_shadow(MDB_txn *src, MDB_txn *dst)
+	void mdb_cursor_shadow(CMdbTxn *src, CMdbTxn *dst)
 	{
-		MDB_cursor *mc, *bk;
-		MDB_xcursor *mx;
+		CMdbCursor *mc, *bk;
+		CMdbXCursor *mx;
 		umint size;
 		int i;
 
@@ -1712,12 +1732,12 @@ namespace NMib::NDatabase::NPrivate
 		{
 			if ((mc = src->mt_cursors[i]) != nullptr)
 			{
-				size = sizeof(MDB_cursor);
+				size = sizeof(CMdbCursor);
 				if (mc->mc_xcursor)
-					size += sizeof(MDB_xcursor);
+					size += sizeof(CMdbXCursor);
 				for (; mc; mc = bk->mc_next)
 				{
-					bk = (MDB_cursor *)NMemory::fg_Alloc(size);
+					bk = (CMdbCursor *)NMemory::fg_Alloc(size);
 					*bk = *mc;
 					mc->mc_backup = bk;
 					mc->mc_db = &dst->mt_dbs[i];
@@ -1729,7 +1749,7 @@ namespace NMib::NDatabase::NPrivate
 					mc->mc_dbflag = &dst->mt_dbflags[i];
 					if ((mx = mc->mc_xcursor) != nullptr)
 					{
-						*(MDB_xcursor *)(bk + 1) = *mx;
+						*(CMdbXCursor *)(bk + 1) = *mx;
 						mx->mx_cursor.mc_txn = dst;
 					}
 					mc->mc_next = dst->mt_cursors[i];
@@ -1744,10 +1764,10 @@ namespace NMib::NDatabase::NPrivate
 	 * @param[in] merge true to keep changes to parent cursors, false to revert.
 	 * @return 0 on success, non-zero on failure.
 	 */
-	void mdb_cursors_close(MDB_txn *txn, unsigned merge)
+	void mdb_cursors_close(CMdbTxn *txn, unsigned merge)
 	{
-		MDB_cursor **cursors = txn->mt_cursors, *mc, *next, *bk;
-		MDB_xcursor *mx;
+		CMdbCursor **cursors = txn->mt_cursors, *mc, *next, *bk;
+		CMdbXCursor *mx;
 		int i;
 
 		for (i = txn->mt_numdbs; --i >= 0;)
@@ -1773,14 +1793,14 @@ namespace NMib::NDatabase::NPrivate
 						/* Abort nested txn */
 						*mc = *bk;
 						if ((mx = mc->mc_xcursor) != nullptr)
-							*mx = *(MDB_xcursor *)(bk + 1);
+							*mx = *(CMdbXCursor *)(bk + 1);
 					}
 					mc = bk;
 				}
 				/* Only malloced cursors are permanently tracked. */
-				umint Size = sizeof(MDB_cursor);
+				umint Size = sizeof(CMdbCursor);
 				if (mc->mc_xcursor)
-					Size += sizeof(MDB_xcursor);
+					Size += sizeof(CMdbXCursor);
 
 				NMemory::fg_Free(mc, Size);
 			}
@@ -1789,7 +1809,7 @@ namespace NMib::NDatabase::NPrivate
 	}
 
 	/** Pop a page off the top of the cursor's stack. */
-	void mdb_cursor_pop(MDB_cursor *mc)
+	void mdb_cursor_pop(CMdbCursor *mc)
 	{
 		if (mc->mc_snum)
 		{
@@ -1806,7 +1826,7 @@ namespace NMib::NDatabase::NPrivate
 	/** Push a page onto the top of the cursor's stack.
 	 * Set #DMdbTxnError on failure.
 	 */
-	int mdb_cursor_push(MDB_cursor *mc, MDB_page *mp)
+	int mdb_cursor_push(CMdbCursor *mc, CMdbPage *mp)
 	{
 		DMibDatabaseTrace("pushing page {} on db {} cursor {}", mp->mp_p.p_pgno, DDbi(mc), (void *)mc);
 
@@ -1831,13 +1851,13 @@ namespace NMib::NDatabase::NPrivate
 	 * otherwise the left sibling.
 	 * @return 0 on success, non-zero on failure.
 	 */
-	int mdb_cursor_sibling(MDB_cursor *mc, int move_right)
+	int mdb_cursor_sibling(CMdbCursor *mc, int move_right)
 	{
 		int rc;
-		MDB_node *indx;
-		MDB_page *mp;
+		CMdbNode *indx;
+		CMdbPage *mp;
 #ifdef DMibDatabase_Always64BitSupport
-		MDB_page *op;
+		CMdbPage *op;
 #endif
 
 		if (mc->mc_snum < 2)
@@ -1888,14 +1908,14 @@ namespace NMib::NDatabase::NPrivate
 	}
 
 	/** Move the cursor to the next data item. */
-	int mdb_cursor_next(MDB_cursor *mc, CDatabaseValue *key, CDatabaseValue *data, EDatabaseCursorGet op)
+	int mdb_cursor_next(CMdbCursor *mc, CDatabaseValue *key, CDatabaseValue *data, EDatabaseCursorGet op)
 	{
 		DMibFastCheck(key);
-		MDB_page *mp;
-		MDB_node *leaf;
+		CMdbPage *mp;
+		CMdbNode *leaf;
 		int rc;
 
-		if ((mc->mc_flags & DCDel && op == MDB_NEXT_DUP))
+		if ((mc->mc_flags & DCDel && op == EDatabaseCursorGet_NextDup))
 			return DMdbNotFound;
 
 		if (!(mc->mc_flags & DCInitialized))
@@ -1915,10 +1935,10 @@ namespace NMib::NDatabase::NPrivate
 			leaf = DNodePtr(mp, mc->mc_ki[mc->mc_top]);
 			if (DFIsSet(leaf->mn_flags, DFDupData))
 			{
-				if (op == MDB_NEXT || op == MDB_NEXT_DUP)
+				if (op == EDatabaseCursorGet_Next || op == EDatabaseCursorGet_NextDup)
 				{
-					rc = mdb_cursor_next(&mc->mc_xcursor->mx_cursor, data, nullptr, MDB_NEXT);
-					if (op != MDB_NEXT || rc != DMdbNotFound)
+					rc = mdb_cursor_next(&mc->mc_xcursor->mx_cursor, data, nullptr, EDatabaseCursorGet_Next);
+					if (op != EDatabaseCursorGet_Next || rc != DMdbNotFound)
 					{
 						if (rc == DMdbSuccess)
 							DMdbGetKey(leaf, key);
@@ -1931,7 +1951,7 @@ namespace NMib::NDatabase::NPrivate
 			else
 			{
 				mc->mc_xcursor->mx_cursor.mc_flags &= ~(DCInitialized | DCEof);
-				if (op == MDB_NEXT_DUP)
+				if (op == EDatabaseCursorGet_NextDup)
 					return DMdbNotFound;
 			}
 		}
@@ -1990,12 +2010,12 @@ namespace NMib::NDatabase::NPrivate
 	}
 
 	/** Move the cursor to the previous data item. */
-	int mdb_cursor_prev(MDB_cursor *mc, CDatabaseValue *key, CDatabaseValue *data, EDatabaseCursorGet op)
+	int mdb_cursor_prev(CMdbCursor *mc, CDatabaseValue *key, CDatabaseValue *data, EDatabaseCursorGet op)
 	{
 		DMibFastCheck(key);
 
-		MDB_page *mp;
-		MDB_node *leaf;
+		CMdbPage *mp;
+		CMdbNode *leaf;
 		int rc;
 
 		if (!(mc->mc_flags & DCInitialized))
@@ -2013,10 +2033,10 @@ namespace NMib::NDatabase::NPrivate
 			leaf = DNodePtr(mp, mc->mc_ki[mc->mc_top]);
 			if (DFIsSet(leaf->mn_flags, DFDupData))
 			{
-				if (op == MDB_PREV || op == MDB_PREV_DUP)
+				if (op == EDatabaseCursorGet_Prev || op == EDatabaseCursorGet_PrevDup)
 				{
-					rc = mdb_cursor_prev(&mc->mc_xcursor->mx_cursor, data, nullptr, MDB_PREV);
-					if (op != MDB_PREV || rc != DMdbNotFound)
+					rc = mdb_cursor_prev(&mc->mc_xcursor->mx_cursor, data, nullptr, EDatabaseCursorGet_Prev);
+					if (op != EDatabaseCursorGet_Prev || rc != DMdbNotFound)
 					{
 						if (rc == DMdbSuccess)
 						{
@@ -2032,7 +2052,7 @@ namespace NMib::NDatabase::NPrivate
 			else
 			{
 				mc->mc_xcursor->mx_cursor.mc_flags &= ~(DCInitialized | DCEof);
-				if (op == MDB_PREV_DUP)
+				if (op == EDatabaseCursorGet_PrevDup)
 					return DMdbNotFound;
 			}
 		}
@@ -2086,11 +2106,11 @@ namespace NMib::NDatabase::NPrivate
 	}
 
 	/** Set the cursor on a specific data item. */
-	int mdb_cursor_set(MDB_cursor *mc, CDatabaseValue *key, CDatabaseValue *data, EDatabaseCursorGet op, int *exactp)
+	int mdb_cursor_set(CMdbCursor *mc, CDatabaseValue *key, CDatabaseValue *data, EDatabaseCursorGet op, int *exactp)
 	{
 		int rc;
-		MDB_page *mp;
-		MDB_node *leaf = nullptr;
+		CMdbPage *mp;
+		CMdbNode *leaf = nullptr;
 		DKBuf;
 
 		if (key->m_Size == 0)
@@ -2201,7 +2221,7 @@ namespace NMib::NDatabase::NPrivate
 			{
 				/* There are no other pages */
 				mc->mc_ki[mc->mc_top] = 0;
-				if (op == MDB_SET_RANGE && !exactp)
+				if (op == EDatabaseCursorGet_SetRange && !exactp)
 				{
 					rc = 0;
 					goto set1;
@@ -2224,7 +2244,7 @@ namespace NMib::NDatabase::NPrivate
 		leaf = mdb_node_search(mc, key, exactp);
 		if (exactp != nullptr && !*exactp)
 		{
-			/* MDB_SET specified and not an exact match. */
+			/* EDatabaseCursorGet_Set specified and not an exact match. */
 			return DMdbNotFound;
 		}
 
@@ -2247,7 +2267,7 @@ namespace NMib::NDatabase::NPrivate
 
 		if (DIsLeaf2(mp))
 		{
-			if (op == MDB_SET_RANGE || op == MDB_SET_KEY)
+			if (op == EDatabaseCursorGet_SetRange || op == EDatabaseCursorGet_SetKey)
 			{
 				key->m_Size = mc->mc_db->md_pad;
 				key->m_pData = DLeaf2Key(mp, mc->mc_ki[mc->mc_top], key->m_Size);
@@ -2262,24 +2282,24 @@ namespace NMib::NDatabase::NPrivate
 		{
 			if (DFIsSet(leaf->mn_flags, DFDupData))
 			{
-				if (op == MDB_SET || op == MDB_SET_KEY || op == MDB_SET_RANGE)
+				if (op == EDatabaseCursorGet_Set || op == EDatabaseCursorGet_SetKey || op == EDatabaseCursorGet_SetRange)
 					rc = mdb_cursor_first(&mc->mc_xcursor->mx_cursor, data, nullptr);
 				else
 				{
 					int ex2, *ex2p;
-					if (op == MDB_GET_BOTH)
+					if (op == EDatabaseCursorGet_GetBoth)
 					{
 						ex2p = &ex2;
 						ex2 = 0;
 					}
 					else
 						ex2p = nullptr;
-					rc = mdb_cursor_set(&mc->mc_xcursor->mx_cursor, data, nullptr, MDB_SET_RANGE, ex2p);
+					rc = mdb_cursor_set(&mc->mc_xcursor->mx_cursor, data, nullptr, EDatabaseCursorGet_SetRange, ex2p);
 					if (rc != DMdbSuccess)
 						return rc;
 				}
 			}
-			else if (op == MDB_GET_BOTH || op == MDB_GET_BOTH_RANGE)
+			else if (op == EDatabaseCursorGet_GetBoth || op == EDatabaseCursorGet_GetBothRange)
 			{
 				CDatabaseValue olddata;
 				FDatabaseCompare *pDataCompare = nullptr;
@@ -2291,7 +2311,7 @@ namespace NMib::NDatabase::NPrivate
 				rc = (*pDataCompare)(*data, olddata);
 				if (rc)
 				{
-					if (op == MDB_GET_BOTH || rc > 0)
+					if (op == EDatabaseCursorGet_GetBoth || rc > 0)
 						return DMdbNotFound;
 					rc = 0;
 				}
@@ -2307,7 +2327,7 @@ namespace NMib::NDatabase::NPrivate
 		}
 
 		/* The key already matches in all other cases */
-		if (op == MDB_SET_RANGE || op == MDB_SET_KEY)
+		if (op == EDatabaseCursorGet_SetRange || op == EDatabaseCursorGet_SetKey)
 			DMdbGetKey(leaf, key);
 		DMibDatabaseTrace("==> cursor placed on key [{}]", DKey(key));
 
@@ -2315,10 +2335,10 @@ namespace NMib::NDatabase::NPrivate
 	}
 
 	/** Move the cursor to the first item in the database. */
-	int mdb_cursor_first(MDB_cursor *mc, CDatabaseValue *key, CDatabaseValue *data)
+	int mdb_cursor_first(CMdbCursor *mc, CDatabaseValue *key, CDatabaseValue *data)
 	{
 		int rc;
-		MDB_node *leaf;
+		CMdbNode *leaf;
 
 		if (mc->mc_xcursor)
 		{
@@ -2367,10 +2387,10 @@ namespace NMib::NDatabase::NPrivate
 	}
 
 	/** Move the cursor to the last item in the database. */
-	int mdb_cursor_last(MDB_cursor *mc, CDatabaseValue *key, CDatabaseValue *data)
+	int mdb_cursor_last(CMdbCursor *mc, CDatabaseValue *key, CDatabaseValue *data)
 	{
 		int rc;
-		MDB_node *leaf;
+		CMdbNode *leaf;
 
 		if (mc->mc_xcursor)
 		{
@@ -2421,15 +2441,15 @@ namespace NMib::NDatabase::NPrivate
 	 *	Makes sure all the pages are writable, before attempting a write operation.
 	 * @param[in] mc The cursor to operate on.
 	 */
-	int mdb_cursor_touch(MDB_cursor *mc)
+	int mdb_cursor_touch(CMdbCursor *mc)
 	{
 		int rc = DMdbSuccess;
 
 		if (mc->mc_dbi >= DCoreDbs && !(*mc->mc_dbflag & (DDbDirty | DDbDupData)))
 		{
 			/* Touch DB record of named DB */
-			MDB_cursor mc2;
-			MDB_xcursor mcx;
+			CMdbCursor mc2;
+			CMdbXCursor mcx;
 			if (DTxnDbiChanged(mc->mc_txn, mc->mc_dbi))
 				DMibError("Stale write transaction");
 			mdb_cursor_init(&mc2, mc->mc_txn, DMainDbi, &mcx);
@@ -2460,9 +2480,9 @@ namespace NMib::NDatabase::NPrivate
 	 * depend only on the parent DB.
 	 * @param[in] mc The main cursor whose sorted-dups cursor is to be initialized.
 	 */
-	void mdb_xcursor_init0(MDB_cursor *mc)
+	void mdb_xcursor_init0(CMdbCursor *mc)
 	{
-		MDB_xcursor *mx = mc->mc_xcursor;
+		CMdbXCursor *mx = mc->mc_xcursor;
 
 		mx->mx_cursor.mc_xcursor = nullptr;
 		mx->mx_cursor.mc_txn = mc->mc_txn;
@@ -2483,24 +2503,24 @@ namespace NMib::NDatabase::NPrivate
 	/** Final setup of a sorted-dups cursor.
 	 *	Sets up the fields that depend on the data from the main cursor.
 	 * @param[in] mc The main cursor whose sorted-dups cursor is to be initialized.
-	 * @param[in] node The data containing the #MDB_db record for the
+	 * @param[in] node The data containing the #CMdbDb record for the
 	 * sorted-dup database.
 	 */
-	void mdb_xcursor_init1(MDB_cursor *mc, MDB_node *node)
+	void mdb_xcursor_init1(CMdbCursor *mc, CMdbNode *node)
 	{
-		MDB_xcursor *mx = mc->mc_xcursor;
+		CMdbXCursor *mx = mc->mc_xcursor;
 
 		mx->mx_cursor.mc_flags &= DCSub | DCOrigReadOnly | DCWriteMap;
 		if (node->mn_flags & DFSubData)
 		{
-			memcpy(&mx->mx_db, DNodeData(node), sizeof(MDB_db));
+			memcpy(&mx->mx_db, DNodeData(node), sizeof(CMdbDb));
 			mx->mx_cursor.mc_pg[0] = 0;
 			mx->mx_cursor.mc_snum = 0;
 			mx->mx_cursor.mc_top = 0;
 		}
 		else
 		{
-			MDB_page *fp = (MDB_page *)DNodeData(node);
+			CMdbPage *fp = (CMdbPage *)DNodeData(node);
 			mx->mx_db.md_pad = 0;
 			mx->mx_db.md_flags = 0;
 			mx->mx_db.md_depth = 1;
@@ -2536,9 +2556,9 @@ namespace NMib::NDatabase::NPrivate
 	 * @param[in] src_mx The xcursor of an up-to-date cursor.
 	 * @param[in] new_dupdata True if converting from a non-#DFDupData item.
 	 */
-	void mdb_xcursor_init2(MDB_cursor *mc, MDB_xcursor *src_mx, int new_dupdata)
+	void mdb_xcursor_init2(CMdbCursor *mc, CMdbXCursor *src_mx, int new_dupdata)
 	{
-		MDB_xcursor *mx = mc->mc_xcursor;
+		CMdbXCursor *mx = mc->mc_xcursor;
 
 		if (new_dupdata)
 		{
@@ -2559,7 +2579,7 @@ namespace NMib::NDatabase::NPrivate
 	}
 
 	/** Initialize a cursor for a given transaction and database. */
-	void mdb_cursor_init(MDB_cursor *mc, MDB_txn *txn, CDatabaseSubID dbi, MDB_xcursor *mx)
+	void mdb_cursor_init(CMdbCursor *mc, CMdbTxn *txn, CDatabaseSubID dbi, CMdbXCursor *mx)
 	{
 		mc->mc_next = nullptr;
 		mc->mc_backup = nullptr;
@@ -2590,7 +2610,7 @@ namespace NMib::NDatabase::NPrivate
 	 * @param[in] csrc The cursor to copy from.
 	 * @param[out] cdst The cursor to copy to.
 	 */
-	void mdb_cursor_copy(MDB_cursor const *csrc, MDB_cursor *cdst)
+	void mdb_cursor_copy(CMdbCursor const *csrc, CMdbCursor *cdst)
 	{
 		uint32 i;
 
@@ -2611,13 +2631,13 @@ namespace NMib::NDatabase::NPrivate
 	}
 
 	/** Complete a delete operation started by #mdb_cursor_del(). */
-	int mdb_cursor_del0(MDB_cursor *mc)
+	int mdb_cursor_del0(CMdbCursor *mc)
 	{
 		int rc;
-		MDB_page *mp;
-		indx_t ki;
+		CMdbPage *mp;
+		CIndx ki;
 		uint32 nkeys;
-		MDB_cursor *m2, *m3;
+		CMdbCursor *m2, *m3;
 		CDatabaseSubID dbi = mc->mc_dbi;
 
 		ki = mc->mc_ki[mc->mc_top];
@@ -2690,7 +2710,7 @@ namespace NMib::NDatabase::NPrivate
 						}
 						if (mc->mc_db->md_flags & EDatabaseSubFlag_SortedDuplicates)
 						{
-							MDB_node *node = DNodePtr(m3->mc_pg[m3->mc_top], m3->mc_ki[m3->mc_top]);
+							CMdbNode *node = DNodePtr(m3->mc_pg[m3->mc_top], m3->mc_ki[m3->mc_top]);
 							/* If this node has dupdata, it may need to be reinited
 							 * because its data has moved.
 							 * If the xcursor was not initd it must be reinited.
@@ -2702,7 +2722,7 @@ namespace NMib::NDatabase::NPrivate
 								if (m3->mc_xcursor->mx_cursor.mc_flags & DCInitialized)
 								{
 									if (!(node->mn_flags & DFSubData))
-										m3->mc_xcursor->mx_cursor.mc_pg[0] = (MDB_page *)DNodeData(node);
+										m3->mc_xcursor->mx_cursor.mc_pg[0] = (CMdbPage *)DNodeData(node);
 								}
 								else
 								{

@@ -368,7 +368,7 @@ namespace
 						CResultSetBuilder Builder;
 						f_PopulateBuilder(Builder);
 
-						NStream::CBinaryStreamMemory<> OStream;
+						NStream::TCBinaryStreamMemory<> OStream;
 
 						OStream << Builder;
 
@@ -376,7 +376,7 @@ namespace
 					}
 
 					{
-						NStream::CBinaryStreamMemoryRef<> IStream(RawData);
+						NStream::TCBinaryStreamMemoryRef<> IStream(RawData);
 
 						CResultSet RS;
 

@@ -41,11 +41,11 @@ namespace NMib::NDatabase
 	using namespace NPrivate;
 	/** Common code for #f_DatabaseStatistics() and #f_Statistics().
 	 * @param[in] env the environment to operate in.
-	 * @param[in] db the #MDB_db record containing the stats to return.
+	 * @param[in] db the #CMdbDb record containing the stats to return.
 	 * @param[out] arg the address of an #CDatabaseStatistics structure to receive the stats.
 	 * @return 0, this function always succeeds.
 	 */
-	CDatabaseStatistics DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_DatabaseStatistics(MDB_db *db)
+	CDatabaseStatistics DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_DatabaseStatistics(CMdbDb *db)
 	{
 		CDatabaseStatistics Stats;
 		Stats.m_PageSize = me_psize;
@@ -58,7 +58,7 @@ namespace NMib::NDatabase
 		return Stats;
 	}
 
-	CDatabaseSizeStatistics DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_SizeStatistics(MDB_db *db)
+	CDatabaseSizeStatistics DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_SizeStatistics(CMdbDb *db)
 	{
 		CDatabaseSizeStatistics Stats;
 		Stats.m_UsedBytes = (db->md_branch_pages + db->md_leaf_pages + db->md_overflow_pages) * me_psize;
@@ -71,7 +71,7 @@ namespace NMib::NDatabase
 	CDatabaseEnvironmentInfo CDatabaseEnvironment_Internal::f_EnvironmentInfo()
 	{
 		using namespace NPrivate;
-		MDB_meta *meta;
+		CMdbMeta *meta;
 		CDatabaseEnvironmentInfo Info;
 
 		meta = mdb_env_pick_meta();

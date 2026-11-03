@@ -62,7 +62,7 @@ namespace NMib::NDatabase::NPrivate
 #endif
 	}
 
-	bool DMibDatabaseInfrequentSection fg_BrokenFSync(MDB_env *_pEnvironment, HANDLE _FileDescriptor)
+	bool DMibDatabaseInfrequentSection fg_BrokenFSync(CMdbEnv *_pEnvironment, HANDLE _FileDescriptor)
 	{
 		bool bBroken = false;
 #ifdef DPlatformFamily_Linux

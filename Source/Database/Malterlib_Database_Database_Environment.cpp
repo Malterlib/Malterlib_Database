@@ -52,7 +52,7 @@ namespace NMib::NDatabase
 
 	/** @brief Create an LMDB environment handle.
 	 *
-	 * This function allocates memory for a #MDB_env structure. To release
+	 * This function allocates memory for a #CMdbEnv structure. To release
 	 * the allocated memory and discard the handle, call #f_Close().
 	 * Before the handle may be used, it must be opened using #f_Open().
 	 * Various other options may also need to be set before opening the handle,
@@ -87,7 +87,7 @@ namespace NMib::NDatabase
 
 	/** @brief Open an environment handle.
 	 *
-	 * If this function fails, #f_Close() must be called to discard the #MDB_env handle.
+	 * If this function fails, #f_Close() must be called to discard the #CMdbEnv handle.
 	 * @param[in] path The directory in which the database files reside. This
 	 * directory must already exist and be writable.
 	 * @param[in] flags Special options for this environment. This parameter
@@ -152,8 +152,8 @@ namespace NMib::NDatabase
 	 *		This flag may be changed at any time using #f_SetFlags().
 	 *	<li>#EDatabaseEnvironmentFlag_NoTls
 	 *		Don't use Thread-Local Storage. Tie reader locktable slots to
-	 *		#MDB_txn objects instead of to threads. I.e. #f_Reset() keeps
-	 *		the slot reseved for the #MDB_txn object. A thread may use parallel
+	 *		#CMdbTxn objects instead of to threads. I.e. #f_Reset() keeps
+	 *		the slot reseved for the #CMdbTxn object. A thread may use parallel
 	 *		read-only transactions. A read-only transaction may span threads if
 	 *		the user synchronizes its use. Applications that multiplex many
 	 *		user threads over individual OS threads need this option. Such an
@@ -269,7 +269,7 @@ namespace NMib::NDatabase
 		else
 		{
 			Environment.me_free_pgs = mdb_midl_alloc(DMdbIdlUmMax);
-			Environment.me_dirty_list = (MDB_ID2L)NMemory::fg_AllocInitZero(DMdbIdlUmSize * sizeof(MDB_ID2));
+			Environment.me_dirty_list = (CMdbId2L)NMemory::fg_AllocInitZero(DMdbIdlUmSize * sizeof(CMdbId2));
 		}
 
 		Environment.me_flags = flags;
@@ -299,7 +299,7 @@ namespace NMib::NDatabase
 				DMibError(NStr::fg_Format("Previous snapshot needs exclusive access: {}", mdb_strerror(EAGAIN)));
 		}
 
-		rc = Environment.mdb_fopen(_Path, (flags & EDatabaseEnvironmentFlag_ReadOnly) ? MDB_O_RDONLY : MDB_O_RDWR, Mode, &Environment.me_fd);
+		rc = Environment.mdb_fopen(_Path, (flags & EDatabaseEnvironmentFlag_ReadOnly) ? EMdbFOpenType_ReadOnly : EMdbFOpenType_ReadWrite, Mode, &Environment.me_fd);
 		if (rc)
 			DMibError(NStr::fg_Format("Error opening file {}", mdb_strerror(rc)));
 
@@ -313,7 +313,7 @@ namespace NMib::NDatabase
 			/* Synchronous fd for meta writes. Needed even with
 			 * EDatabaseEnvironmentFlag_NoSync/EDatabaseEnvironmentFlag_NoMetaSync, in case these get reset.
 			 */
-			rc = Environment.mdb_fopen(_Path, MDB_O_META, Mode, &Environment.me_mfd);
+			rc = Environment.mdb_fopen(_Path, EMdbFOpenType_Meta, Mode, &Environment.me_mfd);
 			if (rc)
 				DMibError(NStr::fg_Format("Error opening meta sync file {}", mdb_strerror(rc)));
 		}
@@ -328,18 +328,18 @@ namespace NMib::NDatabase
 
 		if (!(flags & EDatabaseEnvironmentFlag_ReadOnly))
 		{
-			MDB_txn *txn;
-			umint tsize = sizeof(MDB_txn);
-			umint size = tsize + Environment.me_maxdbs * (sizeof(MDB_db) + sizeof(MDB_cursor *) + sizeof(uint32) + 1);
+			CMdbTxn *txn;
+			umint tsize = sizeof(CMdbTxn);
+			umint size = tsize + Environment.me_maxdbs * (sizeof(CMdbDb) + sizeof(CMdbCursor *) + sizeof(uint32) + 1);
 			Environment.me_pbuf = NMemory::fg_AllocInitZero(Environment.me_psize);
-			txn = (MDB_txn *)NMemory::fg_AllocInitZero(size);
+			txn = (CMdbTxn *)NMemory::fg_AllocInitZero(size);
 			auto Cleanup1 = g_OnScopeExit / [&]()
 				{
 					NMemory::fg_Free(txn, size);
 				}
 			;
-			txn->mt_dbs = (MDB_db *)((char *)txn + tsize);
-			txn->mt_cursors = (MDB_cursor **)(txn->mt_dbs + Environment.me_maxdbs);
+			txn->mt_dbs = (CMdbDb *)((char *)txn + tsize);
+			txn->mt_cursors = (CMdbCursor **)(txn->mt_dbs + Environment.me_maxdbs);
 			txn->mt_dbiseqs = (uint32 *)(txn->mt_cursors + Environment.me_maxdbs);
 			txn->mt_dbflags = (unsigned char *)(txn->mt_dbiseqs + Environment.me_maxdbs);
 			txn->mt_env = &Environment;
@@ -385,7 +385,7 @@ namespace NMib::NDatabase
 		auto &Environment = *mp_pEnvironment;
 
 		HANDLE newfd = INVALID_HANDLE_VALUE;
-		int rc = Environment.mdb_fopen(_Path, MDB_O_COPY, 0666, &newfd);
+		int rc = Environment.mdb_fopen(_Path, EMdbFOpenType_Copy, 0666, &newfd);
 
 		if (rc)
 			DMibError(NStr::fg_Format("Error opening file {}", mdb_strerror(rc)));
@@ -438,7 +438,7 @@ namespace NMib::NDatabase
 
 		auto &Environment = *mp_pEnvironment;
 		using namespace NPrivate;
-		MDB_meta *meta;
+		CMdbMeta *meta;
 
 		meta = Environment.mdb_env_pick_meta();
 
@@ -451,7 +451,7 @@ namespace NMib::NDatabase
 
 		auto &Environment = *mp_pEnvironment;
 		using namespace NPrivate;
-		MDB_meta *meta;
+		CMdbMeta *meta;
 		meta = Environment.mdb_env_pick_meta();
 
 		return Environment.f_SizeStatistics(&meta->mm_dbs[DMainDbi]);
@@ -495,7 +495,7 @@ namespace NMib::NDatabase
 		auto &Environment = *mp_pEnvironment;
 
 		using namespace NPrivate;
-		MDB_meta *m = Environment.mdb_env_pick_meta();
+		CMdbMeta *m = Environment.mdb_env_pick_meta();
 		Environment.mdb_env_sync0(_bForce, m->mm_last_pg + 1);
 	}
 
@@ -530,7 +530,7 @@ namespace NMib::NDatabase
 		fp_CheckOpened();
 
 		using namespace NPrivate;
-		MDB_page *dp;
+		CMdbPage *dp;
 
 		auto &Environment = *mp_pEnvironment;
 
@@ -670,7 +670,7 @@ namespace NMib::NDatabase
 
 		if (Environment.me_map)
 		{
-			MDB_meta *meta;
+			CMdbMeta *meta;
 #ifndef DMibDatabase_Always64BitSupport
 			void *old;
 			int rc;
@@ -710,7 +710,7 @@ namespace NMib::NDatabase
 	 * Starting a read-only transaction normally ties a lock table slot to the
 	 * current thread until the environment closes or the thread exits. If
 	 * EDatabaseEnvironmentFlag_NoTls is in use, #mdb_txn_begin() instead ties the slot to the
-	 * MDB_txn object until it or the #MDB_env object is destroyed.
+	 * CMdbTxn object until it or the #CMdbEnv object is destroyed.
 	 * This function may only be called after #CDatabaseEnvironment::CDatabaseEnvironment() and before #f_Open().
 	 * @param[in] readers The maximum number of reader lock table slots
 	 * @return A non-zero error value on failure and 0 on success. Some possible
@@ -802,7 +802,7 @@ namespace NMib::NDatabase
 
 		NContainer::TCVector<CDatabaseReaderInfo> ReaderInfos;
 		umint nReaders = Environment.m_pLocksMemoryMap->m_TransactionBody.m_NumReaders.f_Load(NAtomic::gc_MemoryOrder_Relaxed);
-		MDB_reader *pReaders = Environment.m_pLocksMemoryMap->m_Readers;
+		CMdbReader *pReaders = Environment.m_pLocksMemoryMap->m_Readers;
 		for (umint i = 0; i < nReaders; i++)
 		{
 			auto &Reader = pReaders[i];
@@ -846,7 +846,7 @@ namespace NMib::NDatabase
 	// Private from here
 	// ---------------------------------------------------------------------------------------------------------------------------------------
 
-	void CDatabaseEnvironment_Internal::mdb_env_sync0(bool _bForce, NPrivate::pgno_t numpgs)
+	void CDatabaseEnvironment_Internal::mdb_env_sync0(bool _bForce, NPrivate::CPgno numpgs)
 	{
 		int rc = 0;
 		if (me_flags & EDatabaseEnvironmentFlag_ReadOnly)
@@ -879,17 +879,14 @@ namespace NMib::NDatabase
 	 * @param[out] meta address of where to store the meta information
 	 * @return 0 on success, non-zero on failure.
 	 */
-	bool DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::mdb_env_read_header(int prev, NPrivate::MDB_meta *meta)
+	bool DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::mdb_env_read_header(int prev, NPrivate::CMdbMeta *meta)
 	{
 		using namespace NPrivate;
-		MDB_metabuf pbuf;
-		MDB_page *p;
-		MDB_meta *m;
+		CMdbMetaBuf pbuf;
+		CMdbPage *p;
+		CMdbMeta *m;
 		int i, off;
-		enum
-		{
-			Size = sizeof(pbuf)
-		};
+		constexpr aint c_Size = sizeof(pbuf);
 
 		/* We don't know the page size yet, so use a minimum value.
 		 * Read both meta pages so we can use the latest one.
@@ -902,13 +899,13 @@ namespace NMib::NDatabase
 			OVERLAPPED ov;
 			memset(&ov, 0, sizeof(ov));
 			ov.Offset = off;
-			int rc = ReadFile(me_fd, &pbuf, Size, &len, &ov) ? (int)len : -1;
+			int rc = ReadFile(me_fd, &pbuf, c_Size, &len, &ov) ? (int)len : -1;
 			if (rc == -1 && DErrCode() == ERROR_HANDLE_EOF)
 				rc = 0;
 #else
-			int rc = pread(me_fd, &pbuf, Size, off);
+			int rc = pread(me_fd, &pbuf, c_Size, off);
 #endif
-			if (rc != Size)
+			if (rc != c_Size)
 			{
 				if (rc == 0 && off == 0)
 					return true;
@@ -918,12 +915,12 @@ namespace NMib::NDatabase
 				DMibError(NStr::fg_Format("Error reading environment header: {}", mdb_strerror(rc)));
 			}
 
-			p = (MDB_page *)&pbuf;
+			p = (CMdbPage *)&pbuf;
 
 			if (!DFIsSet(p->mp_flags, DPMeta))
 				DMibError(NStr::fg_Format("Header page '{}' is not a meta page", p->mp_p.p_pgno));
 
-			m = (MDB_meta *)DMetaData(p);
+			m = (CMdbMeta *)DMetaData(p);
 			if (m->mm_magic != DMdbMagic)
 				DMibError(NStr::fg_Format("Header page '{}' has invalid magic: 0x{nfh,sf0,sj4}", p->mp_p.p_pgno, m->mm_magic));
 
@@ -947,8 +944,8 @@ namespace NMib::NDatabase
 		return false;
 	}
 
-	/** Fill in most of the zeroed #MDB_meta for an empty database environment */
-	void DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::mdb_env_init_meta0(MDB_meta *meta)
+	/** Fill in most of the zeroed #CMdbMeta for an empty database environment */
+	void DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::mdb_env_init_meta0(CMdbMeta *meta)
 	{
 		meta->mm_magic = DMdbMagic;
 		meta->mm_version = DMdbDataVersion;
@@ -962,12 +959,12 @@ namespace NMib::NDatabase
 	}
 
 	/** Write the environment parameters of a freshly created DB environment.
-	 * @param[in] meta the #MDB_meta to write
+	 * @param[in] meta the #CMdbMeta to write
 	 * @return 0 on success, non-zero on failure.
 	 */
-	void DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::mdb_env_init_meta(MDB_meta *meta)
+	void DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::mdb_env_init_meta(CMdbMeta *meta)
 	{
-		MDB_page *p, *q;
+		CMdbPage *p, *q;
 		uint32 psize;
 #ifdef DPlatformFamily_Windows
 		DWORD len;
@@ -1000,7 +997,7 @@ namespace NMib::NDatabase
 
 		psize = me_psize;
 
-		p = (MDB_page *)NMemory::fg_AllocInitZero(DNumMetas * psize);
+		p = (CMdbPage *)NMemory::fg_AllocInitZero(DNumMetas * psize);
 		auto Cleanup = g_OnScopeExit / [&]()
 			{
 				NMemory::fg_Free(p, DNumMetas * psize);
@@ -1008,12 +1005,12 @@ namespace NMib::NDatabase
 		;
 		p->mp_p.p_pgno = 0;
 		p->mp_flags = DPMeta;
-		*(MDB_meta *)DMetaData(p) = *meta;
+		*(CMdbMeta *)DMetaData(p) = *meta;
 
-		q = (MDB_page *)((char *)p + psize);
+		q = (CMdbPage *)((char *)p + psize);
 		q->mp_p.p_pgno = 1;
 		q->mp_flags = DPMeta;
-		*(MDB_meta *)DMetaData(q) = *meta;
+		*(CMdbMeta *)DMetaData(q) = *meta;
 
 		{
 			int rc = 0;
@@ -1034,10 +1031,10 @@ namespace NMib::NDatabase
 	 * @param[in] txn the transaction that's being committed
 	 * @return 0 on success, non-zero on failure.
 	 */
-	int NPrivate::mdb_env_write_meta(MDB_txn *txn)
+	int NPrivate::mdb_env_write_meta(CMdbTxn *txn)
 	{
-		MDB_env *env;
-		MDB_meta meta, metab, *mp;
+		CMdbEnv *env;
+		CMdbMeta meta, metab, *mp;
 		unsigned flags;
 		CDatabaseOffset mapsize;
 		off_t off;
@@ -1100,9 +1097,9 @@ namespace NMib::NDatabase
 		meta.mm_last_pg = txn->mt_next_pgno - 1;
 		meta.mm_txnid.f_Store(txn->mt_txnid, NAtomic::gc_MemoryOrder_Relaxed);
 
-		off = offsetof(MDB_meta, mm_mapsize);
+		off = offsetof(CMdbMeta, mm_mapsize);
 		ptr = (char *)&meta + off;
-		len = sizeof(MDB_meta) - off;
+		len = sizeof(CMdbMeta) - off;
 		off += (char *)mp - env->me_map;
 
 		/* Write to the SYNC fd unless MDB_NOSYNC/MDB_NOMETASYNC.
@@ -1163,11 +1160,11 @@ namespace NMib::NDatabase
 	}
 
 	/** Check both meta pages to see which one is newer.
-	 * @return newest #MDB_meta.
+	 * @return newest #CMdbMeta.
 	 */
-	NPrivate::MDB_meta *CDatabaseEnvironment_Internal::mdb_env_pick_meta() const
+	NPrivate::CMdbMeta *CDatabaseEnvironment_Internal::mdb_env_pick_meta() const
 	{
-		MDB_meta * const *metas = me_metas;
+		CMdbMeta * const *metas = me_metas;
 		return metas
 			[
 				(metas[0]->mm_txnid.f_Load(NAtomic::gc_MemoryOrder_Relaxed) < metas[1]->mm_txnid.f_Load(NAtomic::gc_MemoryOrder_Relaxed))
@@ -1199,7 +1196,7 @@ namespace NMib::NDatabase
 
 	int DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::mdb_env_map(void *addr)
 	{
-		MDB_page *p;
+		CMdbPage *p;
 		uint32 flags = me_flags;
 #ifdef DPlatformFamily_Windows
 		int rc;
@@ -1289,14 +1286,14 @@ namespace NMib::NDatabase
 			return EBUSY; // TODO: Make a new MDB_* error code?
 #endif
 
-		p = (MDB_page *)me_map;
-		me_metas[0] = (MDB_meta *)DMetaData(p);
-		me_metas[1] = (MDB_meta *)((char *)me_metas[0] + me_psize);
+		p = (CMdbPage *)me_map;
+		me_metas[0] = (CMdbMeta *)DMetaData(p);
+		me_metas[1] = (CMdbMeta *)((char *)me_metas[0] + me_psize);
 
 		return DMdbSuccess;
 	}
 
-	NStr::CStr CDatabaseEnvironment_Internal::mdb_getfilename(NStr::CStr const &_FileName, NPrivate::mdb_fopen_type which)
+	NStr::CStr CDatabaseEnvironment_Internal::mdb_getfilename(NStr::CStr const &_FileName, NPrivate::EMdbFOpenType which)
 	{
 		/** Filename suffixes [datafile,lockfile][without,with MDB_NOSUBDIR] */
 		static constexpr ch8 const *pSuffixes[2][2] =
@@ -1306,7 +1303,7 @@ namespace NMib::NDatabase
 			}
 		;
 
-		return _FileName + pSuffixes[which == MDB_O_LOCKS][(me_flags & EDatabaseEnvironmentFlag_NoSubdir) != 0];
+		return _FileName + pSuffixes[which == EMdbFOpenType_Locks][(me_flags & EDatabaseEnvironmentFlag_NoSubdir) != 0];
 	}
 
 	/** Open an LMDB file.
@@ -1317,7 +1314,7 @@ namespace NMib::NDatabase
 	 * @param[out] res	Resulting file handle.
 	 * @return 0 on success, non-zero on failure.
 	 */
-	int DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::mdb_fopen(NStr::CStr const &_FileName, NPrivate::mdb_fopen_type which, NPrivate::mdb_mode_t mode, HANDLE *res)
+	int DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::mdb_fopen(NStr::CStr const &_FileName, NPrivate::EMdbFOpenType which, NPrivate::CMdbMode mode, HANDLE *res)
 	{
 		int rc = DMdbSuccess;
 		HANDLE fd;
@@ -1328,10 +1325,10 @@ namespace NMib::NDatabase
 		NStr::CStr FileName = mdb_getfilename(_FileName, which);
 
 		/* The directory must already exist.  Usually the file need not.
-		 * MDB_O_META requires the file because we already created it using
-		 * MDB_O_RDWR.  MDB_O_COPY must not overwrite an existing file.
+		 * EMdbFOpenType_Meta requires the file because we already created it using
+		 * EMdbFOpenType_ReadWrite.  EMdbFOpenType_Copy must not overwrite an existing file.
 		 *
-		 * With MDB_O_COPY we do not want the OS to cache the writes, since
+		 * With EMdbFOpenType_Copy we do not want the OS to cache the writes, since
 		 * the source data is already in the OS cache.
 		 *
 		 * The lockfile needs FD_CLOEXEC (close file descriptor on exec*())
@@ -1348,16 +1345,16 @@ namespace NMib::NDatabase
 		attrs = FILE_ATTRIBUTE_NORMAL;
 		switch (which)
 		{
-		case MDB_O_RDONLY: // read-only datafile
+		case EMdbFOpenType_ReadOnly: // read-only datafile
 			acc = GENERIC_READ;
 			disp = OPEN_EXISTING;
 			break;
-		case MDB_O_META: // for writing metapages
+		case EMdbFOpenType_Meta: // for writing metapages
 			acc = GENERIC_WRITE;
 			disp = OPEN_EXISTING;
 			attrs = FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH;
 			break;
-		case MDB_O_COPY: // mdb_env_copy() & co
+		case EMdbFOpenType_Copy: // mdb_env_copy() & co
 			acc = GENERIC_WRITE;
 			share = 0;
 			disp = CREATE_NEW;
@@ -1367,7 +1364,7 @@ namespace NMib::NDatabase
 		}
 		fd = CreateFileW(NStr::CWStr(FileName).f_GetStr(), acc, share, NULL, disp, attrs, NULL);
 #else
-		fd = open(FileName.f_GetStr(), (which & MDB_O_MASK) | fg_GetUnixOpenFlags(), mode);
+		fd = open(FileName.f_GetStr(), (which & EMdbFOpenType_Mask) | fg_GetUnixOpenFlags(), mode);
 #endif
 
 		if (fd == INVALID_HANDLE_VALUE)
@@ -1377,7 +1374,7 @@ namespace NMib::NDatabase
 		{
 			fg_SetUnixHandleOptions(fd);
 
-			if (which == MDB_O_COPY && me_psize >= me_os_psize)
+			if (which == EMdbFOpenType_Copy && me_psize >= me_os_psize)
 			{
 				/* This may require buffer alignment.  There is no portable
 				 * way to ask how much, so we require OS pagesize alignment.
@@ -1412,7 +1409,7 @@ namespace NMib::NDatabase
 	{
 		uint32 flags = me_flags;
 		int newenv = 0;
-		MDB_meta meta;
+		CMdbMeta meta;
 
 #ifdef DPlatformFamily_Windows
 		if (NLocal::g_VersionInfo.dwMajorVersion >= 6)
@@ -1511,10 +1508,10 @@ namespace NMib::NDatabase
 			mdb_env_init_meta(&meta);
 		}
 
-		me_maxfree_1pg = (me_psize - DPageHeaderSize) / sizeof(pgno_t) - 1;
-		me_nodemax = (((me_psize - DPageHeaderSize) / DMdbMinKeys) & -2) - sizeof(indx_t);
+		me_maxfree_1pg = (me_psize - DPageHeaderSize) / sizeof(CPgno) - 1;
+		me_nodemax = (((me_psize - DPageHeaderSize) / DMdbMinKeys) & -2) - sizeof(CIndx);
 #if !(DMdbMaxKeySize)
-		me_maxkey = me_nodemax - (DNodeSize + sizeof(MDB_db));
+		me_maxkey = me_nodemax - (DNodeSize + sizeof(CMdbDb));
 #endif
 		me_maxpg = m_MapSize / me_psize;
 
@@ -1523,8 +1520,8 @@ namespace NMib::NDatabase
 
 #if DMibDatabaseDebug
 		{
-			MDB_meta *meta = mdb_env_pick_meta();
-			MDB_db *db = &meta->mm_dbs[DMainDbi];
+			CMdbMeta *meta = mdb_env_pick_meta();
+			CMdbDb *db = &meta->mm_dbs[DMainDbi];
 
 			DMibDatabaseTrace("opened database version {}, pagesize {}", meta->mm_version, me_psize);
 			DMibDatabaseTrace("using meta page {}", (int)(meta->mm_txnid.f_Load(NAtomic::gc_MemoryOrder_Relaxed) & 1));
@@ -1561,7 +1558,7 @@ namespace NMib::NDatabase
 		NMemory::fg_Free(me_dbiseqs, me_maxdbs * sizeof(uint32));
 		NMemory::fg_Free(me_dbflags, me_maxdbs * sizeof(uint16));
 		me_path.f_Clear();
-		NMemory::fg_Free(me_dirty_list, DMdbIdlUmSize * sizeof(MDB_ID2));
+		NMemory::fg_Free(me_dirty_list, DMdbIdlUmSize * sizeof(CMdbId2));
 #ifdef DMibDatabase_Always64BitSupport
 		if (me_txn0 && me_txn0->mt_rpages)
 			NMemory::fg_Free(me_txn0->mt_rpages, DMdbTrpageSize * sizeof(MDB_ID3));
@@ -1575,7 +1572,7 @@ namespace NMib::NDatabase
 		}
 #endif
 		{
-			umint size = sizeof(MDB_txn) + me_maxdbs * (sizeof(MDB_db) + sizeof(MDB_cursor *) + sizeof(uint32) + 1);
+			umint size = sizeof(CMdbTxn) + me_maxdbs * (sizeof(CMdbDb) + sizeof(CMdbCursor *) + sizeof(uint32) + 1);
 			NMemory::fg_Free(me_txn0, size);
 		}
 		mdb_midl_free(me_free_pgs);
@@ -1663,7 +1660,7 @@ namespace NMib::NDatabase
 					semctl(me_rmutex->semid, 0, IPC_RMID);
 			}
 #endif
-			munmap((void *)m_pLocksMemoryMap, (m_MaxReaders - 1) * sizeof(MDB_reader) + sizeof(CLocksMemoryMap));
+			munmap((void *)m_pLocksMemoryMap, (m_MaxReaders - 1) * sizeof(CMdbReader) + sizeof(CLocksMemoryMap));
 		}
 		if (me_lfd != INVALID_HANDLE_VALUE)
 		{
@@ -1699,8 +1696,8 @@ namespace NMib::NDatabase
 		DMibError("Not supported on 32 bit");
 #endif
 
-		MDB_txn *txn = nullptr;
-		mdb_mutexref_t wmutex = nullptr;
+		CMdbTxn *txn = nullptr;
+		CMdbMutexRef wmutex = nullptr;
 		CDatabaseOffset wsize, w3;
 		char *ptr;
 
@@ -1730,7 +1727,7 @@ namespace NMib::NDatabase
 			if (m_pLocksMemoryMap)
 			{
 				/* We must start the actual read txn after blocking writers */
-				mdb_txn_end(txn, MDB_END_RESET_TMP);
+				mdb_txn_end(txn, gc_MDB_END_RESET_TMP);
 
 				/* Temporarily block writers until we snapshot the meta pages */
 				{

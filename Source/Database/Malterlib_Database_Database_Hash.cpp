@@ -72,10 +72,10 @@ namespace NMib::NDatabase::NPrivate
 	 * @param[in] len	length of value
 	 * @return 64 bit hash
 	 */
-	mdb_hash_t mdb_hash(void const *val, size_t len)
+	CMdbHash mdb_hash(void const *val, size_t len)
 	{
 		unsigned char const *s = (unsigned char const *)val, *end = s + len;
-		mdb_hash_t hval = 0xcbf29ce484222325ULL;
+		CMdbHash hval = 0xcbf29ce484222325ULL;
 		/*
 		 * FNV-1a hash each octet of the buffer
 		 */
@@ -110,10 +110,10 @@ namespace NMib::NDatabase::NPrivate
 		*out = '\0';
 	}
 
-	/** Init #MDB_env.me_mutexname[] except the char which #DMutexName() will set.
+	/** Init #CMdbEnv.me_mutexname[] except the char which #DMutexName() will set.
 	 *	Changes to this code must be reflected in #DMdbLockFormat.
 	 */
-	void DMibDatabaseInfrequentSection mdb_env_mname_init(MDB_env *env)
+	void DMibDatabaseInfrequentSection mdb_env_mname_init(CMdbEnv *env)
 	{
 		char *nm = env->me_mutexname;
 		strcpy(nm, DMutexNamePrefix);

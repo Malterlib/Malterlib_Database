@@ -44,7 +44,7 @@ namespace NMib::NDatabase
 	 */
 	void NPrivate::mdb_env_reader_dest(void *ptr)
 	{
-		MDB_reader *reader = (MDB_reader *)ptr;
+		CMdbReader *reader = (CMdbReader *)ptr;
 
 #ifndef DPlatformFamily_Windows
 		if (reader->m_OwningProcessID.f_Load(NAtomic::gc_MemoryOrder_Acquire) == getpid()) // catch pthread_exit() in child process
@@ -74,7 +74,7 @@ namespace NMib::NDatabase
 			case DLL_THREAD_DETACH:
 				for (i = 0; i < NPrivate::mdb_tls_nkeys; i++)
 				{
-					NPrivate::MDB_reader *r = (NPrivate::MDB_reader *)pthread_getspecific(NPrivate::mdb_tls_keys[i]);
+					NPrivate::CMdbReader *r = (NPrivate::CMdbReader *)pthread_getspecific(NPrivate::mdb_tls_keys[i]);
 					if (r)
 						mdb_env_reader_dest(r);
 				}

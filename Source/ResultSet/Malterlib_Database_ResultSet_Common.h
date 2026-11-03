@@ -13,8 +13,8 @@ namespace NMib::NDatabase
 	enum EResultDataType
 	{
 		EResultDataType_CStr
-		, EResultDataType_fp64
-		, EResultDataType_uint64
+		, EResultDataType_fp64   // NOLINT(malterlib-type-naming): the check doesn't take a built-in type as the value of an enumerator
+		, EResultDataType_uint64 // NOLINT(malterlib-type-naming): the check doesn't take a built-in type as the value of an enumerator
 		, EResultDataType_Binary
 		/* Deprecated:
 		, EResultDataType_int32
@@ -32,10 +32,7 @@ namespace NMib::NDatabase
 		// Result Set Implementation Data Types
 		//
 
-		enum
-		{
-			EResultSetFormatVersion = 2
-		};
+		constexpr uint32 gc_ResultSetFormatVersion = 2;
 
 		// Represents a bit of metadata with a specified ID
 		// Used for metadata attached to the result set itself.

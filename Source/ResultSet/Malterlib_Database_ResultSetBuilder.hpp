@@ -284,7 +284,7 @@ namespace NMib::NDatabase
 		DMibCheck(f_IsValid())("Attempting to stream a result set that is not valid.");
 
 		// Version
-		_Stream << (uint32)NResultSet::EResultSetFormatVersion;
+		_Stream << (uint32)NResultSet::gc_ResultSetFormatVersion;
 
 		// Structure & Metadata
 		_Stream << mp_Metadata;
@@ -308,7 +308,7 @@ namespace NMib::NDatabase
 		uint32 Version = 0;
 		_Stream >> Version;
 
-		if (Version != NResultSet::EResultSetFormatVersion)
+		if (Version != NResultSet::gc_ResultSetFormatVersion)
 			DMibErrorStreamVersionMismatch("Unsupported result set version!");
 
 		DMibBinaryStreamVersion(_Stream, Version);

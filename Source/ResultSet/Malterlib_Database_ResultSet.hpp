@@ -173,7 +173,7 @@ namespace NMib::NDatabase
 		uint32 Version = 0;
 		_Stream >> Version;
 
-		if (Version != NResultSet::EResultSetFormatVersion)
+		if (Version != NResultSet::gc_ResultSetFormatVersion)
 			DMibErrorStreamVersionMismatch("Unsupported result set version!");
 
 		DMibBinaryStreamVersion(_Stream, Version);

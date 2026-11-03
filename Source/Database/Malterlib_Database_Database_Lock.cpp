@@ -43,16 +43,16 @@ namespace NMib::NDatabase
 	 * Check returns 0 if the process is certainly dead, nonzero if it may
 	 * be alive (the lock exists or an error happened so we do not know).
 	 *
-	 * On Windows Pidset is a no-op, we merely check for the existence
+	 * On Windows EPidLockOp_Set is a no-op, we merely check for the existence
 	 * of the process with the given pid. On POSIX we use a single byte
 	 * lock on the lockfile, set at an offset equal to the pid.
 	 */
-	int CDatabaseEnvironment_Internal::mdb_reader_pid(Pidlock_op op, CProcessID pid)
+	int CDatabaseEnvironment_Internal::mdb_reader_pid(EPidLockOp op, CProcessID pid)
 	{
 #if !(DMdbPidLock)		/* Currently the same as defined(DPlatformFamily_Windows) */
 		int ret = 0;
 		HANDLE h;
-		if (op == Pidcheck)
+		if (op == EPidLockOp_Check)
 		{
 			h = OpenProcess(me_pidquery, FALSE, pid);
 			/* No documented "no such process" code, but other program use this: */
@@ -130,9 +130,9 @@ namespace NMib::NDatabase
 	void DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::mdb_reader_check0(bool _bReadLock, umint *_pDead)
 	{
 		using namespace NPrivate;
-		mdb_mutexref_t rmutex = _bReadLock ? nullptr : me_rmutex;
+		CMdbMutexRef rmutex = _bReadLock ? nullptr : me_rmutex;
 		uint32 i, j, rdrs;
-		MDB_reader *mr;
+		CMdbReader *mr;
 		CProcessID *pids, pid;
 		umint nDead = 0;
 
@@ -152,7 +152,7 @@ namespace NMib::NDatabase
 			{
 				if (mdb_pid_insert(pids, pid) == 0)
 				{
-					if (!mdb_reader_pid(Pidcheck, pid))
+					if (!mdb_reader_pid(EPidLockOp_Check, pid))
 					{
 						/* Stale reader found */
 						j = i;
@@ -168,7 +168,7 @@ namespace NMib::NDatabase
 							else
 							{
 								/* Recheck, a new process may have reused pid */
-								if (mdb_reader_pid(Pidcheck, pid))
+								if (mdb_reader_pid(EPidLockOp_Check, pid))
 									j = rdrs;
 							}
 						}
@@ -200,7 +200,7 @@ namespace NMib::NDatabase
 	 * @param[in] rc	DLockMutex0() error (nonzero)
 	 * @return 0 on success with the mutex locked, or an error code on failure.
 	 */
-	int DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::mdb_mutex_failed(NPrivate::mdb_mutexref_t mutex, int rc)
+	int DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::mdb_mutex_failed(NPrivate::CMdbMutexRef mutex, int rc)
 	{
 #	ifdef DPlatformFamily_macOS
 		if (rc == EINVAL)
@@ -218,7 +218,7 @@ namespace NMib::NDatabase
 #	endif
 
 		bool bReadLock;
-		MDB_meta *meta;
+		CMdbMeta *meta;
 		if (rc == DMdbOwnerdead)
 		{
 			/* We own the mutex. Clean up after dead previous owner. */
@@ -292,9 +292,9 @@ namespace NMib::NDatabase
 		off_t size, rsize;
 		int error_location = 0;
 
-		NStr::CStr LockPath = mdb_getfilename(_LockPath, MDB_O_LOCKS);
+		NStr::CStr LockPath = mdb_getfilename(_LockPath, EMdbFOpenType_Locks);
 		{
-			int rc = mdb_fopen(_LockPath, MDB_O_LOCKS, mode, &me_lfd);
+			int rc = mdb_fopen(_LockPath, EMdbFOpenType_Locks, mode, &me_lfd);
 			if (rc)
 			{
 				/* Omit lockfile if read-only env on read-only filesystem */
@@ -338,7 +338,7 @@ namespace NMib::NDatabase
 			goto fail_errno;
 		}
 #endif
-		rsize = (m_MaxReaders - 1) * sizeof(MDB_reader) + sizeof(CLocksMemoryMap);
+		rsize = (m_MaxReaders - 1) * sizeof(CMdbReader) + sizeof(CLocksMemoryMap);
 		if (size < rsize && *excl > 0)
 		{
 #ifdef DPlatformFamily_Windows
@@ -359,7 +359,7 @@ namespace NMib::NDatabase
 		{
 			rsize = size;
 			size = rsize - sizeof(CLocksMemoryMap);
-			m_MaxReaders = size/sizeof(MDB_reader) + 1;
+			m_MaxReaders = size/sizeof(CMdbReader) + 1;
 		}
 		{
 #ifdef DPlatformFamily_Windows
@@ -466,7 +466,7 @@ namespace NMib::NDatabase
 				/* Max 9 base85-digits.  We truncate here instead of in
 				 * mdb_env_mname_init() to keep the latter portable.
 				 */
-				% ((mdb_hash_t)85 * 85 * 85 * 85 * 85 * 85 * 85 * 85 * 85)
+				% ((CMdbHash)85 * 85 * 85 * 85 * 85 * 85 * 85 * 85 * 85)
 #	endif
 				;
 			mdb_env_mname_init(this);

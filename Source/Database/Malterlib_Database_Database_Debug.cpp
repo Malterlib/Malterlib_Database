@@ -43,9 +43,9 @@ namespace NMib::NDatabase::NPrivate
 	CTransactionID mdb_debug_start = -1;
 
 	/** Return the page number of \b mp which may be sub-page, for debug output */
-	pgno_t mdb_dbg_pgno(MDB_page const *mp)
+	CPgno mdb_dbg_pgno(CMdbPage const *mp)
 	{
-		pgno_t ret;
+		CPgno ret;
 		DCopyPgno(ret, mp->mp_p.p_pgno);
 		return ret;
 	}
@@ -84,18 +84,18 @@ namespace NMib::NDatabase::NPrivate
 		return buf;
 	}
 
-	char const *mdb_leafnode_type(MDB_node const *n)
+	char const *mdb_leafnode_type(CMdbNode const *n)
 	{
 		static char const * const tp[2][2] = {{"", ": DB"}, {": sub-page", ": sub-DB"}};
 		return DFIsSet(n->mn_flags, DFBigData) ? ": overflow page" : tp[DFIsSet(n->mn_flags, DFDupData)][DFIsSet(n->mn_flags, DFSubData)];
 	}
 
 	/** Display all the keys in the page. */
-	void mdb_page_list(MDB_page const *mp)
+	void mdb_page_list(CMdbPage const *mp)
 	{
-		pgno_t pgno = mdb_dbg_pgno(mp);
+		CPgno pgno = mdb_dbg_pgno(mp);
 		char const *type, *state = (mp->mp_flags & DPDirty) ? ", dirty" : "";
-		MDB_node *node;
+		CMdbNode *node;
 		uint32 i, nkeys, nsize, total = 0;
 		CDatabaseValue key;
 		DKBuf;
@@ -111,7 +111,7 @@ namespace NMib::NDatabase::NPrivate
 			DMibConErrOut("Overflow page {} pages {}{}\n", pgno, mp->mp_pages, state);
 			return;
 		case DPMeta:
-			DMibConErrOut("Meta-page {} txnid {}\n", pgno, fg_RemoveQualifiers(((MDB_meta *)DMetaData(mp))->mm_txnid.f_Load(NAtomic::gc_MemoryOrder_Relaxed)));
+			DMibConErrOut("Meta-page {} txnid {}\n", pgno, fg_RemoveQualifiers(((CMdbMeta *)DMetaData(mp))->mm_txnid.f_Load(NAtomic::gc_MemoryOrder_Relaxed)));
 			return;
 		default:
 			DMibConErrOut("Bad page {} flags 0x{nfh,sf0,sj4}\n", pgno, mp->mp_flags);
@@ -143,11 +143,11 @@ namespace NMib::NDatabase::NPrivate
 			else
 			{
 				if (DFIsSet(node->mn_flags, DFBigData))
-					nsize += sizeof(pgno_t);
+					nsize += sizeof(CPgno);
 				else
 					nsize += DNodeDataSize(node);
 				total += nsize;
-				nsize += sizeof(indx_t);
+				nsize += sizeof(CIndx);
 				DMibConErrOut("key {}: nsize {}, {}{}\n", i, nsize, DKey(&key), mdb_leafnode_type(node));
 			}
 			total = DEven(total);
@@ -155,12 +155,12 @@ namespace NMib::NDatabase::NPrivate
 		DMibConErrOut("Total: header {} + contents {} + unused {}\n", DIsLeaf2(mp) ? DPageHeaderSize : DPageBase + mp->mp_lower, total, DSizeLeft(mp));
 	}
 
-	void mdb_cursor_chk(MDB_cursor const *mc)
+	void mdb_cursor_chk(CMdbCursor const *mc)
 	{
 		using namespace NPrivate;
 		uint32 i;
-		MDB_node *node;
-		MDB_page *mp;
+		CMdbNode *node;
+		CMdbPage *mp;
 
 		if (!mc->mc_snum || !(mc->mc_flags & DCInitialized))
 			return;
@@ -176,7 +176,7 @@ namespace NMib::NDatabase::NPrivate
 		if (DXCursorInited(mc))
 		{
 			node = DNodePtr(mc->mc_pg[mc->mc_top], mc->mc_ki[mc->mc_top]);
-			if (((node->mn_flags & (DFDupData | DFSubData)) == DFDupData) && mc->mc_xcursor->mx_cursor.mc_pg[0] != (MDB_page *)DNodeData(node))
+			if (((node->mn_flags & (DFDupData | DFSubData)) == DFDupData) && mc->mc_xcursor->mx_cursor.mc_pg[0] != (CMdbPage *)DNodeData(node))
 				printf("blah!\n");
 		}
 	}
@@ -188,24 +188,24 @@ namespace NMib::NDatabase::NPrivate
 	 *  being used.
 	 *  All named DBs must be open for a correct count.
 	 */
-	void mdb_audit(MDB_txn *txn)
+	void mdb_audit(CMdbTxn *txn)
 	{
-		MDB_cursor mc;
+		CMdbCursor mc;
 		CDatabaseValue key, data;
-		MDB_ID freecount, count;
+		CMdbId freecount, count;
 		CDatabaseSubID i;
 		int rc;
 
 		freecount = 0;
 		mdb_cursor_init(&mc, txn, DFreeDbi, nullptr);
-		while ((rc = mdb_cursor_get(&mc, &key, &data, MDB_NEXT)) == 0)
-			freecount += *(MDB_ID *)data.m_pData;
+		while ((rc = mdb_cursor_get(&mc, &key, &data, EDatabaseCursorGet_Next)) == 0)
+			freecount += *(CMdbId *)data.m_pData;
 		DMibCheck(rc == DMdbNotFound);
 
 		count = 0;
 		for (i = 0; i < txn->mt_numdbs; i++)
 		{
-			MDB_xcursor mx;
+			CMdbXCursor mx;
 			if (!(txn->mt_dbflags[i] & DDbValid))
 				continue;
 			mdb_cursor_init(&mc, txn, i, &mx);
@@ -218,14 +218,14 @@ namespace NMib::NDatabase::NPrivate
 				for (; rc == DMdbSuccess; rc = mdb_cursor_sibling(&mc, 1))
 				{
 					unsigned j;
-					MDB_page *mp;
+					CMdbPage *mp;
 					mp = mc.mc_pg[mc.mc_top];
 					for (j = 0; j < DNumKeys(mp); j++)
 					{
-						MDB_node *leaf = DNodePtr(mp, j);
+						CMdbNode *leaf = DNodePtr(mp, j);
 						if (leaf->mn_flags & DFSubData)
 						{
-							MDB_db db;
+							CMdbDb db;
 							memcpy(&db, DNodeData(leaf), sizeof(db));
 							count += db.md_branch_pages + db.md_leaf_pages + db.md_overflow_pages;
 						}

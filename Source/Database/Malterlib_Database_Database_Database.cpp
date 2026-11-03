@@ -86,8 +86,8 @@ namespace NMib::NDatabase
 	 *		This flag may only be used in combination with #EDatabaseSubFlag_SortedDuplicates. This option
 	 *		tells the library that the data items for this database are all the same
 	 *		size, which allows further optimizations in storage and retrieval. When
-	 *		all data items are the same size, the #MDB_GET_MULTIPLE, #MDB_NEXT_MULTIPLE
-	 *		and #MDB_PREV_MULTIPLE cursor operations may be used to retrieve multiple
+	 *		all data items are the same size, the #EDatabaseCursorGet_GetMultiple, #EDatabaseCursorGet_NextMultiple
+	 *		and #EDatabaseCursorGet_PrevMultiple cursor operations may be used to retrieve multiple
 	 *		items at once.
 	 *	<li>#EDatabaseSubFlag_SortedDuplicatesIntegerKeys
 	 *		This option specifies that duplicate data items are binary integers,
@@ -113,8 +113,8 @@ namespace NMib::NDatabase
 		using namespace NPrivate;
 		CDatabaseValue key, data;
 		CDatabaseSubID i;
-		MDB_cursor mc;
-		MDB_db dummy;
+		CMdbCursor mc;
+		CMdbDb dummy;
 		int dbflag, exact;
 		uint32 unused = 0, seq;
 		umint len;
@@ -182,11 +182,11 @@ namespace NMib::NDatabase
 		key.m_Size = len;
 		key.m_pData = (uint8 *)_pName;
 		mdb_cursor_init(&mc, txn, DMainDbi, nullptr);
-		int rc = mdb_cursor_set(&mc, &key, &data, MDB_SET, &exact);
+		int rc = mdb_cursor_set(&mc, &key, &data, EDatabaseCursorGet_Set, &exact);
 		if (rc == DMdbSuccess)
 		{
 			/* make sure this is actually a DB */
-			MDB_node *node = DNodePtr(mc.mc_pg[mc.mc_top], mc.mc_ki[mc.mc_top]);
+			CMdbNode *node = DNodePtr(mc.mc_pg[mc.mc_top], mc.mc_ki[mc.mc_top]);
 			if ((node->mn_flags & (DFDupData | DFSubData)) != DFSubData)
 				DMibError("Named record is not a database");
 		}
@@ -209,7 +209,7 @@ namespace NMib::NDatabase
 		if (rc)
 		{
 			/* DMdbNotFound and EDatabaseSubFlag_Create: Create new DB */
-			data.m_Size = sizeof(MDB_db);
+			data.m_Size = sizeof(CMdbDb);
 			data.m_pData = (uint8 *)&dummy;
 			memset(&dummy, 0, sizeof(dummy));
 			dummy.md_root = DPInvalid;
@@ -233,7 +233,7 @@ namespace NMib::NDatabase
 			seq = ++txn->mt_env->me_dbiseqs[slot];
 			txn->mt_dbiseqs[slot] = seq;
 
-			memcpy(&txn->mt_dbs[slot], data.m_pData, sizeof(MDB_db));
+			memcpy(&txn->mt_dbs[slot], data.m_pData, sizeof(CMdbDb));
 			mdb_default_cmp(txn, slot);
 			if (!unused)
 				txn->mt_numdbs++;
@@ -312,8 +312,8 @@ namespace NMib::NDatabase
 
 		if (mt_dbflags[_DatabaseID] & DDbStale)
 		{
-			MDB_cursor mc;
-			MDB_xcursor mx;
+			CMdbCursor mc;
+			CMdbXCursor mx;
 			/* Stale, must read the DB's root. cursor_init does it for us. */
 			mdb_cursor_init(&mc, this, _DatabaseID, &mx);
 		}
@@ -412,7 +412,7 @@ namespace NMib::NDatabase
 	void CDatabaseTransactionCommon::CInternal::f_DropDatabase(CDatabaseSubID _DatabaseID, bool _bDelete)
 	{
 		using namespace NPrivate;
-		MDB_cursor *mc, *m2;
+		CMdbCursor *mc, *m2;
 
 		if (!DTxnDbiExist(this, _DatabaseID, DDbUserValid))
 			DMibError("Database does not exists");

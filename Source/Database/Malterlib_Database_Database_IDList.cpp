@@ -31,7 +31,7 @@ namespace NMib::NDatabase::NPrivate
 	 */
 #define DCmp(d_Left,d_Right)	 ( (d_Left) < (d_Right) ? -1 : (d_Left) > (d_Right) )
 
-	unsigned mdb_midl_search(MDB_IDL ids, MDB_ID id)
+	unsigned mdb_midl_search(CMdbIdl ids, CMdbId id)
 	{
 		/*
 		 * binary search of id in ids
@@ -65,62 +65,62 @@ namespace NMib::NDatabase::NPrivate
 		return cursor;
 	}
 
-	MDB_IDL mdb_midl_alloc(int num)
+	CMdbIdl mdb_midl_alloc(int num)
 	{
-		MDB_IDL ids = (MDB_IDL)NMib::NMemory::fg_Alloc((num + 2) * sizeof(MDB_ID));
+		CMdbIdl ids = (CMdbIdl)NMib::NMemory::fg_Alloc((num + 2) * sizeof(CMdbId));
 		*ids++ = num;
 		*ids = 0;
 		return ids;
 	}
 
-	void mdb_midl_free(MDB_IDL ids)
+	void mdb_midl_free(CMdbIdl ids)
 	{
 		if (ids)
 		{
 			--ids;
 			umint nIds = *ids;
-			NMib::NMemory::fg_Free(ids, (nIds + 2) * sizeof(MDB_ID));
+			NMib::NMemory::fg_Free(ids, (nIds + 2) * sizeof(CMdbId));
 		}
 	}
 
-	void mdb_midl_shrink(MDB_IDL *idp)
+	void mdb_midl_shrink(CMdbIdl *idp)
 	{
-		MDB_IDL ids = *idp;
-		umint NewSize = (DMdbIdlUmMax + 2) * sizeof(MDB_ID);
-		if (*(--ids) > DMdbIdlUmMax && (ids = (MDB_IDL)NMib::NMemory::fg_Resize(ids, NewSize, 0)))
+		CMdbIdl ids = *idp;
+		umint NewSize = (DMdbIdlUmMax + 2) * sizeof(CMdbId);
+		if (*(--ids) > DMdbIdlUmMax && (ids = (CMdbIdl)NMib::NMemory::fg_Resize(ids, NewSize, 0)))
 		{
 			*ids++ = DMdbIdlUmMax;
 			*idp = ids;
 		}
 	}
 
-	static void mdb_midl_grow(MDB_IDL *idp, int num)
+	static void mdb_midl_grow(CMdbIdl *idp, int num)
 	{
-		MDB_IDL idn = *idp - 1;
+		CMdbIdl idn = *idp - 1;
 		/* grow it */
-		umint NewSize = (*idn + num + 2) * sizeof(MDB_ID);
-		idn = (MDB_IDL)NMib::NMemory::fg_Resize(idn, NewSize, 0, EAllocationFlag_SizeNotNeeded);
+		umint NewSize = (*idn + num + 2) * sizeof(CMdbId);
+		idn = (CMdbIdl)NMib::NMemory::fg_Resize(idn, NewSize, 0, EAllocationFlag_SizeNotNeeded);
 		*idn++ += num;
 		*idp = idn;
 	}
 
-	void mdb_midl_need(MDB_IDL *idp, unsigned num)
+	void mdb_midl_need(CMdbIdl *idp, unsigned num)
 	{
-		MDB_IDL ids = *idp;
+		CMdbIdl ids = *idp;
 		num += ids[0];
 		if (num > ids[-1])
 		{
 			num = (num + num / 4 + (256 + 2)) & -256;
-			umint NewSize = num * sizeof(MDB_ID);
-			ids = (MDB_IDL)NMib::NMemory::fg_Resize(ids - 1, NewSize, 0, EAllocationFlag_SizeNotNeeded);
+			umint NewSize = num * sizeof(CMdbId);
+			ids = (CMdbIdl)NMib::NMemory::fg_Resize(ids - 1, NewSize, 0, EAllocationFlag_SizeNotNeeded);
 			*ids++ = num - 2;
 			*idp = ids;
 		}
 	}
 
-	void mdb_midl_append(MDB_IDL *idp, MDB_ID id)
+	void mdb_midl_append(CMdbIdl *idp, CMdbId id)
 	{
-		MDB_IDL ids = *idp;
+		CMdbIdl ids = *idp;
 		/* Too big? */
 		if (ids[0] >= ids[-1])
 		{
@@ -131,22 +131,22 @@ namespace NMib::NDatabase::NPrivate
 		ids[ids[0]] = id;
 	}
 
-	void mdb_midl_append_list(MDB_IDL *idp, MDB_IDL app)
+	void mdb_midl_append_list(CMdbIdl *idp, CMdbIdl app)
 	{
-		MDB_IDL ids = *idp;
+		CMdbIdl ids = *idp;
 		/* Too big? */
 		if (ids[0] + app[0] >= ids[-1])
 		{
 			mdb_midl_grow(idp, app[0]);
 			ids = *idp;
 		}
-		memcpy(&ids[ids[0] + 1], &app[1], app[0] * sizeof(MDB_ID));
+		memcpy(&ids[ids[0] + 1], &app[1], app[0] * sizeof(CMdbId));
 		ids[0] += app[0];
 	}
 
-	void mdb_midl_append_range(MDB_IDL *idp, MDB_ID id, unsigned n)
+	void mdb_midl_append_range(CMdbIdl *idp, CMdbId id, unsigned n)
 	{
-		MDB_ID *ids = *idp, len = ids[0];
+		CMdbId *ids = *idp, len = ids[0];
 		/* Too big? */
 		if (len + n > ids[-1])
 		{
@@ -159,10 +159,10 @@ namespace NMib::NDatabase::NPrivate
 			ids[n--] = id++;
 	}
 
-	void mdb_midl_xmerge(MDB_IDL idl, MDB_IDL merge)
+	void mdb_midl_xmerge(CMdbIdl idl, CMdbIdl merge)
 	{
-		MDB_ID old_id, merge_id, i = merge[0], j = idl[0], k = i + j, total = k;
-		idl[0] = (MDB_ID) - 1; // delimiter for idl scan below
+		CMdbId old_id, merge_id, i = merge[0], j = idl[0], k = i + j, total = k;
+		idl[0] = (CMdbId)-1; // delimiter for idl scan below
 		old_id = idl[j];
 		while (i)
 		{
@@ -179,12 +179,12 @@ namespace NMib::NDatabase::NPrivate
 #define DSmall	8
 #define	DMidlSwap(d_Left,d_Right)	{ itmp=(d_Left); (d_Left)=(d_Right); (d_Right)=itmp; }
 
-	void mdb_midl_sort(MDB_IDL ids)
+	void mdb_midl_sort(CMdbIdl ids)
 	{
 		/* Max possible depth of int-indexed tree * 2 items/level */
 		int istack[sizeof(int) * 8 * 2];
 		int i, j, k, l, ir, jstack;
-		MDB_ID a, itmp;
+		CMdbId a, itmp;
 
 		ir = (int)ids[0];
 		l = 1;
@@ -253,7 +253,7 @@ namespace NMib::NDatabase::NPrivate
 		}
 	}
 
-	unsigned mdb_mid2l_search(MDB_ID2L ids, MDB_ID id)
+	unsigned mdb_mid2l_search(CMdbId2L ids, CMdbId id)
 	{
 		/*
 		 * binary search of id in ids
@@ -287,7 +287,7 @@ namespace NMib::NDatabase::NPrivate
 		return cursor;
 	}
 
-	int mdb_mid2l_insert(MDB_ID2L ids, MDB_ID2 *id)
+	int mdb_mid2l_insert(CMdbId2L ids, CMdbId2 *id)
 	{
 		unsigned x, i;
 
@@ -322,7 +322,7 @@ namespace NMib::NDatabase::NPrivate
 		return 0;
 	}
 
-	int mdb_mid2l_append(MDB_ID2L ids, MDB_ID2 *id)
+	int mdb_mid2l_append(CMdbId2L ids, CMdbId2 *id)
 	{
 		/* Too big? */
 		if (ids[0].mid >= DMdbIdlUmMax)
@@ -333,7 +333,7 @@ namespace NMib::NDatabase::NPrivate
 	}
 
 #ifdef DMibDatabase_Always64BitSupport
-	unsigned mdb_mid3l_search(MDB_ID3L ids, MDB_ID id)
+	unsigned mdb_mid3l_search(MDB_ID3L ids, CMdbId id)
 	{
 		/*
 		 * binary search of id in ids

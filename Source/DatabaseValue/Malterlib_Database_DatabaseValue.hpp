@@ -57,7 +57,7 @@ namespace NMib::NDatabase
 	CDatabaseValue CDatabaseValue::fs_ToLexicographic(CDatabaseValueCache &o_StreamCache, tfp_CValue const & ...p_Value)
 	{
 		{
-			NStream::CBinaryStreamMemoryRef<NStream::CBinaryStreamBigEndian, CDatabaseValueCache> Stream{o_StreamCache, 0};
+			NStream::TCBinaryStreamMemoryRef<NStream::CBinaryStreamBigEndian, CDatabaseValueCache> Stream{o_StreamCache, 0};
 			(
 				[&]
 				{
@@ -73,7 +73,7 @@ namespace NMib::NDatabase
 	template <typename ...tfp_CValue>
 	CDatabaseValue CDatabaseValue::fs_ToStream(CDatabaseValueCache &o_StreamCache, NStorage::TCTuple<tfp_CValue...> const &_Value)
 	{
-		NStream::CBinaryStreamMemoryRef<NStream::CBinaryStreamDefault, CDatabaseValueCache> Stream{o_StreamCache, 0};
+		NStream::TCBinaryStreamMemoryRef<NStream::CBinaryStreamDefault, CDatabaseValueCache> Stream{o_StreamCache, 0};
 
 		NStorage::fg_TupleApply
 			(
@@ -98,7 +98,7 @@ namespace NMib::NDatabase
 	CDatabaseValue CDatabaseValue::fs_ToStream(CDatabaseValueCache &o_StreamCache, tfp_CValue const & ...p_Value)
 	{
 		{
-			NStream::CBinaryStreamMemoryRef<NStream::CBinaryStreamDefault, CDatabaseValueCache> Stream{o_StreamCache, 0};
+			NStream::TCBinaryStreamMemoryRef<NStream::CBinaryStreamDefault, CDatabaseValueCache> Stream{o_StreamCache, 0};
 			(
 				[&]
 				{
@@ -120,7 +120,7 @@ namespace NMib::NDatabase
 	template <typename tf_CValue>
 	void CDatabaseValue::f_FromLexicographic(tf_CValue &o_Value) const
 	{
-		NStream::CBinaryStreamMemoryPtr<NStream::CBinaryStreamBigEndian> Stream;
+		NStream::TCBinaryStreamMemoryPtr<NStream::CBinaryStreamBigEndian> Stream;
 		Stream.f_OpenRead(m_pData, m_Size);
 		CDatabaseValue::fs_ConsumeLexicographic(Stream, o_Value);
 	}
@@ -130,7 +130,7 @@ namespace NMib::NDatabase
 	{
 		using CDecodedDescending = TCGetDescending<NTraits::TCRemoveQualifiers<tf_CValue>>;
 
-		NStream::CBinaryStreamMemoryPtr<NStream::CBinaryStreamBigEndian> Stream;
+		NStream::TCBinaryStreamMemoryPtr<NStream::CBinaryStreamBigEndian> Stream;
 		Stream.f_OpenRead(m_pData, m_Size);
 		if constexpr (CDecodedDescending::mc_bDescending)
 		{
@@ -150,7 +150,7 @@ namespace NMib::NDatabase
 	template <typename ...tfp_CValue>
 	auto CDatabaseValue::f_TupleFromStream() const
 	{
-		NStream::CBinaryStreamMemoryPtr<NStream::CBinaryStreamDefault> Stream;
+		NStream::TCBinaryStreamMemoryPtr<NStream::CBinaryStreamDefault> Stream;
 		Stream.f_OpenRead(m_pData, m_Size);
 
 		NStorage::TCTuple<tfp_CValue...> Tuple;
@@ -161,7 +161,7 @@ namespace NMib::NDatabase
 	template <typename tf_CValue>
 	auto CDatabaseValue::f_FromStream() const
 	{
-		NStream::CBinaryStreamMemoryPtr<NStream::CBinaryStreamDefault> Stream;
+		NStream::TCBinaryStreamMemoryPtr<NStream::CBinaryStreamDefault> Stream;
 		Stream.f_OpenRead(m_pData, m_Size);
 
 		tf_CValue Value;
@@ -172,7 +172,7 @@ namespace NMib::NDatabase
 	template <typename tf_CValue>
 	void CDatabaseValue::f_FromStream(tf_CValue &o_Value) const
 	{
-		NStream::CBinaryStreamMemoryPtr<NStream::CBinaryStreamDefault> Stream;
+		NStream::TCBinaryStreamMemoryPtr<NStream::CBinaryStreamDefault> Stream;
 		Stream.f_OpenRead(m_pData, m_Size);
 
 		Stream >> o_Value;

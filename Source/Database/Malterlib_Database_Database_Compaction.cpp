@@ -45,7 +45,7 @@ namespace NMib::NDatabase::NPrivate
 
 	struct CCompactingCopyState
 	{
-		CCompactingCopyState(MDB_env *_pEnvironment, HANDLE _DestinationFile)
+		CCompactingCopyState(CMdbEnv *_pEnvironment, HANDLE _DestinationFile)
 			: m_pEnvironment{_pEnvironment}
 			, m_OutputFileHandle{_DestinationFile}
 			, m_BlockingActorCheckout(fg_BlockingActor())
@@ -71,9 +71,9 @@ namespace NMib::NDatabase::NPrivate
 		uint8 *m_OverflowPages[2] = {nullptr, nullptr};
 		umint m_WriteBuffersLength[2] = {0, 0};
 		umint m_OverflowPagesLength[2] = {0, 0};
-		MDB_env *m_pEnvironment = nullptr;
-		MDB_txn *m_pInternalTransaction = nullptr;
-		pgno_t m_NextPageNo = DNumMetas;
+		CMdbEnv *m_pEnvironment = nullptr;
+		CMdbTxn *m_pInternalTransaction = nullptr;
+		CPgno m_NextPageNo = DNumMetas;
 		HANDLE m_OutputFileHandle = INVALID_HANDLE_VALUE;
 		int m_Status = 0;
 		int m_iBuffer = 0;
@@ -168,11 +168,11 @@ namespace NMib::NDatabase::NPrivate
 	}
 
 	/** Depth-first tree traversal for compacting copy. */
-	int DMibDatabaseInfrequentSection fg_TraverseTreeCopyRecursive(CCompactingCopyState &_CopyState, pgno_t *pg, int flags)
+	int DMibDatabaseInfrequentSection fg_TraverseTreeCopyRecursive(CCompactingCopyState &_CopyState, CPgno *pg, int flags)
 	{
-		MDB_cursor mc = {0};
-		MDB_node *ni;
-		MDB_page *mo, *mp, *leaf;
+		CMdbCursor mc = {0};
+		CMdbNode *ni;
+		CMdbPage *mo, *mp, *leaf;
 		char *buf, *ptr;
 		int rc;
 		uint32 i;
@@ -200,13 +200,13 @@ namespace NMib::NDatabase::NPrivate
 
 		for (i = 0; i < mc.mc_top; i++)
 		{
-			mdb_page_copy((MDB_page *)ptr, mc.mc_pg[i], CopyState.m_pEnvironment->me_psize);
-			mc.mc_pg[i] = (MDB_page *)ptr;
+			mdb_page_copy((CMdbPage *)ptr, mc.mc_pg[i], CopyState.m_pEnvironment->me_psize);
+			mc.mc_pg[i] = (CMdbPage *)ptr;
 			ptr += CopyState.m_pEnvironment->me_psize;
 		}
 
 		/* This is writable space for a leaf page. Usually not needed. */
-		leaf = (MDB_page *)ptr;
+		leaf = (CMdbPage *)ptr;
 
 		auto iBuffer = CopyState.m_iBuffer;
 		while (mc.mc_snum > 0)
@@ -224,8 +224,8 @@ namespace NMib::NDatabase::NPrivate
 						ni = DNodePtr(mp, i);
 						if (ni->mn_flags & DFBigData)
 						{
-							MDB_page *omp;
-							pgno_t pg;
+							CMdbPage *omp;
+							CPgno pg;
 
 							/* Need writable leaf */
 							if (mp != leaf)
@@ -237,7 +237,7 @@ namespace NMib::NDatabase::NPrivate
 							}
 
 							memcpy(&pg, DNodeData(ni), sizeof(pg));
-							memcpy(DNodeData(ni), &CopyState.m_NextPageNo, sizeof(pgno_t));
+							memcpy(DNodeData(ni), &CopyState.m_NextPageNo, sizeof(CPgno));
 							rc = mdb_page_get(&mc, pg, &omp, nullptr);
 							if (rc)
 								goto done;
@@ -248,7 +248,7 @@ namespace NMib::NDatabase::NPrivate
 									goto done;
 								iBuffer = CopyState.m_iBuffer;
 							}
-							mo = (MDB_page *)(CopyState.m_WriteBuffers[iBuffer] + CopyState.m_WriteBuffersLength[iBuffer]);
+							mo = (CMdbPage *)(CopyState.m_WriteBuffers[iBuffer] + CopyState.m_WriteBuffersLength[iBuffer]);
 							memcpy(mo, omp, CopyState.m_pEnvironment->me_psize);
 							mo->mp_p.p_pgno = CopyState.m_NextPageNo;
 							CopyState.m_NextPageNo += omp->mp_pages;
@@ -265,7 +265,7 @@ namespace NMib::NDatabase::NPrivate
 						}
 						else if (ni->mn_flags & DFSubData)
 						{
-							MDB_db db;
+							CMdbDb db;
 
 							/* Need writable leaf */
 							if (mp != leaf)
@@ -292,7 +292,7 @@ namespace NMib::NDatabase::NPrivate
 				mc.mc_ki[mc.mc_top]++;
 				if (mc.mc_ki[mc.mc_top] < n)
 				{
-					pgno_t pg;
+					CPgno pg;
 				again:
 					ni = DNodePtr(mp, mc.mc_ki[mc.mc_top]);
 					pg = DNodePgno(ni);
@@ -322,7 +322,7 @@ namespace NMib::NDatabase::NPrivate
 					goto done;
 				iBuffer = CopyState.m_iBuffer;
 			}
-			mo = (MDB_page *)(CopyState.m_WriteBuffers[iBuffer] + CopyState.m_WriteBuffersLength[iBuffer]);
+			mo = (CMdbPage *)(CopyState.m_WriteBuffers[iBuffer] + CopyState.m_WriteBuffersLength[iBuffer]);
 			mdb_page_copy(mo, mp, CopyState.m_pEnvironment->me_psize);
 			mo->mp_p.p_pgno = CopyState.m_NextPageNo++;
 			CopyState.m_WriteBuffersLength[iBuffer] += CopyState.m_pEnvironment->me_psize;
@@ -354,26 +354,26 @@ namespace NMib::NDatabase
 		using namespace NPrivate;
 		CCompactingCopyState CopyState{this, fd};
 		int rc;
-		pgno_t root, new_root;
+		CPgno root, new_root;
 
 		CopyState.f_Init(me_os_psize);
 
 		auto Transaction = mdb_txn_begin(nullptr, EDatabaseEnvironmentFlag_ReadOnly);
 		auto pInternalTransaction = Transaction.fp_GetInternal();
 
-		MDB_page *mp = (MDB_page *)CopyState.m_WriteBuffers[0];
+		CMdbPage *mp = (CMdbPage *)CopyState.m_WriteBuffers[0];
 		memset(mp, 0, DNumMetas * me_psize);
 		mp->mp_p.p_pgno = 0;
 		mp->mp_flags = DPMeta;
-		MDB_meta *mm = (MDB_meta *)DMetaData(mp);
+		CMdbMeta *mm = (CMdbMeta *)DMetaData(mp);
 		mdb_env_init_meta0(mm);
 		mm->mm_address = me_metas[0]->mm_address;
 
-		mp = (MDB_page *)(CopyState.m_WriteBuffers[0] + me_psize);
+		mp = (CMdbPage *)(CopyState.m_WriteBuffers[0] + me_psize);
 		mp->mp_p.p_pgno = 1;
 		mp->mp_flags = DPMeta;
-		*(MDB_meta *)DMetaData(mp) = *mm;
-		mm = (MDB_meta *)DMetaData(mp);
+		*(CMdbMeta *)DMetaData(mp) = *mm;
+		mm = (CMdbMeta *)DMetaData(mp);
 
 		/* Set metapage 1 with current main DB */
 		root = new_root = pInternalTransaction->mt_dbs[DMainDbi].md_root;
@@ -382,13 +382,13 @@ namespace NMib::NDatabase
 			/* Count the number of free pages, subtract from lastpg to find
 			 * number of active pages
 			 */
-			MDB_ID freecount = 0;
-			MDB_cursor mc;
+			CMdbId freecount = 0;
+			CMdbCursor mc;
 			CDatabaseValue key;
 			CDatabaseValue data;
 			mdb_cursor_init(&mc, pInternalTransaction, DFreeDbi, nullptr);
-			while ((rc = mdb_cursor_get(&mc, &key, &data, MDB_NEXT)) == 0)
-				freecount += *(MDB_ID *)data.m_pData;
+			while ((rc = mdb_cursor_get(&mc, &key, &data, EDatabaseCursorGet_Next)) == 0)
+				freecount += *(CMdbId *)data.m_pData;
 			if (rc != DMdbNotFound)
 				DMibError(NStr::fg_Format("Error compacting database (read cursor): {}", mdb_strerror(rc)));
 			freecount

@@ -45,7 +45,7 @@ namespace NMib::NDatabase::NPrivate
 	 * @param[in] txn A transaction handle returned by #mdb_txn_begin()
 	 * @param[in] dbi A database handle returned by #f_OpenDatabase()
 	 */
-	void mdb_default_cmp(MDB_txn *txn, CDatabaseSubID dbi)
+	void mdb_default_cmp(CMdbTxn *txn, CDatabaseSubID dbi)
 	{
 		auto &Database = txn->mt_dbs[dbi];
 		auto &LocalDatabase = txn->mt_dbxs[dbi];
@@ -99,7 +99,7 @@ namespace NMib::NDatabase::NPrivate
 
 	/** Compare two items pointing at aligned unsigned int's.
 	 *
-	 *	This is also set as #EDatabaseSubFlag_SortedDuplicatesIntegerKeys|#EDatabaseSubFlag_SortedDuplicatesFixedSize's #MDB_dbx.%m_fDataCompare,
+	 *	This is also set as #EDatabaseSubFlag_SortedDuplicatesIntegerKeys|#EDatabaseSubFlag_SortedDuplicatesFixedSize's #CMdbDbx.%m_fDataCompare,
 	 *	but #mdb_cmp_clong() is called instead if the data type is #CDatabaseOffset.
 	 */
 	int mdb_cmp_int(CDatabaseValue const &_Left, CDatabaseValue const &_Right)

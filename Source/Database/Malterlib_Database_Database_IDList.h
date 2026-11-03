@@ -37,7 +37,7 @@ namespace NMib::NDatabase::NPrivate
 	 *	Preferably it should have the same size as a pointer.
 	 */
 
-	using MDB_ID = CDatabaseOffset;
+	using CMdbId = CDatabaseOffset;
 
 	/** An IDL is an ID List, a sorted array of IDs. The first
 	 * element of the array is a counter for how many actual
@@ -45,7 +45,7 @@ namespace NMib::NDatabase::NPrivate
 	 * sorted in ascending order. For libmdb IDLs are sorted in
 	 * descending order.
 	 */
-	typedef MDB_ID *MDB_IDL;
+	typedef CMdbId *CMdbIdl;
 
 	/* IDL sizes - likely should be even bigger
 	 *   limiting factors: sizeof(ID), thread stack size
@@ -57,7 +57,7 @@ namespace NMib::NDatabase::NPrivate
 #define DMdbIdlDbMax		(DMdbIdlDbSize-1)
 #define DMdbIdlUmMax		(DMdbIdlUmSize-1)
 
-#define DMdbIdlSizeof(d_Ids)		(((d_Ids)[0]+1) * sizeof(MDB_ID))
+#define DMdbIdlSizeof(d_Ids)		(((d_Ids)[0]+1) * sizeof(CMdbId))
 #define DMdbIdlIsZero(d_Ids) ( (d_Ids)[0] == 0 )
 #define DMdbIdlCpy( d_Dst, d_Src ) (memcpy( d_Dst, d_Src, DMdbIdlSizeof( d_Src ) ))
 #define DMdbIdlFirst( d_Ids )	( (d_Ids)[1] )
@@ -67,10 +67,10 @@ namespace NMib::NDatabase::NPrivate
 #define DMdbIdlAlloclen( d_Ids )	( (d_Ids)[-1] )
 
 	/** Append ID to IDL. The IDL must be big enough. */
-	inline_always void mdb_midl_xappend(MDB_IDL idl, MDB_ID id)
+	inline_always void mdb_midl_xappend(CMdbIdl idl, CMdbId id)
 	{
-		MDB_ID *xidl = idl;
-		MDB_ID xlen = ++xidl[0];
+		CMdbId *xidl = idl;
+		CMdbId xlen = ++xidl[0];
 		xidl[xlen] = id;
 	}
 
@@ -79,45 +79,45 @@ namespace NMib::NDatabase::NPrivate
 	 * @param[in] id	The ID to search for.
 	 * @return	The index of the first ID greater than or equal to \b id.
 	 */
-	unsigned mdb_midl_search(MDB_IDL ids, MDB_ID id);
+	unsigned mdb_midl_search(CMdbIdl ids, CMdbId id);
 
 	/** Allocate an IDL.
 	 * Allocates memory for an IDL of the given size.
 	 * @return	IDL on success, nullptr on failure.
 	 */
-	MDB_IDL mdb_midl_alloc(int num);
+	CMdbIdl mdb_midl_alloc(int num);
 
 	/** Free an IDL.
 	 * @param[in] ids	The IDL to free.
 	 */
-	void mdb_midl_free(MDB_IDL ids);
+	void mdb_midl_free(CMdbIdl ids);
 
 	/** Shrink an IDL.
 	 * Return the IDL to the default size if it has grown larger.
 	 * @param[in,out] idp	Address of the IDL to shrink.
 	 */
-	void mdb_midl_shrink(MDB_IDL *idp);
+	void mdb_midl_shrink(CMdbIdl *idp);
 
 	/** Make room for num additional elements in an IDL.
 	 * @param[in,out] idp	Address of the IDL.
 	 * @param[in] num	Number of elements to make room for.
 	 * @return	0 on success, ENOMEM on failure.
 	 */
-	void mdb_midl_need(MDB_IDL *idp, unsigned num);
+	void mdb_midl_need(CMdbIdl *idp, unsigned num);
 
 	/** Append an ID onto an IDL.
 	 * @param[in,out] idp	Address of the IDL to append to.
 	 * @param[in] id	The ID to append.
 	 * @return	0 on success, ENOMEM if the IDL is too large.
 	 */
-	void mdb_midl_append(MDB_IDL *idp, MDB_ID id);
+	void mdb_midl_append(CMdbIdl *idp, CMdbId id);
 
 	/** Append an IDL onto an IDL.
 	 * @param[in,out] idp	Address of the IDL to append to.
 	 * @param[in] app	The IDL to append.
 	 * @return	0 on success, ENOMEM if the IDL is too large.
 	 */
-	void mdb_midl_append_list(MDB_IDL *idp, MDB_IDL app);
+	void mdb_midl_append_list(CMdbIdl *idp, CMdbIdl app);
 
 	/** Append an ID range onto an IDL.
 	 * @param[in,out] idp	Address of the IDL to append to.
@@ -125,24 +125,24 @@ namespace NMib::NDatabase::NPrivate
 	 * @param[in] n		Number of IDs to append.
 	 * @return	0 on success, ENOMEM if the IDL is too large.
 	 */
-	void mdb_midl_append_range(MDB_IDL *idp, MDB_ID id, unsigned n);
+	void mdb_midl_append_range(CMdbIdl *idp, CMdbId id, unsigned n);
 
 	/** Merge an IDL onto an IDL. The destination IDL must be big enough.
 	 * @param[in] idl	The IDL to merge into.
 	 * @param[in] merge	The IDL to merge.
 	 */
-	void mdb_midl_xmerge(MDB_IDL idl, MDB_IDL merge);
+	void mdb_midl_xmerge(CMdbIdl idl, CMdbIdl merge);
 
 	/** Sort an IDL.
 	 * @param[in,out] ids	The IDL to sort.
 	 */
-	void mdb_midl_sort(MDB_IDL ids);
+	void mdb_midl_sort(CMdbIdl ids);
 
 	/** An ID2 is an ID/pointer pair.
 	 */
-	struct MDB_ID2
+	struct CMdbId2
 	{
-		MDB_ID mid; ///< The ID
+		CMdbId mid; ///< The ID
 		void *mptr; ///< The pointer
 	};
 
@@ -151,33 +151,33 @@ namespace NMib::NDatabase::NPrivate
 	 * elements are in the array. The \b mptr member of the first element is unused.
 	 * The array is sorted in ascending order by \b mid.
 	 */
-	typedef MDB_ID2 *MDB_ID2L;
+	typedef CMdbId2 *CMdbId2L;
 
 	/** Search for an ID in an ID2L.
 	 * @param[in] ids	The ID2L to search.
 	 * @param[in] id	The ID to search for.
 	 * @return	The index of the first ID2 whose \b mid member is greater than or equal to \b id.
 	 */
-	unsigned mdb_mid2l_search(MDB_ID2L ids, MDB_ID id);
+	unsigned mdb_mid2l_search(CMdbId2L ids, CMdbId id);
 
 	/** Insert an ID2 into a ID2L.
 	 * @param[in,out] ids	The ID2L to insert into.
 	 * @param[in] id	The ID2 to insert.
 	 * @return	0 on success, -1 if the ID was already present in the ID2L.
 	 */
-	int mdb_mid2l_insert(MDB_ID2L ids, MDB_ID2 *id);
+	int mdb_mid2l_insert(CMdbId2L ids, CMdbId2 *id);
 
 	/** Append an ID2 into a ID2L.
 	 * @param[in,out] ids	The ID2L to append into.
 	 * @param[in] id	The ID2 to append.
 	 * @return	0 on success, -2 if the ID2L is too big.
 	 */
-	int mdb_mid2l_append(MDB_ID2L ids, MDB_ID2 *id);
+	int mdb_mid2l_append(CMdbId2L ids, CMdbId2 *id);
 
 #ifdef DMibDatabase_Always64BitSupport
 	struct MDB_ID3
 	{
-		MDB_ID mid;  ///< The ID
+		CMdbId mid;  ///< The ID
 		void *mptr;  ///< The pointer
 		uint32 mcnt; ///< Number of pages
 		uint32 mref; ///< Refcounter
@@ -185,7 +185,7 @@ namespace NMib::NDatabase::NPrivate
 
 	typedef MDB_ID3 *MDB_ID3L;
 
-	unsigned mdb_mid3l_search(MDB_ID3L ids, MDB_ID id);
+	unsigned mdb_mid3l_search(MDB_ID3L ids, CMdbId id);
 	int mdb_mid3l_insert(MDB_ID3L ids, MDB_ID3 *id);
 
 #endif /* DMibDatabase_Always64BitSupport */
