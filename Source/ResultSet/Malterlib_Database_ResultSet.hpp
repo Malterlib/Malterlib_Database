@@ -9,13 +9,13 @@ namespace NMib::NDatabase
 	// CResultSet::CKeyPartIterator Public Implementation
 	//
 
-	template <typename t_CType>
-	t_CType const &CResultSet::CKeyPartIterator::f_Get() const
+	template <typename tf_CType>
+	tf_CType const &CResultSet::CKeyPartIterator::f_Get() const
 	{
 		auto const &KeyPartRowValueIndices = mp_pResultSet->mp_KeyPartRowValueIndices;
 		auto const &KeyPartValues = mp_pResultSet->mp_KeyPartValues;
 
-		static constexpr EResultDataType KeyPartType = NResultSet::TCTypeToDataType<t_CType>::mc_Type;
+		static constexpr EResultDataType KeyPartType = NResultSet::TCTypeToDataType<tf_CType>::mc_Type;
 
 		umint iValue = KeyPartRowValueIndices[mp_iKeyPart][mp_iRow];
 
@@ -52,14 +52,14 @@ namespace NMib::NDatabase
 	// CResultSet::CColumnValueIterator Public Implementation
 	//
 
-	template <typename t_CType>
-	t_CType const *CResultSet::CColumnValueIterator::f_Get() const
+	template <typename tf_CType>
+	tf_CType const *CResultSet::CColumnValueIterator::f_Get() const
 	{
 		auto const &Columns = mp_pResultSet->mp_Columns;
 
 		umint iCurColPos = mp_ColumnValueIterators[mp_iColumn];
 
-		static constexpr EResultDataType ColumnType = NResultSet::TCTypeToDataType<t_CType>::mc_Type;
+		static constexpr EResultDataType ColumnType = NResultSet::TCTypeToDataType<tf_CType>::mc_Type;
 
 		auto const &lValueArray = Columns[mp_iColumn].f_Get<ColumnType>();
 
@@ -88,10 +88,10 @@ namespace NMib::NDatabase
 	// CResultSet::CRowIterator Public Implementation
 	//
 
-	template <typename t_CType>
-	t_CType const &CResultSet::CRowIterator::f_GetKeyPart(umint _iKeyPart) const
+	template <typename tf_CType>
+	tf_CType const &CResultSet::CRowIterator::f_GetKeyPart(umint _iKeyPart) const
 	{
-		static constexpr EResultDataType KeyPartType = NResultSet::TCTypeToDataType<t_CType>::mc_Type;
+		static constexpr EResultDataType KeyPartType = NResultSet::TCTypeToDataType<tf_CType>::mc_Type;
 
 		umint iValue = mp_pResultSet->mp_KeyPartRowValueIndices[_iKeyPart][mp_iCurRow];
 
@@ -103,14 +103,14 @@ namespace NMib::NDatabase
 		return mp_pResultSet->mp_KeyPartRowValueIndices[_iKeyPart][mp_iCurRow];
 	}
 
-	template <typename t_CType>
-	t_CType const *CResultSet::CRowIterator::f_GetColumnValue(umint _iColumn) const
+	template <typename tf_CType>
+	tf_CType const *CResultSet::CRowIterator::f_GetColumnValue(umint _iColumn) const
 	{
 		auto const &Columns = mp_pResultSet->mp_Columns;
 
 		umint iCurColPos = mp_ColumnValueIterators[_iColumn];
 
-		static constexpr EResultDataType ColumnType = NResultSet::TCTypeToDataType<t_CType>::mc_Type;
+		static constexpr EResultDataType ColumnType = NResultSet::TCTypeToDataType<tf_CType>::mc_Type;
 
 		auto const &lValueArray = Columns[_iColumn].f_Get<ColumnType>();
 
@@ -134,12 +134,12 @@ namespace NMib::NDatabase
 	// ResultSet Public Implementation
 	//
 
-	template <typename t_CType>
-	NContainer::TCVector<t_CType> const &CResultSet::f_GetKeyPartValues(umint _iKeyPart) const
+	template <typename tf_CType>
+	NContainer::TCVector<tf_CType> const &CResultSet::f_GetKeyPartValues(umint _iKeyPart) const
 	{
 		auto const &KeyPartValues = mp_KeyPartValues;
 
-		static constexpr EResultDataType KeyPartType = NResultSet::TCTypeToDataType<t_CType>::mc_Type;
+		static constexpr EResultDataType KeyPartType = NResultSet::TCTypeToDataType<tf_CType>::mc_Type;
 
 		auto const &lValueArray = KeyPartValues[_iKeyPart].f_Get<KeyPartType>();
 

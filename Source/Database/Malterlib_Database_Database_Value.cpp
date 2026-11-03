@@ -41,8 +41,8 @@ namespace NMib::NDatabase
 	/** @brief Get items from a database.
 	 *
 	 * This function retrieves key/data pairs from the database. The address
-	 * and length of the data associated with the specified \b key are returned
-	 * in the structure to which \b data refers.
+	 * and length of the data associated with the specified \b _pKey are returned
+	 * in the structure to which \b _pData refers.
 	 * If the database supports duplicate keys (#EDatabaseSubFlag_SortedDuplicates) then the
 	 * first data item for the key will be returned. Retrieval of other
 	 * items requires the use of #fg_CursorGet().
@@ -54,9 +54,9 @@ namespace NMib::NDatabase
 	 * @note Values returned from the database are valid only until a
 	 * subsequent update operation, or the end of the transaction.
 	 * @param[in] txn A transaction handle returned by #f_TxnBegin()
-	 * @param[in] dbi A database handle returned by #f_OpenDatabase()
-	 * @param[in] key The key to search for in the database
-	 * @param[out] data The data corresponding to the key
+	 * @param[in] _DatabaseID A database handle returned by #f_OpenDatabase()
+	 * @param[in] _pKey The key to search for in the database
+	 * @param[out] _pData The data corresponding to the key
 	 * @return A non-zero error value on failure and 0 on success. Some possible
 	 * errors are:
 	 * <ul>
@@ -64,10 +64,10 @@ namespace NMib::NDatabase
 	 *	<li>EINVAL - an invalid parameter was specified.
 	 * </ul>
 	 */
-	bool CDatabaseTransactionCommon::CInternal::f_Get(CDatabaseSubID dbi, CDatabaseValue *key, CDatabaseValue *data)
+	bool CDatabaseTransactionCommon::CInternal::f_Get(CDatabaseSubID _DatabaseID, CDatabaseValue *_pKey, CDatabaseValue *_pData)
 	{
-		DMibRequire(key);
-		DMibRequire(data);
+		DMibRequire(_pKey);
+		DMibRequire(_pData);
 
 		using namespace NPrivate;
 		CMdbCursor mc;
@@ -75,16 +75,16 @@ namespace NMib::NDatabase
 		int exact = 0;
 		DKBuf;
 
-		DMibDatabaseTrace("===> get db {} key [{}]", dbi, DKey(key));
+		DMibDatabaseTrace("===> get db {} key [{}]", _DatabaseID, DKey(_pKey));
 
-		if (!DTxnDbiExist(this, dbi, DDbUserValid))
+		if (!DTxnDbiExist(this, _DatabaseID, DDbUserValid))
 			DMibError("Database does not exists");
 
 		f_CheckBlocked();
 
-		fg_CursorInit(&mc, this, dbi, &mx);
+		fg_CursorInit(&mc, this, _DatabaseID, &mx);
 		{
-			int rc = fg_CursorSet(&mc, key, data, EDatabaseCursorGet_Set, &exact);
+			int rc = fg_CursorSet(&mc, _pKey, _pData, EDatabaseCursorGet_Set, &exact);
 			if (rc)
 			{
 				if (rc == DMdbNotFound)
@@ -106,9 +106,9 @@ namespace NMib::NDatabase
 	 * if duplicates are disallowed, or adding a duplicate data item if
 	 * duplicates are allowed (#EDatabaseSubFlag_SortedDuplicates).
 	 * @param[in] txn A transaction handle returned by #f_TxnBegin()
-	 * @param[in] dbi A database handle returned by #f_OpenDatabase()
-	 * @param[in] key The key to store in the database
-	 * @param[in,out] data The data to store
+	 * @param[in] _DatabaseID A database handle returned by #f_OpenDatabase()
+	 * @param[in] _pKey The key to store in the database
+	 * @param[in,out] _pData The data to store
 	 * @param[in] flags Special options for this operation. This parameter
 	 * must be set to 0 or by bitwise OR'ing together one or more of the
 	 * values described here.
@@ -121,7 +121,7 @@ namespace NMib::NDatabase
 	 *	<li>#EDatabaseWriteFlag_NoOverwrite - enter the new key/data pair only if the key
 	 *		does not already appear in the database. The function will return
 	 *		#DMdbKeyExist if the key already appears in the database, even if
-	 *		the database supports duplicates (#EDatabaseSubFlag_SortedDuplicates). The \b data
+	 *		the database supports duplicates (#EDatabaseSubFlag_SortedDuplicates). The \b _pData
 	 *		parameter will be set to point to the existing item.
 	 *	<li>#EDatabaseWriteFlag_ReserveSpace - reserve space for data of the given size, but
 	 *		don't copy the given data. Instead, return a pointer to the
@@ -146,16 +146,16 @@ namespace NMib::NDatabase
 	 *	<li>EINVAL - an invalid parameter was specified.
 	 * </ul>
 	 */
-	void CDatabaseTransactionCommon::CInternal::f_Put(CDatabaseSubID dbi, CDatabaseValue *key, CDatabaseValue *data, EDatabaseWriteFlag _WriteFlags)
+	void CDatabaseTransactionCommon::CInternal::f_Put(CDatabaseSubID _DatabaseID, CDatabaseValue *_pKey, CDatabaseValue *_pData, EDatabaseWriteFlag _WriteFlags)
 	{
-		DMibRequire(key);
-		DMibRequire(data);
-		DMibRequire(!mt_env->f_IsInsideMemoryMap(key->m_pData) && !mt_env->f_IsInsideMemoryMap(data->m_pData))
+		DMibRequire(_pKey);
+		DMibRequire(_pData);
+		DMibRequire(!mt_env->f_IsInsideMemoryMap(_pKey->m_pData) && !mt_env->f_IsInsideMemoryMap(_pData->m_pData))
 			("You cannot use a value from the database in a database write. The database can change the value while writing, corrupting the database.")
 		;
 		using namespace NPrivate;
 
-		if (!DTxnDbiExist(this, dbi, DDbUserValid))
+		if (!DTxnDbiExist(this, _DatabaseID, DDbUserValid))
 			DMibError("Database does not exists");
 
 		if
@@ -183,11 +183,11 @@ namespace NMib::NDatabase
 		CMdbCursor mc;
 		CMdbXCursor mx;
 
-		fg_CursorInit(&mc, this, dbi, &mx);
-		mc.mc_next = mt_cursors[dbi];
-		mt_cursors[dbi] = &mc;
-		int rc = fg_CursorPut(&mc, key, data, _WriteFlags);
-		mt_cursors[dbi] = mc.mc_next;
+		fg_CursorInit(&mc, this, _DatabaseID, &mx);
+		mc.mc_next = mt_cursors[_DatabaseID];
+		mt_cursors[_DatabaseID] = &mc;
+		int rc = fg_CursorPut(&mc, _pKey, _pData, _WriteFlags);
+		mt_cursors[_DatabaseID] = mc.mc_next;
 		if (rc)
 			DMibError(NStr::fg_Format("Error putting data: {}", fg_StrError(rc)));
 	}
@@ -204,9 +204,9 @@ namespace NMib::NDatabase
 	 * This function will return #DMdbNotFound if the specified key/data
 	 * pair is not in the database.
 	 * @param[in] txn A transaction handle returned by #f_TxnBegin()
-	 * @param[in] dbi A database handle returned by #f_OpenDatabase()
-	 * @param[in] key The key to delete from the database
-	 * @param[in] data The data to delete
+	 * @param[in] _DatabaseID A database handle returned by #f_OpenDatabase()
+	 * @param[in] _pKey The key to delete from the database
+	 * @param[in] _pData The data to delete
 	 * @return A non-zero error value on failure and 0 on success. Some possible
 	 * errors are:
 	 * <ul>
@@ -214,12 +214,12 @@ namespace NMib::NDatabase
 	 *	<li>EINVAL - an invalid parameter was specified.
 	 * </ul>
 	 */
-	void CDatabaseTransactionCommon::CInternal::f_Delete(CDatabaseSubID dbi, CDatabaseValue const *key, CDatabaseValue const *data)
+	void CDatabaseTransactionCommon::CInternal::f_Delete(CDatabaseSubID _DatabaseID, CDatabaseValue const *_pKey, CDatabaseValue const *_pData)
 	{
-		DMibRequire(key);
+		DMibRequire(_pKey);
 		using namespace NPrivate;
 
-		if (!DTxnDbiExist(this, dbi, DDbUserValid))
+		if (!DTxnDbiExist(this, _DatabaseID, DDbUserValid))
 			DMibError("Database does not exists");
 
 		f_CheckBlocked();
@@ -227,13 +227,13 @@ namespace NMib::NDatabase
 		if (mt_flags & (DMdbTxnReadOnly))
 			DMibError("Trying to write to read only transaction");
 
-		if (!DFIsSet(mt_dbs[dbi].md_flags, EDatabaseSubFlag_SortedDuplicates))
+		if (!DFIsSet(mt_dbs[_DatabaseID].md_flags, EDatabaseSubFlag_SortedDuplicates))
 		{
 			/* must ignore any data */
-			data = nullptr;
+			_pData = nullptr;
 		}
 
-		int rc = fg_Del0(this, dbi, key, data, EDatabaseWriteFlag_None);
+		int rc = fg_Del0(this, _DatabaseID, _pKey, _pData, EDatabaseWriteFlag_None);
 		if (rc)
 			DMibError(NStr::fg_Format("Error deleting: {}", fg_StrError(rc)));
 	}
@@ -243,14 +243,14 @@ namespace NMib::NDatabase
 	 * This returns a comparison as if the two data items were keys in the
 	 * specified database.
 	 * @param[in] txn A transaction handle returned by #f_TxnBegin()
-	 * @param[in] dbi A database handle returned by #f_OpenDatabase()
-	 * @param[in] a The first item to compare
-	 * @param[in] b The second item to compare
-	 * @return < 0 if a < b, 0 if a == b, > 0 if a > b
+	 * @param[in] _DatabaseID A database handle returned by #f_OpenDatabase()
+	 * @param[in] _pLeft The first item to compare
+	 * @param[in] _pRight The second item to compare
+	 * @return < 0 if _pLeft < _pRight, 0 if _pLeft == _pRight, > 0 if _pLeft > _pRight
 	 */
-	int CDatabaseTransactionCommon::CInternal::f_KeyCompare(CDatabaseSubID dbi, CDatabaseValue const *a, CDatabaseValue const *b)
+	int CDatabaseTransactionCommon::CInternal::f_KeyCompare(CDatabaseSubID _DatabaseID, CDatabaseValue const *_pLeft, CDatabaseValue const *_pRight)
 	{
-		return mt_dbxs[dbi].m_fKeyCompare(*a, *b);
+		return mt_dbxs[_DatabaseID].m_fKeyCompare(*_pLeft, *_pRight);
 	}
 
 	/** @brief Compare two data items according to a particular database.
@@ -258,26 +258,26 @@ namespace NMib::NDatabase
 	 * This returns a comparison as if the two items were data items of
 	 * the specified database. The database must have the #EDatabaseSubFlag_SortedDuplicates flag.
 	 * @param[in] txn A transaction handle returned by #f_TxnBegin()
-	 * @param[in] dbi A database handle returned by #f_OpenDatabase()
-	 * @param[in] a The first item to compare
-	 * @param[in] b The second item to compare
-	 * @return < 0 if a < b, 0 if a == b, > 0 if a > b
+	 * @param[in] _DatabaseID A database handle returned by #f_OpenDatabase()
+	 * @param[in] _pLeft The first item to compare
+	 * @param[in] _pRight The second item to compare
+	 * @return < 0 if _pLeft < _pRight, 0 if _pLeft == _pRight, > 0 if _pLeft > _pRight
 	 */
-	int CDatabaseTransactionCommon::CInternal::f_DataCompare(CDatabaseSubID dbi, CDatabaseValue const *a, CDatabaseValue const *b)
+	int CDatabaseTransactionCommon::CInternal::f_DataCompare(CDatabaseSubID _DatabaseID, CDatabaseValue const *_pLeft, CDatabaseValue const *_pRight)
 	{
-		FDatabaseCompare const &DataCompare = mt_dbxs[dbi].m_fDataCompare;
+		FDatabaseCompare const &DataCompare = mt_dbxs[_DatabaseID].m_fDataCompare;
 #if DMibPPtrBits > 32 || defined(DMibDatabase_Always64BitSupport)
-		if (a->m_Size == sizeof(CDatabaseOffset) && DataCompare == NPrivate::g_mdb_cmp_int)
-			return NPrivate::g_mdb_cmp_clong(*a, *b);
+		if (_pLeft->m_Size == sizeof(CDatabaseOffset) && DataCompare == NPrivate::g_mdb_cmp_int)
+			return NPrivate::g_mdb_cmp_clong(*_pLeft, *_pRight);
 #endif
-		return DataCompare(*a, *b);
+		return DataCompare(*_pLeft, *_pRight);
 	}
 
 	// ---------------------------------------------------------------------------------------------------------------------------------------
 	// Private from here
 	// ---------------------------------------------------------------------------------------------------------------------------------------
 
-	int NPrivate::fg_Del0(CMdbTxn *txn, CDatabaseSubID dbi, CDatabaseValue const *key, CDatabaseValue const *data, EDatabaseWriteFlag _Flags)
+	int NPrivate::fg_Del0(CMdbTxn *_pTransaction, CDatabaseSubID _DatabaseID, CDatabaseValue const *_pKey, CDatabaseValue const *_pData, EDatabaseWriteFlag _Flags)
 	{
 		CMdbCursor mc;
 		CMdbXCursor mx;
@@ -286,14 +286,14 @@ namespace NMib::NDatabase
 		int rc, exact = 0;
 		DKBuf;
 
-		DMibDatabaseTrace("====> delete db {} key [{}]", dbi, DKey(key));
+		DMibDatabaseTrace("====> delete db {} key [{}]", _DatabaseID, DKey(_pKey));
 
-		fg_CursorInit(&mc, txn, dbi, &mx);
+		fg_CursorInit(&mc, _pTransaction, _DatabaseID, &mx);
 
-		if (data)
+		if (_pData)
 		{
 			op = EDatabaseCursorGet_GetBoth;
-			rdata = *data;
+			rdata = *_pData;
 			xdata = &rdata;
 		}
 		else
@@ -302,7 +302,7 @@ namespace NMib::NDatabase
 			xdata = nullptr;
 			_Flags |= EDatabaseWriteFlag_NoDuplicateData;
 		}
-		auto Key = *key;
+		auto Key = *_pKey;
 		rc = fg_CursorSet(&mc, &Key, xdata, op, &exact);
 		if (rc == 0)
 		{
@@ -314,10 +314,10 @@ namespace NMib::NDatabase
 			 * run out of space, triggering a split. We need this
 			 * cursor to be consistent until the end of the rebalance.
 			 */
-			mc.mc_next = txn->mt_cursors[dbi];
-			txn->mt_cursors[dbi] = &mc;
+			mc.mc_next = _pTransaction->mt_cursors[_DatabaseID];
+			_pTransaction->mt_cursors[_DatabaseID] = &mc;
 			rc = fg_CursorDel(&mc, _Flags);
-			txn->mt_cursors[dbi] = mc.mc_next;
+			_pTransaction->mt_cursors[_DatabaseID] = mc.mc_next;
 		}
 		return rc;
 	}

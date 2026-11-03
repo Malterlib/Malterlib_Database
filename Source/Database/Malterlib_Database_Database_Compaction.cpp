@@ -168,7 +168,7 @@ namespace NMib::NDatabase::NPrivate
 	}
 
 	/** Depth-first tree traversal for compacting copy. */
-	int DMibDatabaseInfrequentSection fg_TraverseTreeCopyRecursive(CCompactingCopyState &_CopyState, CPgno *pg, int flags)
+	int DMibDatabaseInfrequentSection fg_TraverseTreeCopyRecursive(CCompactingCopyState &_CopyState, CPgno *_pPageNumber, int _Flags)
 	{
 		CMdbCursor mc = {0};
 		CMdbNode *ni;
@@ -178,7 +178,7 @@ namespace NMib::NDatabase::NPrivate
 		uint32 i;
 
 		/* Empty DB, nothing to do */
-		if (*pg == DPInvalid)
+		if (*_pPageNumber == DPInvalid)
 			return DMdbSuccess;
 
 		auto &CopyState = _CopyState;
@@ -187,7 +187,7 @@ namespace NMib::NDatabase::NPrivate
 		mc.mc_txn = CopyState.m_pInternalTransaction;
 		mc.mc_flags = CopyState.m_pInternalTransaction->mt_flags & (DCOrigReadOnly | DCWriteMap);
 
-		rc = fg_PageGet(&mc, *pg, &mc.mc_pg[0], nullptr);
+		rc = fg_PageGet(&mc, *_pPageNumber, &mc.mc_pg[0], nullptr);
 		if (rc)
 			return rc;
 		rc = fg_PageSearchRoot(&mc, nullptr, DMdbPsFirst);
@@ -217,7 +217,7 @@ namespace NMib::NDatabase::NPrivate
 
 			if (DIsLeaf(mp))
 			{
-				if (!DIsLeaf2(mp) && !(flags & DFDupData))
+				if (!DIsLeaf2(mp) && !(_Flags & DFDupData))
 				{
 					for (i = 0; i < n; i++)
 					{
@@ -336,7 +336,7 @@ namespace NMib::NDatabase::NPrivate
 			else
 			{
 				/* Otherwise we're done */
-				*pg = mo->mp_p.p_pgno;
+				*_pPageNumber = mo->mp_p.p_pgno;
 				break;
 			}
 		}
@@ -349,10 +349,10 @@ namespace NMib::NDatabase::NPrivate
 namespace NMib::NDatabase
 {
 	/** Copy environment with compaction. */
-	void DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_CopyCompact(HANDLE fd)
+	void DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_CopyCompact(HANDLE _FileHandle)
 	{
 		using namespace NPrivate;
-		CCompactingCopyState CopyState{this, fd};
+		CCompactingCopyState CopyState{this, _FileHandle};
 		int rc;
 		CPgno root, new_root;
 

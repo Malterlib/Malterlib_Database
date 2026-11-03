@@ -42,13 +42,13 @@ namespace NMib::NDatabase::NPrivate
 	 * Called immediately after a database is opened to set the defaults.
 	 * The user can then override them with #f_SetDatabaseKeyCompare() or
 	 * #f_SetDatabaseDataCompare().
-	 * @param[in] txn A transaction handle returned by #f_TxnBegin()
-	 * @param[in] dbi A database handle returned by #f_OpenDatabase()
+	 * @param[in] _pTransaction A transaction handle returned by #f_TxnBegin()
+	 * @param[in] _DatabaseID A database handle returned by #f_OpenDatabase()
 	 */
-	void fg_DefaultCmp(CMdbTxn *txn, CDatabaseSubID dbi)
+	void fg_DefaultCmp(CMdbTxn *_pTransaction, CDatabaseSubID _DatabaseID)
 	{
-		auto &Database = txn->mt_dbs[dbi];
-		auto &LocalDatabase = txn->mt_dbxs[dbi];
+		auto &Database = _pTransaction->mt_dbs[_DatabaseID];
+		auto &LocalDatabase = _pTransaction->mt_dbxs[_DatabaseID];
 
 		uint16 f = Database.md_flags;
 

@@ -265,19 +265,19 @@ namespace NMib::NDatabase
 
 	struct CMetadataCompare
 	{
-		COrdering_Strong operator () (NResultSet::CMetadataEntry const &_A, NResultSet::CMetadataEntry const &_B) const
+		COrdering_Strong operator () (NResultSet::CMetadataEntry const &_Left, NResultSet::CMetadataEntry const &_Right) const
 		{
-			return _A.m_ID <=> _B.m_ID;
+			return _Left.m_ID <=> _Right.m_ID;
 		}
 
-		COrdering_Strong operator () (NResultSet::CMetadataEntry const &_A, uint32 _B) const
+		COrdering_Strong operator () (NResultSet::CMetadataEntry const &_Left, uint32 _Right) const
 		{
-			return _A.m_ID <=> _B;
+			return _Left.m_ID <=> _Right;
 		}
 
-		COrdering_Strong operator () (uint32 _A, NResultSet::CMetadataEntry const &_B) const
+		COrdering_Strong operator () (uint32 _Left, NResultSet::CMetadataEntry const &_Right) const
 		{
-			return _A <=> _B.m_ID;
+			return _Left <=> _Right.m_ID;
 		}
 	};
 

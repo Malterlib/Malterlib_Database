@@ -41,27 +41,27 @@ namespace NMib::NDatabase
 	using namespace NPrivate;
 	/** Common code for #f_DatabaseStatistics() and #f_Statistics().
 	 * @param[in] env the environment to operate in.
-	 * @param[in] db the #CMdbDb record containing the stats to return.
+	 * @param[in] _pDatabase the #CMdbDb record containing the stats to return.
 	 * @param[out] arg the address of an #CDatabaseStatistics structure to receive the stats.
 	 * @return 0, this function always succeeds.
 	 */
-	CDatabaseStatistics DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_DatabaseStatistics(CMdbDb *db)
+	CDatabaseStatistics DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_DatabaseStatistics(CMdbDb *_pDatabase)
 	{
 		CDatabaseStatistics Stats;
 		Stats.m_PageSize = me_psize;
-		Stats.m_BTreeDepth = db->md_depth;
-		Stats.m_nBranchPages = db->md_branch_pages;
-		Stats.m_nLeafPages = db->md_leaf_pages;
-		Stats.m_nOverflowPages = db->md_overflow_pages;
-		Stats.m_nDataItems = db->md_entries;
+		Stats.m_BTreeDepth = _pDatabase->md_depth;
+		Stats.m_nBranchPages = _pDatabase->md_branch_pages;
+		Stats.m_nLeafPages = _pDatabase->md_leaf_pages;
+		Stats.m_nOverflowPages = _pDatabase->md_overflow_pages;
+		Stats.m_nDataItems = _pDatabase->md_entries;
 
 		return Stats;
 	}
 
-	CDatabaseSizeStatistics DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_SizeStatistics(CMdbDb *db)
+	CDatabaseSizeStatistics DMibDatabaseInfrequentSection CDatabaseEnvironment_Internal::f_SizeStatistics(CMdbDb *_pDatabase)
 	{
 		CDatabaseSizeStatistics Stats;
-		Stats.m_UsedBytes = (db->md_branch_pages + db->md_leaf_pages + db->md_overflow_pages) * me_psize;
+		Stats.m_UsedBytes = (_pDatabase->md_branch_pages + _pDatabase->md_leaf_pages + _pDatabase->md_overflow_pages) * me_psize;
 		Stats.m_MapSize = m_MapSize;
 		Stats.m_PageSize = me_psize;
 

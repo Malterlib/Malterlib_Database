@@ -30,8 +30,8 @@ namespace NMib::NDatabase
 			}
 		};
 
-		template <typename t_VectorVariant>
-		umint fg_GetVectorVariantLength(t_VectorVariant const &_VecVar)
+		template <typename tf_CVectorVariant>
+		umint fg_GetVectorVariantLength(tf_CVectorVariant const &_VecVar)
 		{
 			CVectorVariantSizeVisitor Visitor;
 
@@ -65,15 +65,15 @@ namespace NMib::NDatabase
 
 	CResultSetBuilder::CResultSetBuilder
 		(
-			NContainer::TCVector<EResultDataType> const &_lKeyPartTypes
-			, NContainer::TCVector<NResultSet::CSubType> const &_lKeyPartSubTypes
-			, NContainer::TCVector<EResultDataType> const &_lColumnTypes
-			, NContainer::TCVector<NResultSet::CSubType> const &_lColumnSubTypes
+			NContainer::TCVector<EResultDataType> const &_KeyPartTypes
+			, NContainer::TCVector<NResultSet::CSubType> const &_KeyPartSubTypes
+			, NContainer::TCVector<EResultDataType> const &_ColumnTypes
+			, NContainer::TCVector<NResultSet::CSubType> const &_ColumnSubTypes
 		)
 		: mp_nRows(0)
 		, mp_bRowActive(false)
 	{
-		f_SetDescription(_lKeyPartTypes, _lKeyPartSubTypes, _lColumnTypes, _lColumnSubTypes);
+		f_SetDescription(_KeyPartTypes, _KeyPartSubTypes, _ColumnTypes, _ColumnSubTypes);
 	}
 
 	CResultSetBuilder::CResultSetBuilder(CResultSetDescription const &_Desc)
@@ -115,21 +115,21 @@ namespace NMib::NDatabase
 
 	void CResultSetBuilder::f_SetDescription
 		(
-			NContainer::TCVector<EResultDataType> const &_lKeyPartTypes
-			, NContainer::TCVector<NResultSet::CSubType> const &_lKeyPartSubTypes
-			, NContainer::TCVector<EResultDataType> const &_lColumnTypes
-			, NContainer::TCVector<NResultSet::CSubType> const &_lColumnSubTypes
+			NContainer::TCVector<EResultDataType> const &_KeyPartTypes
+			, NContainer::TCVector<NResultSet::CSubType> const &_KeyPartSubTypes
+			, NContainer::TCVector<EResultDataType> const &_ColumnTypes
+			, NContainer::TCVector<NResultSet::CSubType> const &_ColumnSubTypes
 		)
 	{
 		f_Clear();
 
 		// Set the key part types.
-		mp_KeyPartInfos.f_SetLen(_lKeyPartTypes.f_GetLen());
-		mp_KeyPartValues.f_SetLen(_lKeyPartTypes.f_GetLen());
-		mp_KeyPartRowValueIndices.f_SetLen(_lKeyPartTypes.f_GetLen());
+		mp_KeyPartInfos.f_SetLen(_KeyPartTypes.f_GetLen());
+		mp_KeyPartValues.f_SetLen(_KeyPartTypes.f_GetLen());
+		mp_KeyPartRowValueIndices.f_SetLen(_KeyPartTypes.f_GetLen());
 
-		auto iKeyPartType = _lKeyPartTypes.f_GetIterator();
-		auto iKeyPartSubType = _lKeyPartSubTypes.f_GetIterator();
+		auto iKeyPartType = _KeyPartTypes.f_GetIterator();
+		auto iKeyPartSubType = _KeyPartSubTypes.f_GetIterator();
 		auto iKeyPartValues = mp_KeyPartValues.f_GetIterator();
 		for (auto &KeyPartInfo : mp_KeyPartInfos)
 		{
@@ -169,11 +169,11 @@ namespace NMib::NDatabase
 		}
 
 		// Set the column types.
-		mp_ColumnInfos.f_SetLen(_lColumnTypes.f_GetLen());
-		mp_Columns.f_SetLen(_lColumnTypes.f_GetLen());
+		mp_ColumnInfos.f_SetLen(_ColumnTypes.f_GetLen());
+		mp_Columns.f_SetLen(_ColumnTypes.f_GetLen());
 
-		auto iColumnType = _lColumnTypes.f_GetIterator();
-		auto iColumnSubType = _lColumnSubTypes.f_GetIterator();
+		auto iColumnType = _ColumnTypes.f_GetIterator();
+		auto iColumnSubType = _ColumnSubTypes.f_GetIterator();
 		auto iColumn = mp_Columns.f_GetIterator();
 		for (auto &ColumnInfo : mp_ColumnInfos)
 		{
@@ -282,7 +282,7 @@ namespace NMib::NDatabase
 		return iIndex;
 	}
 
-	umint CResultSetBuilder::f_SetKeyPartVariantValues(uint32 _iKeyPart, NContainer::TCVector<NResultSet::CValue> const &_lValues)
+	umint CResultSetBuilder::f_SetKeyPartVariantValues(uint32 _iKeyPart, NContainer::TCVector<NResultSet::CValue> const &_Values)
 	{
 		DMibCheck(mp_KeyPartInfos.f_IsPosValid(_iKeyPart))("Values for too many key parts are being specified!");
 
@@ -293,7 +293,7 @@ namespace NMib::NDatabase
 				auto &lValues = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_CStr>();
 
 				lValues.f_Clear();
-				for (auto const &CurValue : _lValues)
+				for (auto const &CurValue : _Values)
 					lValues.f_Insert(CurValue.f_Get<EResultDataType_CStr>());
 				break;
 			}
@@ -302,7 +302,7 @@ namespace NMib::NDatabase
 				auto &lValues = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_fp64>();
 
 				lValues.f_Clear();
-				for (auto const &CurValue : _lValues)
+				for (auto const &CurValue : _Values)
 					lValues.f_Insert(CurValue.f_Get<EResultDataType_fp64>());
 
 				break;
@@ -312,7 +312,7 @@ namespace NMib::NDatabase
 				auto &lValues = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_uint64>();
 
 				lValues.f_Clear();
-				for (auto const &CurValue : _lValues)
+				for (auto const &CurValue : _Values)
 					lValues.f_Insert(CurValue.f_Get<EResultDataType_uint64>());
 
 				break;
@@ -322,7 +322,7 @@ namespace NMib::NDatabase
 				auto &lValues = mp_KeyPartValues[_iKeyPart].f_Get<EResultDataType_Binary>();
 
 				lValues.f_Clear();
-				for (auto const &CurValue : _lValues)
+				for (auto const &CurValue : _Values)
 					lValues.f_Insert(CurValue.f_Get<EResultDataType_Binary>());
 
 				break;
@@ -369,21 +369,21 @@ namespace NMib::NDatabase
 		return CColumn(*this, _iColumn);
 	}
 
-	void CResultSetBuilder::f_ExtractTo(CResultSet &_oRS)
+	void CResultSetBuilder::f_ExtractTo(CResultSet &o_ResultSet)
 	{
 		DMibCheck(!mp_bRowActive)("No row must be active when extracting.");
 
-		_oRS.f_Clear();
+		o_ResultSet.f_Clear();
 
 		for (auto iMetadata = mp_Metadata.f_GetIterator(); iMetadata; ++iMetadata)
-			_oRS.mp_Metadata.f_Insert({iMetadata.f_GetKey(), fg_Move(*iMetadata)});
+			o_ResultSet.mp_Metadata.f_Insert({iMetadata.f_GetKey(), fg_Move(*iMetadata)});
 
-		_oRS.mp_KeyPartInfos = fg_Move(mp_KeyPartInfos);
-		_oRS.mp_ColumnInfos = fg_Move(mp_ColumnInfos);
-		_oRS.mp_KeyPartValues = fg_Move(mp_KeyPartValues);
-		_oRS.mp_nRows = mp_nRows;
-		_oRS.mp_KeyPartRowValueIndices = fg_Move(mp_KeyPartRowValueIndices);
-		_oRS.mp_Columns = fg_Move(mp_Columns);
+		o_ResultSet.mp_KeyPartInfos = fg_Move(mp_KeyPartInfos);
+		o_ResultSet.mp_ColumnInfos = fg_Move(mp_ColumnInfos);
+		o_ResultSet.mp_KeyPartValues = fg_Move(mp_KeyPartValues);
+		o_ResultSet.mp_nRows = mp_nRows;
+		o_ResultSet.mp_KeyPartRowValueIndices = fg_Move(mp_KeyPartRowValueIndices);
+		o_ResultSet.mp_Columns = fg_Move(mp_Columns);
 
 		f_Clear();
 	}
@@ -432,7 +432,7 @@ namespace NMib::NDatabase
 		}
 	}
 
-	CResultSetBuilder::CRow &CResultSetBuilder::CRow::f_Column(std::nullptr_t)
+	CResultSetBuilder::CRow &CResultSetBuilder::CRow::f_Column(std::nullptr_t _pNull)
 	{
 		DMibCheck(mp_pBuilder)("Adding a column value to an invalid row.");
 		DMibCheck(mp_iCurKeyPart == mp_nKeyParts)("A column value is being specified before all key parts have been.");

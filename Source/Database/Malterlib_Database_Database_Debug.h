@@ -40,13 +40,13 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 namespace NMib::NDatabase::NPrivate
 {
 #if DMibDatabaseDebug
-	CPgno fg_DbgPgno(CMdbPage const *mp);
-	char const *fg_DKey(CDatabaseValue const *key, char *buf);
-	char const *fg_LeafNodeType(CMdbNode const *n);
-	void fg_PageList(CMdbPage const *mp);
-	void fg_CursorChk(CMdbCursor const *mc);
+	CPgno fg_DbgPgno(CMdbPage const *_pPage);
+	char const *fg_DKey(CDatabaseValue const *_pKey, char *_pBuffer);
+	char const *fg_LeafNodeType(CMdbNode const *_pNode);
+	void fg_PageList(CMdbPage const *_pPage);
+	void fg_CursorChk(CMdbCursor const *_pCursor);
 #	if (DMibDatabaseDebug) > 2
-	void fg_Audit(CMdbTxn *txn);
+	void fg_Audit(CMdbTxn *_pTransaction);
 #	endif
 #endif
 }

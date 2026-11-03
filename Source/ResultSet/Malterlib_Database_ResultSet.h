@@ -222,8 +222,8 @@ namespace NMib::NDatabase
 		EResultDataType f_GetKeyPartType(umint _iKeyPart) const;
 		NResultSet::CSubType f_GetKeyPartSubType(umint _iKeyPart) const;
 
-		template <typename t_CType>
-		NContainer::TCVector<t_CType> const &f_GetKeyPartValues(umint _iKeyPart) const;
+		template <typename tf_CType>
+		NContainer::TCVector<tf_CType> const &f_GetKeyPartValues(umint _iKeyPart) const;
 
 		EResultDataType f_GetColumnType(umint _iColumn) const;
 		NResultSet::CSubType f_GetColumnSubType(umint _iColumn) const;

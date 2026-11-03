@@ -121,15 +121,15 @@ namespace NMib::NDatabase
 
 			// inline CRow& f_KeyPartVariant(NResultSet::CValue const& _Value);
 
-			// template<typename t_CType>
-			// inline CRow& f_KeyPart(t_CType&& _Value);
+			// template<typename tf_CType>
+			// inline CRow& f_KeyPart(tf_CType&& _Value);
 
 			inline CRow &f_KeyPart(uint32 _iValueIndex);
 
-			template <typename t_CType>
-			inline CRow &f_Column(t_CType &&_Value);
+			template <typename tf_CType>
+			inline CRow &f_Column(tf_CType &&_Value);
 
-			CRow &f_Column(std::nullptr_t);
+			CRow &f_Column(std::nullptr_t _pNull);
 
 		private:
 			CResultSetBuilder *mp_pBuilder;
@@ -153,8 +153,8 @@ namespace NMib::NDatabase
 			CKeyPart(CKeyPart &&_ToMove);
 			~CKeyPart();
 
-			// template<typename t_CType>
-			// inline CKeyPart& f_AddValue(t_CType&& _Value);
+			// template<typename tf_CType>
+			// inline CKeyPart& f_AddValue(tf_CType&& _Value);
 
 			inline CKeyPart &f_AddValue(uint32 _iValueIndex);
 
@@ -174,10 +174,10 @@ namespace NMib::NDatabase
 			CColumn(CColumn &&_ToMove);
 			~CColumn();
 
-			template <typename t_CType>
-			inline CColumn &f_AddValue(t_CType &&_Value);
+			template <typename tf_CType>
+			inline CColumn &f_AddValue(tf_CType &&_Value);
 
-			inline CColumn &f_AddValue(std::nullptr_t);
+			inline CColumn &f_AddValue(std::nullptr_t _pNull);
 
 		private:
 			CResultSetBuilder *mp_pBuilder;
@@ -197,10 +197,10 @@ namespace NMib::NDatabase
 		CResultSetBuilder(CResultSetBuilder &&_ToMove);
 		CResultSetBuilder
 			(
-				NContainer::TCVector<EResultDataType> const &_lKeyPartTypes
-				, NContainer::TCVector<NResultSet::CSubType> const &_lKeyPartSubTypes
-				, NContainer::TCVector<EResultDataType> const &_lColumnTypes
-				, NContainer::TCVector<NResultSet::CSubType> const &_lColumnSubTypes
+				NContainer::TCVector<EResultDataType> const &_KeyPartTypes
+				, NContainer::TCVector<NResultSet::CSubType> const &_KeyPartSubTypes
+				, NContainer::TCVector<EResultDataType> const &_ColumnTypes
+				, NContainer::TCVector<NResultSet::CSubType> const &_ColumnSubTypes
 			)
 		;
 		CResultSetBuilder(CResultSetDescription const &_Desc);
@@ -212,10 +212,10 @@ namespace NMib::NDatabase
 
 		void f_SetDescription
 			(
-				NContainer::TCVector<EResultDataType> const &_lKeyPartTypes
-				, NContainer::TCVector<NResultSet::CSubType> const &_lKeyPartSubTypes
-				, NContainer::TCVector<EResultDataType> const &_lColumnTypes
-				, NContainer::TCVector<NResultSet::CSubType> const &_lColumnSubTypes
+				NContainer::TCVector<EResultDataType> const &_KeyPartTypes
+				, NContainer::TCVector<NResultSet::CSubType> const &_KeyPartSubTypes
+				, NContainer::TCVector<EResultDataType> const &_ColumnTypes
+				, NContainer::TCVector<NResultSet::CSubType> const &_ColumnSubTypes
 			)
 		;
 		void f_SetDescription(CResultSetDescription const &_Desc);
@@ -224,14 +224,14 @@ namespace NMib::NDatabase
 		void f_SetKeyPartMetadata(umint _iKeyPart, CResultMetadata &&_Data);
 		void f_SetColumnMetadata(umint _iColumn, CResultMetadata &&_Data);
 
-		template <typename t_CType>
-		inline umint f_AddKeyPartValue(uint32 _iKeyPart, t_CType &&_Value);
+		template <typename tf_CType>
+		inline umint f_AddKeyPartValue(uint32 _iKeyPart, tf_CType &&_Value);
 
-		template <typename t_CType>
-		inline umint f_SetKeyPartValues(uint32 _iKeyPart, NContainer::TCVector<t_CType> &&_lValues);
+		template <typename tf_CType>
+		inline umint f_SetKeyPartValues(uint32 _iKeyPart, NContainer::TCVector<tf_CType> &&_Values);
 
 		umint f_AddKeyPartVariantValue(uint32 _iKeyPart, NResultSet::CValue const &_Value);
-		umint f_SetKeyPartVariantValues(uint32 _iKeyPart, NContainer::TCVector<NResultSet::CValue> const &_lValues);
+		umint f_SetKeyPartVariantValues(uint32 _iKeyPart, NContainer::TCVector<NResultSet::CValue> const &_Values);
 
 		CRow f_AddRow();
 		inline umint f_GetNumRows() const;
@@ -240,7 +240,7 @@ namespace NMib::NDatabase
 		CColumn f_Column(uint32 _iColumn);
 
 		// Mostly useful for test code.
-		void f_ExtractTo(CResultSet &_oRS);
+		void f_ExtractTo(CResultSet &o_ResultSet);
 
 		template <typename tf_CStream>
 		void f_Feed(tf_CStream &_Stream) const;

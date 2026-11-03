@@ -175,7 +175,7 @@ namespace NMib::NDatabase
 		umint f_CheckForStaleReaders();
 
 		void f_SetMapSize(CDatabaseOffset _Size);
-		void f_SetMaxDatabases(CDatabaseSubID _DatabaseID);
+		void f_SetMaxDatabases(CDatabaseSubID _nDatabases);
 
 		NAtomic::TCAtomic<umint> *f_GetReferencesPointer();
 

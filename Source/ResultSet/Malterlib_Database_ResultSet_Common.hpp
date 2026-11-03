@@ -89,7 +89,7 @@ namespace NMib::NDatabase::NResultSet
 	{	\
 		using CDataType = d_OutType; \
 		static constexpr EResultDataType mc_Type = d_Enum; \
-		static d_OutType fs_Convert(d_InType _V) { return d_OutType (_V); } \
+		static d_OutType fs_Convert(d_InType _Value) { return d_OutType (_Value); } \
 	}
 
 	DAODB_DefineTypeToDataType(fp64, fp64, EResultDataType_fp64);
@@ -101,9 +101,9 @@ namespace NMib::NDatabase::NResultSet
 	{
 		using CDataType = NStr::CStr;
 		static constexpr EResultDataType mc_Type = EResultDataType_CStr;
-		static NStr::CStr fs_Convert(NStr::CStr &&_V)
+		static NStr::CStr fs_Convert(NStr::CStr &&_Value)
 		{
-			return fg_Move(_V);
+			return fg_Move(_Value);
 		}
 	};
 
@@ -112,9 +112,9 @@ namespace NMib::NDatabase::NResultSet
 	{
 		using CDataType = NContainer::CByteVector;
 		static constexpr EResultDataType mc_Type = EResultDataType_Binary;
-		static NContainer::CByteVector fs_Convert(NContainer::CByteVector &&_V)
+		static NContainer::CByteVector fs_Convert(NContainer::CByteVector &&_Value)
 		{
-			return fg_Move(_V);
+			return fg_Move(_Value);
 		}
 	};
 
@@ -123,9 +123,9 @@ namespace NMib::NDatabase::NResultSet
 	{
 		using CDataType = NContainer::CByteVector;
 		static constexpr EResultDataType mc_Type = EResultDataType_Binary;
-		static NContainer::CByteVector fs_Convert(NContainer::CByteVector const &_V)
+		static NContainer::CByteVector fs_Convert(NContainer::CByteVector const &_Value)
 		{
-			return _V;
+			return _Value;
 		}
 	};
 
@@ -134,9 +134,9 @@ namespace NMib::NDatabase::NResultSet
 	{
 		using CDataType = NContainer::CByteVector;
 		static constexpr EResultDataType mc_Type = EResultDataType_Binary;
-		static NContainer::CByteVector fs_Convert(NContainer::CByteVector const &_V)
+		static NContainer::CByteVector fs_Convert(NContainer::CByteVector const &_Value)
 		{
-			return _V;
+			return _Value;
 		}
 	};
 
@@ -145,9 +145,9 @@ namespace NMib::NDatabase::NResultSet
 	{
 		using CDataType = NStr::CStr;
 		static constexpr EResultDataType mc_Type = EResultDataType_CStr;
-		static NStr::CStr fs_Convert(char const _V[t_Len])
+		static NStr::CStr fs_Convert(char const _Value[t_Len])
 		{
-			return NStr::CStr(_V);
+			return NStr::CStr(_Value);
 		}
 	};
 

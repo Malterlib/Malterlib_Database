@@ -41,17 +41,17 @@ namespace NMib::NDatabase
 	using namespace NPrivate;
 	/** Search for key within a page, using binary search.
 	 * Returns the smallest entry larger or equal to the key.
-	 * If exactp is non-null, stores whether the found entry was an exact match
-	 * in *exactp (1 or 0).
+	 * If o_pExact is non-null, stores whether the found entry was an exact match
+	 * in *o_pExact (1 or 0).
 	 * Updates the cursor index with the index of the found entry.
 	 * If no entry larger or equal to the key is found, returns nullptr.
 	 */
-	NPrivate::CMdbNode *NPrivate::fg_NodeSearch(CMdbCursor *mc, CDatabaseValue const *key, int *exactp)
+	NPrivate::CMdbNode *NPrivate::fg_NodeSearch(CMdbCursor *_pCursor, CDatabaseValue const *_pKey, int *o_pExact)
 	{
 		uint32 i = 0, nkeys;
 		int low, high;
 		int rc = 0;
-		CMdbPage *mp = mc->mc_pg[mc->mc_top];
+		CMdbPage *mp = _pCursor->mc_pg[_pCursor->mc_top];
 		CMdbNode *node = nullptr;
 		CDatabaseValue nodekey;
 		FDatabaseCompare *pCompare;
@@ -63,7 +63,7 @@ namespace NMib::NDatabase
 
 		low = DIsLeaf(mp) ? 0 : 1;
 		high = nkeys - 1;
-		pCompare = &(mc->mc_dbx->m_fKeyCompare);
+		pCompare = &(_pCursor->mc_dbx->m_fKeyCompare);
 
 		/* Branch pages have no data, so if using integer keys,
 		 * alignment is guaranteed. Use faster fg_CmpInt.
@@ -78,13 +78,13 @@ namespace NMib::NDatabase
 
 		if (DIsLeaf2(mp))
 		{
-			nodekey.m_Size = mc->mc_db->md_pad;
+			nodekey.m_Size = _pCursor->mc_db->md_pad;
 			node = DNodePtr(mp, 0); // fake
 			while (low <= high)
 			{
 				i = (low + high) >> 1;
 				nodekey.m_pData = DLeaf2Key(mp, i, nodekey.m_Size);
-				rc = (*pCompare)(*key, nodekey);
+				rc = (*pCompare)(*_pKey, nodekey);
 				DMibDatabaseTrace("found leaf index {} [{}], rc = {}", i, DKey(&nodekey), rc);
 				if (rc == 0)
 					break;
@@ -104,7 +104,7 @@ namespace NMib::NDatabase
 				nodekey.m_Size = DNodeKeySize(node);
 				nodekey.m_pData = DNodeKey(node);
 
-				rc = (*pCompare)(*key, nodekey);
+				rc = (*pCompare)(*_pKey, nodekey);
 #if DMibDatabaseDebug
 				if (DIsLeaf(mp))
 					DMibDatabaseTrace("found leaf index {} [{}], rc = {}", i, DKey(&nodekey), rc);
@@ -126,10 +126,10 @@ namespace NMib::NDatabase
 			if (!DIsLeaf2(mp))
 				node = DNodePtr(mp, i);
 		}
-		if (exactp)
-			*exactp = (rc == 0 && nkeys > 0);
+		if (o_pExact)
+			*o_pExact = (rc == 0 && nkeys > 0);
 		/* store the key index */
-		mc->mc_ki[mc->mc_top] = i;
+		_pCursor->mc_ki[_pCursor->mc_top] = i;
 		if (i >= nkeys)
 			/* There is no entry larger or equal to the key. */
 			return nullptr;
@@ -139,52 +139,52 @@ namespace NMib::NDatabase
 	}
 
 	/** Return the data associated with a given node.
-	 * @param[in] mc The cursor for this operation.
-	 * @param[in] leaf The node being read.
-	 * @param[out] data Updated to point to the node's data.
+	 * @param[in] _pCursor The cursor for this operation.
+	 * @param[in] _pLeaf The node being read.
+	 * @param[out] _pData Updated to point to the node's data.
 	 * @return 0 on success, non-zero on failure.
 	 */
-	int NPrivate::fg_NodeRead(CMdbCursor *mc, CMdbNode *leaf, CDatabaseValue *data)
+	int NPrivate::fg_NodeRead(CMdbCursor *_pCursor, CMdbNode *_pLeaf, CDatabaseValue *_pData)
 	{
 		CMdbPage *omp; // overflow page
 		CPgno pgno;
 		int rc;
 
-		if (DMcOvpg(mc))
+		if (DMcOvpg(_pCursor))
 		{
-			DMdbPageUnref(mc->mc_txn, DMcOvpg(mc));
-			DMcSetOvpg(mc, NULL);
+			DMdbPageUnref(_pCursor->mc_txn, DMcOvpg(_pCursor));
+			DMcSetOvpg(_pCursor, NULL);
 		}
-		if (!DFIsSet(leaf->mn_flags, DFBigData))
+		if (!DFIsSet(_pLeaf->mn_flags, DFBigData))
 		{
-			data->m_Size = DNodeDataSize(leaf);
-			data->m_pData = DNodeData(leaf);
+			_pData->m_Size = DNodeDataSize(_pLeaf);
+			_pData->m_pData = DNodeData(_pLeaf);
 			return DMdbSuccess;
 		}
 
 		/* Read overflow data.
 		*/
-		data->m_Size = DNodeDataSize(leaf);
-		memcpy(&pgno, DNodeData(leaf), sizeof(pgno));
-		if ((rc = fg_PageGet(mc, pgno, &omp, nullptr)) != 0)
+		_pData->m_Size = DNodeDataSize(_pLeaf);
+		memcpy(&pgno, DNodeData(_pLeaf), sizeof(pgno));
+		if ((rc = fg_PageGet(_pCursor, pgno, &omp, nullptr)) != 0)
 		{
 			DMibDatabaseTrace("read overflow page {} failed", pgno);
 			return rc;
 		}
-		data->m_pData = DMetaData(omp);
-		DMcSetOvpg(mc, omp);
+		_pData->m_pData = DMetaData(omp);
+		DMcSetOvpg(_pCursor, omp);
 
 		return DMdbSuccess;
 	}
 
 	/** Add a node to the page pointed to by the cursor.
 	 * Set #DMdbTxnError on failure.
-	 * @param[in] mc The cursor for this operation.
-	 * @param[in] indx The index on the page where the new node should be added.
-	 * @param[in] key The key for the new node.
-	 * @param[in] data The data for the new node, if any.
-	 * @param[in] pgno The page number, if adding a branch node.
-	 * @param[in] flags Flags for the node.
+	 * @param[in] _pCursor The cursor for this operation.
+	 * @param[in] _iNode The index on the page where the new node should be added.
+	 * @param[in] _pKey The key for the new node.
+	 * @param[in] _pData The data for the new node, if any.
+	 * @param[in] _PageNumber The page number, if adding a branch node.
+	 * @param[in] _Flags Flags for the node.
 	 * @return 0 on success, non-zero on failure. Possible errors are:
 	 * <ul>
 	 *	<li>ENOMEM - failed to allocate overflow pages for the node.
@@ -193,14 +193,14 @@ namespace NMib::NDatabase
 	 *	page's free space before calling this function.
 	 * </ul>
 	 */
-	int NPrivate::fg_NodeAdd(CMdbCursor *mc, CIndx indx, CDatabaseValue *key, CDatabaseValue *data, CPgno pgno, uint32 flags)
+	int NPrivate::fg_NodeAdd(CMdbCursor *_pCursor, CIndx _iNode, CDatabaseValue *_pKey, CDatabaseValue *_pData, CPgno _PageNumber, uint32 _Flags)
 	{
 		uint32 i;
 		umint node_size = DNodeSize;
 		smint room;
 		CIndx ofs;
 		CMdbNode *node;
-		CMdbPage *mp = mc->mc_pg[mc->mc_top];
+		CMdbPage *mp = _pCursor->mc_pg[_pCursor->mc_top];
 		CMdbPage *ofp = nullptr; // overflow page
 		void *ndata;
 		DKBuf;
@@ -213,23 +213,23 @@ namespace NMib::NDatabase
 				, DIsLeaf(mp) ? "leaf" : "branch"
 				, DIsSubp(mp) ? "sub-" : ""
 				, fg_DbgPgno(mp)
-				, indx
-				, data ? data->m_Size : 0
-				, key ? key->m_Size : 0
-				, key ? DKey(key) : "null"
+				, _iNode
+				, _pData ? _pData->m_Size : 0
+				, _pKey ? _pKey->m_Size : 0
+				, _pKey ? DKey(_pKey) : "null"
 			)
 		;
 
 		if (DIsLeaf2(mp))
 		{
 			/* Move higher keys up one slot. */
-			int ksize = mc->mc_db->md_pad, dif;
-			uint8 *ptr = DLeaf2Key(mp, indx, ksize);
-			dif = DNumKeys(mp) - indx;
+			int ksize = _pCursor->mc_db->md_pad, dif;
+			uint8 *ptr = DLeaf2Key(mp, _iNode, ksize);
+			dif = DNumKeys(mp) - _iNode;
 			if (dif > 0)
 				memmove(ptr + ksize, ptr, dif*ksize);
 			/* insert new key */
-			memcpy(ptr, key->m_pData, ksize);
+			memcpy(ptr, _pKey->m_pData, ksize);
 
 			/* Just using these for counting */
 			mp->mp_lower += sizeof(CIndx);
@@ -238,33 +238,33 @@ namespace NMib::NDatabase
 		}
 
 		room = (smint)DSizeLeft(mp) - (smint)sizeof(CIndx);
-		if (key != nullptr)
-			node_size += key->m_Size;
+		if (_pKey != nullptr)
+			node_size += _pKey->m_Size;
 		if (DIsLeaf(mp))
 		{
-			DMibCheck(key && data);
-			if (DFIsSet(flags, DFBigData))
+			DMibCheck(_pKey && _pData);
+			if (DFIsSet(_Flags, DFBigData))
 			{
 				/* Data already on overflow page. */
 				node_size += sizeof(CPgno);
 			}
-			else if (node_size + data->m_Size > mc->mc_txn->mt_env->me_nodemax)
+			else if (node_size + _pData->m_Size > _pCursor->mc_txn->mt_env->me_nodemax)
 			{
-				int ovpages = DOverflowPages(data->m_Size, mc->mc_txn->mt_env->me_psize);
+				int ovpages = DOverflowPages(_pData->m_Size, _pCursor->mc_txn->mt_env->me_psize);
 				int rc;
 				/* Put data on overflow page. */
-				DMibDatabaseTrace("data size is {}, node would be {}, put data on overflow page", data->m_Size, node_size + data->m_Size);
+				DMibDatabaseTrace("data size is {}, node would be {}, put data on overflow page", _pData->m_Size, node_size + _pData->m_Size);
 				node_size = DEven(node_size + sizeof(CPgno));
 				if ((smint)node_size > room)
 					goto full;
-				if ((rc = fg_PageNew(mc, DPOverflow, ovpages, &ofp)))
+				if ((rc = fg_PageNew(_pCursor, DPOverflow, ovpages, &ofp)))
 					return rc;
 				DMibDatabaseTrace("allocated overflow page {}", ofp->mp_p.p_pgno);
-				flags |= DFBigData;
+				_Flags |= DFBigData;
 				goto update;
 			}
 			else
-				node_size += data->m_Size;
+				node_size += _pData->m_Size;
 		}
 		node_size = DEven(node_size);
 		if ((smint)node_size > room)
@@ -272,48 +272,48 @@ namespace NMib::NDatabase
 
 	update:
 		/* Move higher pointers up one slot. */
-		for (i = DNumKeys(mp); i > indx; i--)
+		for (i = DNumKeys(mp); i > _iNode; i--)
 			mp->mp_ptrs[i] = mp->mp_ptrs[i - 1];
 
 		/* Adjust free space offsets. */
 		ofs = mp->mp_upper - node_size;
 		DMibCheck(ofs >= mp->mp_lower + sizeof(CIndx));
-		mp->mp_ptrs[indx] = ofs;
+		mp->mp_ptrs[_iNode] = ofs;
 		mp->mp_upper = ofs;
 		mp->mp_lower += sizeof(CIndx);
 
 		/* Write the node data. */
-		node = DNodePtr(mp, indx);
-		node->mn_ksize = (key == nullptr) ? 0 : key->m_Size;
-		node->mn_flags = flags;
+		node = DNodePtr(mp, _iNode);
+		node->mn_ksize = (_pKey == nullptr) ? 0 : _pKey->m_Size;
+		node->mn_flags = _Flags;
 		if (DIsLeaf(mp))
-			DSetDataSize(node, data->m_Size);
+			DSetDataSize(node, _pData->m_Size);
 		else
-			DSetPgno(node, pgno);
+			DSetPgno(node, _PageNumber);
 
-		if (key)
-			memcpy(DNodeKey(node), key->m_pData, key->m_Size);
+		if (_pKey)
+			memcpy(DNodeKey(node), _pKey->m_pData, _pKey->m_Size);
 
 		if (DIsLeaf(mp))
 		{
 			ndata = (CMdbPage *)DNodeData(node);
 			if (ofp == nullptr)
 			{
-				if (DFIsSet(flags, DFBigData))
-					memcpy(ndata, data->m_pData, sizeof(CPgno));
-				else if (DFIsSet(flags, EDatabaseWriteFlag_ReserveSpace))
-					data->m_pData = (uint8 *)ndata;
-				else if (data->m_Size)
-					memcpy(ndata, data->m_pData, data->m_Size);
+				if (DFIsSet(_Flags, DFBigData))
+					memcpy(ndata, _pData->m_pData, sizeof(CPgno));
+				else if (DFIsSet(_Flags, EDatabaseWriteFlag_ReserveSpace))
+					_pData->m_pData = (uint8 *)ndata;
+				else if (_pData->m_Size)
+					memcpy(ndata, _pData->m_pData, _pData->m_Size);
 			}
 			else
 			{
 				memcpy(ndata, &ofp->mp_p.p_pgno, sizeof(CPgno));
 				ndata = DMetaData(ofp);
-				if (DFIsSet(flags, EDatabaseWriteFlag_ReserveSpace))
-					data->m_pData = (uint8 *)ndata;
-				else if (data->m_Size)
-					memcpy(ndata, data->m_pData, data->m_Size);
+				if (DFIsSet(_Flags, EDatabaseWriteFlag_ReserveSpace))
+					_pData->m_pData = (uint8 *)ndata;
+				else if (_pData->m_Size)
+					memcpy(ndata, _pData->m_pData, _pData->m_Size);
 			}
 		}
 
@@ -323,19 +323,19 @@ namespace NMib::NDatabase
 		DMibDatabaseTrace("not enough room in page {}, got {} ptrs", fg_DbgPgno(mp), DNumKeys(mp));
 		DMibDatabaseTrace("upper-lower = {} - {} = {}", mp->mp_upper, mp->mp_lower, room);
 		DMibDatabaseTrace("node size = {}", node_size);
-		mc->mc_txn->mt_flags |= DMdbTxnError;
+		_pCursor->mc_txn->mt_flags |= DMdbTxnError;
 		return DMdbPageFull;
 	}
 
 	/** Delete the specified node from a page.
-	 * @param[in] mc Cursor pointing to the node to delete.
-	 * @param[in] ksize The size of a node. Only used if the page is
+	 * @param[in] _pCursor Cursor pointing to the node to delete.
+	 * @param[in] _KeySize The size of a node. Only used if the page is
 	 * part of a #EDatabaseSubFlag_SortedDuplicatesFixedSize database.
 	 */
-	void NPrivate::fg_NodeDel(CMdbCursor *mc, int ksize)
+	void NPrivate::fg_NodeDel(CMdbCursor *_pCursor, int _KeySize)
 	{
-		CMdbPage *mp = mc->mc_pg[mc->mc_top];
-		CIndx indx = mc->mc_ki[mc->mc_top];
+		CMdbPage *mp = _pCursor->mc_pg[_pCursor->mc_top];
+		CIndx indx = _pCursor->mc_ki[_pCursor->mc_top];
 		uint32 sz;
 		CIndx i, j, numkeys, ptr;
 		CMdbNode *node;
@@ -348,11 +348,11 @@ namespace NMib::NDatabase
 		if (DIsLeaf2(mp))
 		{
 			int x = numkeys - 1 - indx;
-			base = DLeaf2Key(mp, indx, ksize);
+			base = DLeaf2Key(mp, indx, _KeySize);
 			if (x)
-				memmove(base, base + ksize, x * ksize);
+				memmove(base, base + _KeySize, x * _KeySize);
 			mp->mp_lower -= sizeof(CIndx);
-			mp->mp_upper += CIndx(ksize - sizeof(CIndx));
+			mp->mp_upper += CIndx(_KeySize - sizeof(CIndx));
 			return;
 		}
 
@@ -387,10 +387,10 @@ namespace NMib::NDatabase
 	}
 
 	/** Compact the main page after deleting a node on a subpage.
-	 * @param[in] mp The main page to operate on.
-	 * @param[in] indx The index of the subpage on the main page.
+	 * @param[in] _pPage The main page to operate on.
+	 * @param[in] _iNode The index of the subpage on the main page.
 	 */
-	void NPrivate::fg_NodeShrink(CMdbPage *mp, CIndx indx)
+	void NPrivate::fg_NodeShrink(CMdbPage *_pPage, CIndx _iNode)
 	{
 		CMdbNode *node;
 		CMdbPage *sp, *xp;
@@ -398,7 +398,7 @@ namespace NMib::NDatabase
 		CIndx delta, nsize, len, ptr;
 		int i;
 
-		node = DNodePtr(mp, indx);
+		node = DNodePtr(_pPage, _iNode);
 		sp = (CMdbPage *)DNodeData(node);
 		delta = DSizeLeft(sp);
 		nsize = DNodeDataSize(node) - delta;
@@ -418,25 +418,25 @@ namespace NMib::NDatabase
 			len = DPageHeaderSize;
 		}
 		sp->mp_upper = sp->mp_lower;
-		DCopyPgno(sp->mp_p.p_pgno, mp->mp_p.p_pgno);
+		DCopyPgno(sp->mp_p.p_pgno, _pPage->mp_p.p_pgno);
 		DSetDataSize(node, uint32(nsize));
 
 		/* Shift <lower nodes...initial part of subpage> upward */
-		base = (char *)mp + mp->mp_upper + DPageBase;
+		base = (char *)_pPage + _pPage->mp_upper + DPageBase;
 		memmove(base + delta, base, (char *)sp + len - base);
 
-		ptr = mp->mp_ptrs[indx];
-		for (i = DNumKeys(mp); --i >= 0;)
+		ptr = _pPage->mp_ptrs[_iNode];
+		for (i = DNumKeys(_pPage); --i >= 0;)
 		{
-			if (mp->mp_ptrs[i] <= ptr)
-				mp->mp_ptrs[i] += delta;
+			if (_pPage->mp_ptrs[i] <= ptr)
+				_pPage->mp_ptrs[i] += delta;
 		}
-		mp->mp_upper += delta;
+		_pPage->mp_upper += delta;
 	}
 
-	/** Move a node from csrc to cdst.
+	/** Move a node from _pSourceCursor to _pDestinationCursor.
 	 */
-	int NPrivate::fg_NodeMove(CMdbCursor *csrc, CMdbCursor *cdst, int fromleft)
+	int NPrivate::fg_NodeMove(CMdbCursor *_pSourceCursor, CMdbCursor *_pDestinationCursor, int _bFromLeft)
 	{
 		CMdbNode *srcnode;
 		CDatabaseValue key, data;
@@ -448,13 +448,13 @@ namespace NMib::NDatabase
 		DKBuf;
 
 		/* Mark src and dst as dirty. */
-		if ((rc = fg_PageTouch(csrc)) || (rc = fg_PageTouch(cdst)))
+		if ((rc = fg_PageTouch(_pSourceCursor)) || (rc = fg_PageTouch(_pDestinationCursor)))
 			return rc;
 
-		if (DIsLeaf2(csrc->mc_pg[csrc->mc_top]))
+		if (DIsLeaf2(_pSourceCursor->mc_pg[_pSourceCursor->mc_top]))
 		{
-			key.m_Size = csrc->mc_db->md_pad;
-			key.m_pData = DLeaf2Key(csrc->mc_pg[csrc->mc_top], csrc->mc_ki[csrc->mc_top], key.m_Size);
+			key.m_Size = _pSourceCursor->mc_db->md_pad;
+			key.m_pData = DLeaf2Key(_pSourceCursor->mc_pg[_pSourceCursor->mc_top], _pSourceCursor->mc_ki[_pSourceCursor->mc_top], key.m_Size);
 			data.m_Size = 0;
 			data.m_pData = nullptr;
 			srcpg = 0;
@@ -462,31 +462,31 @@ namespace NMib::NDatabase
 		}
 		else
 		{
-			srcnode = DNodePtr(csrc->mc_pg[csrc->mc_top], csrc->mc_ki[csrc->mc_top]);
+			srcnode = DNodePtr(_pSourceCursor->mc_pg[_pSourceCursor->mc_top], _pSourceCursor->mc_ki[_pSourceCursor->mc_top]);
 			DMibCheck(!((umint)srcnode & 1));
 			srcpg = DNodePgno(srcnode);
 			flags = srcnode->mn_flags;
-			if (csrc->mc_ki[csrc->mc_top] == 0 && DIsBranch(csrc->mc_pg[csrc->mc_top]))
+			if (_pSourceCursor->mc_ki[_pSourceCursor->mc_top] == 0 && DIsBranch(_pSourceCursor->mc_pg[_pSourceCursor->mc_top]))
 			{
-				uint32 snum = csrc->mc_snum;
+				uint32 snum = _pSourceCursor->mc_snum;
 				CMdbNode *s2;
 				/* must find the lowest key below src */
-				rc = fg_PageSearchLowest(csrc);
+				rc = fg_PageSearchLowest(_pSourceCursor);
 				if (rc)
 					return rc;
-				if (DIsLeaf2(csrc->mc_pg[csrc->mc_top]))
+				if (DIsLeaf2(_pSourceCursor->mc_pg[_pSourceCursor->mc_top]))
 				{
-					key.m_Size = csrc->mc_db->md_pad;
-					key.m_pData = DLeaf2Key(csrc->mc_pg[csrc->mc_top], 0, key.m_Size);
+					key.m_Size = _pSourceCursor->mc_db->md_pad;
+					key.m_pData = DLeaf2Key(_pSourceCursor->mc_pg[_pSourceCursor->mc_top], 0, key.m_Size);
 				}
 				else
 				{
-					s2 = DNodePtr(csrc->mc_pg[csrc->mc_top], 0);
+					s2 = DNodePtr(_pSourceCursor->mc_pg[_pSourceCursor->mc_top], 0);
 					key.m_Size = DNodeKeySize(s2);
 					key.m_pData = DNodeKey(s2);
 				}
-				csrc->mc_snum = snum--;
-				csrc->mc_top = snum;
+				_pSourceCursor->mc_snum = snum--;
+				_pSourceCursor->mc_top = snum;
 			}
 			else
 			{
@@ -497,13 +497,13 @@ namespace NMib::NDatabase
 			data.m_pData = DNodeData(srcnode);
 		}
 		mn.mc_xcursor = nullptr;
-		if (DIsBranch(cdst->mc_pg[cdst->mc_top]) && cdst->mc_ki[cdst->mc_top] == 0)
+		if (DIsBranch(_pDestinationCursor->mc_pg[_pDestinationCursor->mc_top]) && _pDestinationCursor->mc_ki[_pDestinationCursor->mc_top] == 0)
 		{
-			uint32 snum = cdst->mc_snum;
+			uint32 snum = _pDestinationCursor->mc_snum;
 			CMdbNode *s2;
 			CDatabaseValue bkey;
 			/* must find the lowest key below dst */
-			fg_CursorCopy(cdst, &mn);
+			fg_CursorCopy(_pDestinationCursor, &mn);
 			rc = fg_PageSearchLowest(&mn);
 			if (rc)
 				return rc;
@@ -529,81 +529,81 @@ namespace NMib::NDatabase
 		DMibDatabaseTrace
 			(
 				"moving {} node {} [{}] on page {} to node {} on page {}"
-				, DIsLeaf(csrc->mc_pg[csrc->mc_top]) ? "leaf" : "branch"
-				, csrc->mc_ki[csrc->mc_top]
+				, DIsLeaf(_pSourceCursor->mc_pg[_pSourceCursor->mc_top]) ? "leaf" : "branch"
+				, _pSourceCursor->mc_ki[_pSourceCursor->mc_top]
 				, DKey(&key)
-				, csrc->mc_pg[csrc->mc_top]->mp_p.p_pgno
-				, cdst->mc_ki[cdst->mc_top]
-				, cdst->mc_pg[cdst->mc_top]->mp_p.p_pgno
+				, _pSourceCursor->mc_pg[_pSourceCursor->mc_top]->mp_p.p_pgno
+				, _pDestinationCursor->mc_ki[_pDestinationCursor->mc_top]
+				, _pDestinationCursor->mc_pg[_pDestinationCursor->mc_top]->mp_p.p_pgno
 			)
 		;
 
 		/* Add the node to the destination page.
 		*/
-		rc = fg_NodeAdd(cdst, cdst->mc_ki[cdst->mc_top], &key, &data, srcpg, flags);
+		rc = fg_NodeAdd(_pDestinationCursor, _pDestinationCursor->mc_ki[_pDestinationCursor->mc_top], &key, &data, srcpg, flags);
 		if (rc != DMdbSuccess)
 			return rc;
 
 		/* Delete the node from the source page.
 		*/
-		fg_NodeDel(csrc, key.m_Size);
+		fg_NodeDel(_pSourceCursor, key.m_Size);
 
 		{
 			/* Adjust other cursors pointing to mp */
 			CMdbCursor *m2, *m3;
-			CDatabaseSubID dbi = csrc->mc_dbi;
+			CDatabaseSubID dbi = _pSourceCursor->mc_dbi;
 			CMdbPage *mpd, *mps;
 
-			mps = csrc->mc_pg[csrc->mc_top];
+			mps = _pSourceCursor->mc_pg[_pSourceCursor->mc_top];
 			/* If we're adding on the left, bump others up */
-			if (fromleft)
+			if (_bFromLeft)
 			{
-				mpd = cdst->mc_pg[csrc->mc_top];
-				for (m2 = csrc->mc_txn->mt_cursors[dbi]; m2; m2 = m2->mc_next)
+				mpd = _pDestinationCursor->mc_pg[_pSourceCursor->mc_top];
+				for (m2 = _pSourceCursor->mc_txn->mt_cursors[dbi]; m2; m2 = m2->mc_next)
 				{
-					if (csrc->mc_flags & DCSub)
+					if (_pSourceCursor->mc_flags & DCSub)
 						m3 = &m2->mc_xcursor->mx_cursor;
 					else
 						m3 = m2;
-					if (!(m3->mc_flags & DCInitialized) || m3->mc_top < csrc->mc_top)
+					if (!(m3->mc_flags & DCInitialized) || m3->mc_top < _pSourceCursor->mc_top)
 						continue;
-					if (m3 != cdst && m3->mc_pg[csrc->mc_top] == mpd && m3->mc_ki[csrc->mc_top] >= cdst->mc_ki[csrc->mc_top])
-						m3->mc_ki[csrc->mc_top]++;
-					if (m3 != csrc && m3->mc_pg[csrc->mc_top] == mps && m3->mc_ki[csrc->mc_top] == csrc->mc_ki[csrc->mc_top])
+					if (m3 != _pDestinationCursor && m3->mc_pg[_pSourceCursor->mc_top] == mpd && m3->mc_ki[_pSourceCursor->mc_top] >= _pDestinationCursor->mc_ki[_pSourceCursor->mc_top])
+						m3->mc_ki[_pSourceCursor->mc_top]++;
+					if (m3 != _pSourceCursor && m3->mc_pg[_pSourceCursor->mc_top] == mps && m3->mc_ki[_pSourceCursor->mc_top] == _pSourceCursor->mc_ki[_pSourceCursor->mc_top])
 					{
-						m3->mc_pg[csrc->mc_top] = cdst->mc_pg[cdst->mc_top];
-						m3->mc_ki[csrc->mc_top] = cdst->mc_ki[cdst->mc_top];
-						m3->mc_ki[csrc->mc_top - 1]++;
+						m3->mc_pg[_pSourceCursor->mc_top] = _pDestinationCursor->mc_pg[_pDestinationCursor->mc_top];
+						m3->mc_ki[_pSourceCursor->mc_top] = _pDestinationCursor->mc_ki[_pDestinationCursor->mc_top];
+						m3->mc_ki[_pSourceCursor->mc_top - 1]++;
 					}
 					if (DIsLeaf(mps))
-						DXCursorRefresh(m3, csrc->mc_top, m3->mc_pg[csrc->mc_top]);
+						DXCursorRefresh(m3, _pSourceCursor->mc_top, m3->mc_pg[_pSourceCursor->mc_top]);
 				}
 			}
 			else
 			/* Adding on the right, bump others down */
 			{
-				for (m2 = csrc->mc_txn->mt_cursors[dbi]; m2; m2 = m2->mc_next)
+				for (m2 = _pSourceCursor->mc_txn->mt_cursors[dbi]; m2; m2 = m2->mc_next)
 				{
-					if (csrc->mc_flags & DCSub)
+					if (_pSourceCursor->mc_flags & DCSub)
 						m3 = &m2->mc_xcursor->mx_cursor;
 					else
 						m3 = m2;
-					if (m3 == csrc)
+					if (m3 == _pSourceCursor)
 						continue;
-					if (!(m3->mc_flags & DCInitialized) || m3->mc_top < csrc->mc_top)
+					if (!(m3->mc_flags & DCInitialized) || m3->mc_top < _pSourceCursor->mc_top)
 						continue;
-					if (m3->mc_pg[csrc->mc_top] == mps)
+					if (m3->mc_pg[_pSourceCursor->mc_top] == mps)
 					{
-						if (!m3->mc_ki[csrc->mc_top])
+						if (!m3->mc_ki[_pSourceCursor->mc_top])
 						{
-							m3->mc_pg[csrc->mc_top] = cdst->mc_pg[cdst->mc_top];
-							m3->mc_ki[csrc->mc_top] = cdst->mc_ki[cdst->mc_top];
-							m3->mc_ki[csrc->mc_top - 1]--;
+							m3->mc_pg[_pSourceCursor->mc_top] = _pDestinationCursor->mc_pg[_pDestinationCursor->mc_top];
+							m3->mc_ki[_pSourceCursor->mc_top] = _pDestinationCursor->mc_ki[_pDestinationCursor->mc_top];
+							m3->mc_ki[_pSourceCursor->mc_top - 1]--;
 						}
 						else
-							m3->mc_ki[csrc->mc_top]--;
+							m3->mc_ki[_pSourceCursor->mc_top]--;
 						if (DIsLeaf(mps))
-							DXCursorRefresh(m3, csrc->mc_top, m3->mc_pg[csrc->mc_top]);
+							DXCursorRefresh(m3, _pSourceCursor->mc_top, m3->mc_pg[_pSourceCursor->mc_top]);
 					}
 				}
 			}
@@ -611,20 +611,20 @@ namespace NMib::NDatabase
 
 		/* Update the parent separators.
 		*/
-		if (csrc->mc_ki[csrc->mc_top] == 0)
+		if (_pSourceCursor->mc_ki[_pSourceCursor->mc_top] == 0)
 		{
-			if (csrc->mc_ki[csrc->mc_top - 1] != 0)
+			if (_pSourceCursor->mc_ki[_pSourceCursor->mc_top - 1] != 0)
 			{
-				if (DIsLeaf2(csrc->mc_pg[csrc->mc_top]))
-					key.m_pData = DLeaf2Key(csrc->mc_pg[csrc->mc_top], 0, key.m_Size);
+				if (DIsLeaf2(_pSourceCursor->mc_pg[_pSourceCursor->mc_top]))
+					key.m_pData = DLeaf2Key(_pSourceCursor->mc_pg[_pSourceCursor->mc_top], 0, key.m_Size);
 				else
 				{
-					srcnode = DNodePtr(csrc->mc_pg[csrc->mc_top], 0);
+					srcnode = DNodePtr(_pSourceCursor->mc_pg[_pSourceCursor->mc_top], 0);
 					key.m_Size = DNodeKeySize(srcnode);
 					key.m_pData = DNodeKey(srcnode);
 				}
-				DMibDatabaseTrace("update separator for source page {} to [{}]", csrc->mc_pg[csrc->mc_top]->mp_p.p_pgno, DKey(&key));
-				fg_CursorCopy(csrc, &mn);
+				DMibDatabaseTrace("update separator for source page {} to [{}]", _pSourceCursor->mc_pg[_pSourceCursor->mc_top]->mp_p.p_pgno, DKey(&key));
+				fg_CursorCopy(_pSourceCursor, &mn);
 				mn.mc_snum--;
 				mn.mc_top--;
 				/* We want fg_Rebalance to find mn when doing fixups */
@@ -632,32 +632,32 @@ namespace NMib::NDatabase
 				if (rc)
 					return rc;
 			}
-			if (DIsBranch(csrc->mc_pg[csrc->mc_top]))
+			if (DIsBranch(_pSourceCursor->mc_pg[_pSourceCursor->mc_top]))
 			{
 				CDatabaseValue nullkey;
-				CIndx ix = csrc->mc_ki[csrc->mc_top];
+				CIndx ix = _pSourceCursor->mc_ki[_pSourceCursor->mc_top];
 				nullkey.m_Size = 0;
-				csrc->mc_ki[csrc->mc_top] = 0;
-				rc = fg_UpdateKey(csrc, &nullkey);
-				csrc->mc_ki[csrc->mc_top] = ix;
+				_pSourceCursor->mc_ki[_pSourceCursor->mc_top] = 0;
+				rc = fg_UpdateKey(_pSourceCursor, &nullkey);
+				_pSourceCursor->mc_ki[_pSourceCursor->mc_top] = ix;
 				DMibCheck(rc == DMdbSuccess);
 			}
 		}
 
-		if (cdst->mc_ki[cdst->mc_top] == 0)
+		if (_pDestinationCursor->mc_ki[_pDestinationCursor->mc_top] == 0)
 		{
-			if (cdst->mc_ki[cdst->mc_top - 1] != 0)
+			if (_pDestinationCursor->mc_ki[_pDestinationCursor->mc_top - 1] != 0)
 			{
-				if (DIsLeaf2(csrc->mc_pg[csrc->mc_top]))
-					key.m_pData = DLeaf2Key(cdst->mc_pg[cdst->mc_top], 0, key.m_Size);
+				if (DIsLeaf2(_pSourceCursor->mc_pg[_pSourceCursor->mc_top]))
+					key.m_pData = DLeaf2Key(_pDestinationCursor->mc_pg[_pDestinationCursor->mc_top], 0, key.m_Size);
 				else
 				{
-					srcnode = DNodePtr(cdst->mc_pg[cdst->mc_top], 0);
+					srcnode = DNodePtr(_pDestinationCursor->mc_pg[_pDestinationCursor->mc_top], 0);
 					key.m_Size = DNodeKeySize(srcnode);
 					key.m_pData = DNodeKey(srcnode);
 				}
-				DMibDatabaseTrace("update separator for destination page {} to [{}]", cdst->mc_pg[cdst->mc_top]->mp_p.p_pgno, DKey(&key));
-				fg_CursorCopy(cdst, &mn);
+				DMibDatabaseTrace("update separator for destination page {} to [{}]", _pDestinationCursor->mc_pg[_pDestinationCursor->mc_top]->mp_p.p_pgno, DKey(&key));
+				fg_CursorCopy(_pDestinationCursor, &mn);
 				mn.mc_snum--;
 				mn.mc_top--;
 				/* We want fg_Rebalance to find mn when doing fixups */
@@ -665,14 +665,14 @@ namespace NMib::NDatabase
 				if (rc)
 					return rc;
 			}
-			if (DIsBranch(cdst->mc_pg[cdst->mc_top]))
+			if (DIsBranch(_pDestinationCursor->mc_pg[_pDestinationCursor->mc_top]))
 			{
 				CDatabaseValue nullkey;
-				CIndx ix = cdst->mc_ki[cdst->mc_top];
+				CIndx ix = _pDestinationCursor->mc_ki[_pDestinationCursor->mc_top];
 				nullkey.m_Size = 0;
-				cdst->mc_ki[cdst->mc_top] = 0;
-				rc = fg_UpdateKey(cdst, &nullkey);
-				cdst->mc_ki[cdst->mc_top] = ix;
+				_pDestinationCursor->mc_ki[_pDestinationCursor->mc_top] = 0;
+				rc = fg_UpdateKey(_pDestinationCursor, &nullkey);
+				_pDestinationCursor->mc_ki[_pDestinationCursor->mc_top] = ix;
 				DMibCheck(rc == DMdbSuccess);
 			}
 		}
@@ -687,19 +687,19 @@ namespace NMib::NDatabase
 	 * rounded up to an even number of bytes, to guarantee 2-byte alignment
 	 * of the #CMdbNode headers.
 	 * @param[in] env The environment handle.
-	 * @param[in] key The key for the node.
-	 * @param[in] data The data for the node.
+	 * @param[in] _pKey The key for the node.
+	 * @param[in] _pData The data for the node.
 	 * @return The number of bytes needed to store the node.
 	 */
-	umint CDatabaseEnvironment_Internal::f_LeafSize(CDatabaseValue *key, CDatabaseValue *data)
+	umint CDatabaseEnvironment_Internal::f_LeafSize(CDatabaseValue *_pKey, CDatabaseValue *_pData)
 	{
 		umint sz;
 
-		sz = DLeafSize(key, data);
+		sz = DLeafSize(_pKey, _pData);
 		if (sz > me_nodemax)
 		{
 			/* put on overflow page */
-			sz -= data->m_Size - sizeof(CPgno);
+			sz -= _pData->m_Size - sizeof(CPgno);
 		}
 
 		return DEven(sz + sizeof(CIndx));
@@ -712,19 +712,19 @@ namespace NMib::NDatabase
 	 * size of the key. Sizes are always rounded up to an even number
 	 * of bytes, to guarantee 2-byte alignment of the #CMdbNode headers.
 	 * @param[in] env The environment handle.
-	 * @param[in] key The key for the node.
+	 * @param[in] _pKey The key for the node.
 	 * @return The number of bytes needed to store the node.
 	 */
-	umint CDatabaseEnvironment_Internal::f_BranchSize(CDatabaseValue *key)
+	umint CDatabaseEnvironment_Internal::f_BranchSize(CDatabaseValue *_pKey)
 	{
 		umint sz;
 
-		sz = DIndexSize(key);
+		sz = DIndexSize(_pKey);
 		if (sz > me_nodemax)
 		{
 			/* put on overflow page */
 			/* not implemented */
-			/* sz -= key->size - sizeof(CPgno); */
+			/* sz -= _pKey->size - sizeof(CPgno); */
 		}
 
 		return sz + sizeof(CIndx);
@@ -732,11 +732,11 @@ namespace NMib::NDatabase
 
 	/** Replace the key for a branch node with a new key.
 	 * Set #DMdbTxnError on failure.
-	 * @param[in] mc Cursor pointing to the node to operate on.
-	 * @param[in] key The new key to use.
+	 * @param[in] _pCursor Cursor pointing to the node to operate on.
+	 * @param[in] _pKey The new key to use.
 	 * @return 0 on success, non-zero on failure.
 	 */
-	int NPrivate::fg_UpdateKey(CMdbCursor *mc, CDatabaseValue *key)
+	int NPrivate::fg_UpdateKey(CMdbCursor *_pCursor, CDatabaseValue *_pKey)
 	{
 		CMdbPage *mp;
 		CMdbNode *node;
@@ -746,8 +746,8 @@ namespace NMib::NDatabase
 		CIndx ptr, i, numkeys, indx;
 		DKBuf;
 
-		indx = mc->mc_ki[mc->mc_top];
-		mp = mc->mc_pg[mc->mc_top];
+		indx = _pCursor->mc_ki[_pCursor->mc_top];
+		mp = _pCursor->mc_pg[_pCursor->mc_top];
 		node = DNodePtr(mp, indx);
 		ptr = mp->mp_ptrs[indx];
 #if DMibDatabaseDebug
@@ -756,12 +756,12 @@ namespace NMib::NDatabase
 			char kbuf2[DKBufMaxKeySize * 2 + 1];
 			k2.m_pData = DNodeKey(node);
 			k2.m_Size = node->mn_ksize;
-			DMibDatabaseTrace("update key {} (ofs {}) [{}] to [{}] on page {}", indx, ptr, fg_DKey(&k2, kbuf2), DKey(key), mp->mp_p.p_pgno);
+			DMibDatabaseTrace("update key {} (ofs {}) [{}] to [{}] on page {}", indx, ptr, fg_DKey(&k2, kbuf2), DKey(_pKey), mp->mp_p.p_pgno);
 		}
 #endif
 
 		/* Sizes must be 2-byte aligned. */
-		ksize = DEven(key->m_Size);
+		ksize = DEven(_pKey->m_Size);
 		oksize = DEven(node->mn_ksize);
 		delta = ksize - oksize;
 
@@ -774,8 +774,8 @@ namespace NMib::NDatabase
 				/* not enough space left, do a delete and split */
 				DMibDatabaseTrace("Not enough room, delta = {}, splitting...", delta);
 				pgno = DNodePgno(node);
-				fg_NodeDel(mc, 0);
-				return fg_PageSplit(mc, key, nullptr, pgno, DMdbSplitReplace);
+				fg_NodeDel(_pCursor, 0);
+				return fg_PageSplit(_pCursor, _pKey, nullptr, pgno, DMdbSplitReplace);
 			}
 
 			numkeys = DNumKeys(mp);
@@ -794,21 +794,21 @@ namespace NMib::NDatabase
 		}
 
 		/* But even if no shift was needed, update ksize */
-		if (node->mn_ksize != key->m_Size)
-			node->mn_ksize = key->m_Size;
+		if (node->mn_ksize != _pKey->m_Size)
+			node->mn_ksize = _pKey->m_Size;
 
-		if (key->m_Size)
-			memcpy(DNodeKey(node), key->m_pData, key->m_Size);
+		if (_pKey->m_Size)
+			memcpy(DNodeKey(node), _pKey->m_pData, _pKey->m_Size);
 
 		return DMdbSuccess;
 	}
 
 	/** Rebalance the tree after a delete operation.
-	 * @param[in] mc Cursor pointing to the page where rebalancing
+	 * @param[in] _pCursor Cursor pointing to the page where rebalancing
 	 * should begin.
 	 * @return 0 on success, non-zero on failure.
 	 */
-	int NPrivate::fg_Rebalance(CMdbCursor *mc)
+	int NPrivate::fg_Rebalance(CMdbCursor *_pCursor)
 	{
 		CMdbNode *node;
 		int rc, fromleft;
@@ -816,7 +816,7 @@ namespace NMib::NDatabase
 		CMdbCursor mn;
 		CIndx oldki;
 
-		if (DIsBranch(mc->mc_pg[mc->mc_top]))
+		if (DIsBranch(_pCursor->mc_pg[_pCursor->mc_top]))
 		{
 			minkeys = 2;
 			thresh = 1;
@@ -829,22 +829,22 @@ namespace NMib::NDatabase
 		DMibDatabaseTrace
 			(
 				"rebalancing {} page {} (has {} keys, {fe1} full)"
-				, DIsLeaf(mc->mc_pg[mc->mc_top]) ? "leaf" : "branch"
-				, fg_DbgPgno(mc->mc_pg[mc->mc_top])
-				, DNumKeys(mc->mc_pg[mc->mc_top])
-				, (float)DPageFill(mc->mc_txn->mt_env, mc->mc_pg[mc->mc_top]) / 10
+				, DIsLeaf(_pCursor->mc_pg[_pCursor->mc_top]) ? "leaf" : "branch"
+				, fg_DbgPgno(_pCursor->mc_pg[_pCursor->mc_top])
+				, DNumKeys(_pCursor->mc_pg[_pCursor->mc_top])
+				, (float)DPageFill(_pCursor->mc_txn->mt_env, _pCursor->mc_pg[_pCursor->mc_top]) / 10
 			)
 		;
 
-		if (DPageFill(mc->mc_txn->mt_env, mc->mc_pg[mc->mc_top]) >= thresh && DNumKeys(mc->mc_pg[mc->mc_top]) >= minkeys)
+		if (DPageFill(_pCursor->mc_txn->mt_env, _pCursor->mc_pg[_pCursor->mc_top]) >= thresh && DNumKeys(_pCursor->mc_pg[_pCursor->mc_top]) >= minkeys)
 		{
-			DMibDatabaseTrace("no need to rebalance page {}, above fill threshold", fg_DbgPgno(mc->mc_pg[mc->mc_top]));
+			DMibDatabaseTrace("no need to rebalance page {}, above fill threshold", fg_DbgPgno(_pCursor->mc_pg[_pCursor->mc_top]));
 			return DMdbSuccess;
 		}
 
-		if (mc->mc_snum < 2)
+		if (_pCursor->mc_snum < 2)
 		{
-			CMdbPage *mp = mc->mc_pg[0];
+			CMdbPage *mp = _pCursor->mc_pg[0];
 			if (DIsSubp(mp))
 			{
 				DPuts("Can't rebalance a subpage, ignoring");
@@ -853,25 +853,25 @@ namespace NMib::NDatabase
 			if (DNumKeys(mp) == 0)
 			{
 				DPuts("tree is completely empty");
-				mc->mc_db->md_root = DPInvalid;
-				mc->mc_db->md_depth = 0;
-				mc->mc_db->md_leaf_pages = 0;
-				fg_MidlAppend(&mc->mc_txn->mt_free_pgs, mp->mp_p.p_pgno);
+				_pCursor->mc_db->md_root = DPInvalid;
+				_pCursor->mc_db->md_depth = 0;
+				_pCursor->mc_db->md_leaf_pages = 0;
+				fg_MidlAppend(&_pCursor->mc_txn->mt_free_pgs, mp->mp_p.p_pgno);
 				/* Adjust cursors pointing to mp */
-				mc->mc_snum = 0;
-				mc->mc_top = 0;
-				mc->mc_flags &= ~DCInitialized;
+				_pCursor->mc_snum = 0;
+				_pCursor->mc_top = 0;
+				_pCursor->mc_flags &= ~DCInitialized;
 				{
 					CMdbCursor *m2, *m3;
-					CDatabaseSubID dbi = mc->mc_dbi;
+					CDatabaseSubID dbi = _pCursor->mc_dbi;
 
-					for (m2 = mc->mc_txn->mt_cursors[dbi]; m2; m2 = m2->mc_next)
+					for (m2 = _pCursor->mc_txn->mt_cursors[dbi]; m2; m2 = m2->mc_next)
 					{
-						if (mc->mc_flags & DCSub)
+						if (_pCursor->mc_flags & DCSub)
 							m3 = &m2->mc_xcursor->mx_cursor;
 						else
 							m3 = m2;
-						if (!(m3->mc_flags & DCInitialized) || (m3->mc_snum < mc->mc_snum))
+						if (!(m3->mc_flags & DCInitialized) || (m3->mc_snum < _pCursor->mc_snum))
 							continue;
 						if (m3->mc_pg[0] == mp)
 						{
@@ -886,37 +886,37 @@ namespace NMib::NDatabase
 			{
 				int i;
 				DPuts("collapsing root page!");
-				fg_MidlAppend(&mc->mc_txn->mt_free_pgs, mp->mp_p.p_pgno);
-				mc->mc_db->md_root = DNodePgno(DNodePtr(mp, 0));
-				rc = fg_PageGet(mc, mc->mc_db->md_root, &mc->mc_pg[0], nullptr);
+				fg_MidlAppend(&_pCursor->mc_txn->mt_free_pgs, mp->mp_p.p_pgno);
+				_pCursor->mc_db->md_root = DNodePgno(DNodePtr(mp, 0));
+				rc = fg_PageGet(_pCursor, _pCursor->mc_db->md_root, &_pCursor->mc_pg[0], nullptr);
 				if (rc)
 					return rc;
-				mc->mc_db->md_depth--;
-				mc->mc_db->md_branch_pages--;
-				mc->mc_ki[0] = mc->mc_ki[1];
-				for (i = 1; i < mc->mc_db->md_depth; i++)
+				_pCursor->mc_db->md_depth--;
+				_pCursor->mc_db->md_branch_pages--;
+				_pCursor->mc_ki[0] = _pCursor->mc_ki[1];
+				for (i = 1; i < _pCursor->mc_db->md_depth; i++)
 				{
-					mc->mc_pg[i] = mc->mc_pg[i + 1];
-					mc->mc_ki[i] = mc->mc_ki[i + 1];
+					_pCursor->mc_pg[i] = _pCursor->mc_pg[i + 1];
+					_pCursor->mc_ki[i] = _pCursor->mc_ki[i + 1];
 				}
 				{
 					/* Adjust other cursors pointing to mp */
 					CMdbCursor *m2, *m3;
-					CDatabaseSubID dbi = mc->mc_dbi;
+					CDatabaseSubID dbi = _pCursor->mc_dbi;
 
-					for (m2 = mc->mc_txn->mt_cursors[dbi]; m2; m2 = m2->mc_next)
+					for (m2 = _pCursor->mc_txn->mt_cursors[dbi]; m2; m2 = m2->mc_next)
 					{
-						if (mc->mc_flags & DCSub)
+						if (_pCursor->mc_flags & DCSub)
 							m3 = &m2->mc_xcursor->mx_cursor;
 						else
 							m3 = m2;
-						if (m3 == mc)
+						if (m3 == _pCursor)
 							continue;
 						if (!(m3->mc_flags & DCInitialized))
 							continue;
 						if (m3->mc_pg[0] == mp)
 						{
-							for (i = 0; i < mc->mc_db->md_depth; i++)
+							for (i = 0; i < _pCursor->mc_db->md_depth; i++)
 							{
 								m3->mc_pg[i] = m3->mc_pg[i + 1];
 								m3->mc_ki[i] = m3->mc_ki[i + 1];
@@ -935,8 +935,8 @@ namespace NMib::NDatabase
 		/* The parent (branch page) must have at least 2 pointers,
 		 * otherwise the tree is invalid.
 		 */
-		ptop = mc->mc_top - 1;
-		DMibCheck(DNumKeys(mc->mc_pg[ptop]) > 1);
+		ptop = _pCursor->mc_top - 1;
+		DMibCheck(DNumKeys(_pCursor->mc_pg[ptop]) > 1);
 
 		/* Leaf page fill factor is below the threshold.
 		 * Try to move keys from left or right neighbor, or
@@ -945,22 +945,22 @@ namespace NMib::NDatabase
 
 		/* Find neighbors.
 		*/
-		fg_CursorCopy(mc, &mn);
+		fg_CursorCopy(_pCursor, &mn);
 		mn.mc_xcursor = nullptr;
 
-		oldki = mc->mc_ki[mc->mc_top];
-		if (mc->mc_ki[ptop] == 0)
+		oldki = _pCursor->mc_ki[_pCursor->mc_top];
+		if (_pCursor->mc_ki[ptop] == 0)
 		{
 			/* We're the leftmost leaf in our parent.
 			*/
 			DPuts("reading right neighbor");
 			mn.mc_ki[ptop]++;
-			node = DNodePtr(mc->mc_pg[ptop], mn.mc_ki[ptop]);
-			rc = fg_PageGet(mc, DNodePgno(node), &mn.mc_pg[mn.mc_top], nullptr);
+			node = DNodePtr(_pCursor->mc_pg[ptop], mn.mc_ki[ptop]);
+			rc = fg_PageGet(_pCursor, DNodePgno(node), &mn.mc_pg[mn.mc_top], nullptr);
 			if (rc)
 				return rc;
 			mn.mc_ki[mn.mc_top] = 0;
-			mc->mc_ki[mc->mc_top] = DNumKeys(mc->mc_pg[mc->mc_top]);
+			_pCursor->mc_ki[_pCursor->mc_top] = DNumKeys(_pCursor->mc_pg[_pCursor->mc_top]);
 			fromleft = 0;
 		}
 		else
@@ -969,12 +969,12 @@ namespace NMib::NDatabase
 			*/
 			DPuts("reading left neighbor");
 			mn.mc_ki[ptop]--;
-			node = DNodePtr(mc->mc_pg[ptop], mn.mc_ki[ptop]);
-			rc = fg_PageGet(mc, DNodePgno(node), &mn.mc_pg[mn.mc_top], nullptr);
+			node = DNodePtr(_pCursor->mc_pg[ptop], mn.mc_ki[ptop]);
+			rc = fg_PageGet(_pCursor, DNodePgno(node), &mn.mc_pg[mn.mc_top], nullptr);
 			if (rc)
 				return rc;
 			mn.mc_ki[mn.mc_top] = DNumKeys(mn.mc_pg[mn.mc_top]) - 1;
-			mc->mc_ki[mc->mc_top] = 0;
+			_pCursor->mc_ki[_pCursor->mc_top] = 0;
 			fromleft = 1;
 		}
 
@@ -983,7 +983,7 @@ namespace NMib::NDatabase
 				"found neighbor page {} ({} keys, {fe1} full)"
 				, mn.mc_pg[mn.mc_top]->mp_p.p_pgno
 				, DNumKeys(mn.mc_pg[mn.mc_top])
-				, (float)DPageFill(mc->mc_txn->mt_env, mn.mc_pg[mn.mc_top]) / 10
+				, (float)DPageFill(_pCursor->mc_txn->mt_env, mn.mc_pg[mn.mc_top]) / 10
 			)
 		;
 
@@ -991,9 +991,9 @@ namespace NMib::NDatabase
 		 * move one key from it. Otherwise we should try to merge them.
 		 * (A branch page must never have less than 2 keys.)
 		 */
-		if (DPageFill(mc->mc_txn->mt_env, mn.mc_pg[mn.mc_top]) >= thresh && DNumKeys(mn.mc_pg[mn.mc_top]) > minkeys)
+		if (DPageFill(_pCursor->mc_txn->mt_env, mn.mc_pg[mn.mc_top]) >= thresh && DNumKeys(mn.mc_pg[mn.mc_top]) > minkeys)
 		{
-			rc = fg_NodeMove(&mn, mc, fromleft);
+			rc = fg_NodeMove(&mn, _pCursor, fromleft);
 			if (fromleft)
 			{
 				/* if we inserted on left, bump position up */
@@ -1003,34 +1003,34 @@ namespace NMib::NDatabase
 		else
 		{
 			if (!fromleft)
-				rc = fg_PageMerge(&mn, mc);
+				rc = fg_PageMerge(&mn, _pCursor);
 			else
 			{
 				oldki += DNumKeys(mn.mc_pg[mn.mc_top]);
-				mn.mc_ki[mn.mc_top] += mc->mc_ki[mn.mc_top] + 1;
+				mn.mc_ki[mn.mc_top] += _pCursor->mc_ki[mn.mc_top] + 1;
 				/* We want fg_Rebalance to find mn when doing fixups */
-				DWithCursorTracking(mn, rc = fg_PageMerge(mc, &mn));
-				fg_CursorCopy(&mn, mc);
+				DWithCursorTracking(mn, rc = fg_PageMerge(_pCursor, &mn));
+				fg_CursorCopy(&mn, _pCursor);
 			}
-			mc->mc_flags &= ~DCEof;
+			_pCursor->mc_flags &= ~DCEof;
 		}
-		mc->mc_ki[mc->mc_top] = oldki;
+		_pCursor->mc_ki[_pCursor->mc_top] = oldki;
 		return rc;
 	}
 
 	/** Add all the DB's pages to the free list.
-	 * @param[in] mc Cursor on the DB to free.
-	 * @param[in] subs non-Zero to check for sub-DBs in this DB.
+	 * @param[in] _pCursor Cursor on the DB to free.
+	 * @param[in] _bSubDatabases non-Zero to check for sub-DBs in this DB.
 	 * @return 0 on success, non-zero on failure.
 	 */
-	int NPrivate::fg_Drop0(CMdbCursor *mc, int subs)
+	int NPrivate::fg_Drop0(CMdbCursor *_pCursor, int _bSubDatabases)
 	{
 		int rc;
 
-		rc = fg_PageSearch(mc, nullptr, DMdbPsFirst);
+		rc = fg_PageSearch(_pCursor, nullptr, DMdbPsFirst);
 		if (rc == DMdbSuccess)
 		{
-			CMdbTxn *txn = mc->mc_txn;
+			CMdbTxn *txn = _pCursor->mc_txn;
 			CMdbNode *ni;
 			CMdbCursor mx;
 			uint32 i;
@@ -1040,18 +1040,18 @@ namespace NMib::NDatabase
 			 * Also if the DB doesn't have sub-DBs and has no overflow
 			 * pages, omit scanning leaves.
 			 */
-			if ((mc->mc_flags & DCSub) || (!subs && !mc->mc_db->md_overflow_pages))
-				fg_CursorPop(mc);
+			if ((_pCursor->mc_flags & DCSub) || (!_bSubDatabases && !_pCursor->mc_db->md_overflow_pages))
+				fg_CursorPop(_pCursor);
 
-			fg_CursorCopy(mc, &mx);
+			fg_CursorCopy(_pCursor, &mx);
 #ifdef DMibDatabase_Always64BitSupport
 			/* bump refcount for mx's pages */
-			for (i = 0; i < mc->mc_snum; i++)
-				fg_PageGet(&mx, mc->mc_pg[i]->mp_p.p_pgno, &mx.mc_pg[i], nullptr);
+			for (i = 0; i < _pCursor->mc_snum; i++)
+				fg_PageGet(&mx, _pCursor->mc_pg[i]->mp_p.p_pgno, &mx.mc_pg[i], nullptr);
 #endif
-			while (mc->mc_snum > 0)
+			while (_pCursor->mc_snum > 0)
 			{
-				CMdbPage *mp = mc->mc_pg[mc->mc_top];
+				CMdbPage *mp = _pCursor->mc_pg[_pCursor->mc_top];
 				unsigned n = DNumKeys(mp);
 				if (DIsLeaf(mp))
 				{
@@ -1063,24 +1063,24 @@ namespace NMib::NDatabase
 							CMdbPage *omp;
 							CPgno pg;
 							memcpy(&pg, DNodeData(ni), sizeof(pg));
-							rc = fg_PageGet(mc, pg, &omp, nullptr);
+							rc = fg_PageGet(_pCursor, pg, &omp, nullptr);
 							if (rc != 0)
 								goto done;
 							DMibCheck(DIsOverflow(omp));
 							fg_MidlAppendRange(&txn->mt_free_pgs, pg, omp->mp_pages);
-							mc->mc_db->md_overflow_pages -= omp->mp_pages;
-							if (!mc->mc_db->md_overflow_pages && !subs)
+							_pCursor->mc_db->md_overflow_pages -= omp->mp_pages;
+							if (!_pCursor->mc_db->md_overflow_pages && !_bSubDatabases)
 								break;
 						}
-						else if (subs && (ni->mn_flags & DFSubData))
+						else if (_bSubDatabases && (ni->mn_flags & DFSubData))
 						{
-							fg_XCursorInit1(mc, ni);
-							rc = fg_Drop0(&mc->mc_xcursor->mx_cursor, 0);
+							fg_XCursorInit1(_pCursor, ni);
+							rc = fg_Drop0(&_pCursor->mc_xcursor->mx_cursor, 0);
 							if (rc)
 								goto done;
 						}
 					}
-					if (!subs && !mc->mc_db->md_overflow_pages)
+					if (!_bSubDatabases && !_pCursor->mc_db->md_overflow_pages)
 						goto pop;
 				}
 				else
@@ -1095,10 +1095,10 @@ namespace NMib::NDatabase
 						fg_MidlXAppend(txn->mt_free_pgs, pg);
 					}
 				}
-				if (!mc->mc_top)
+				if (!_pCursor->mc_top)
 					break;
-				mc->mc_ki[mc->mc_top] = i;
-				rc = fg_CursorSibling(mc, 1);
+				_pCursor->mc_ki[_pCursor->mc_top] = i;
+				rc = fg_CursorSibling(_pCursor, 1);
 				if (rc)
 				{
 					if (rc != DMdbNotFound)
@@ -1107,17 +1107,17 @@ namespace NMib::NDatabase
 					 * of previous level.
 					 */
 				pop:
-					fg_CursorPop(mc);
-					mc->mc_ki[0] = 0;
-					for (i = 1; i < mc->mc_snum; i++)
+					fg_CursorPop(_pCursor);
+					_pCursor->mc_ki[0] = 0;
+					for (i = 1; i < _pCursor->mc_snum; i++)
 					{
-						mc->mc_ki[i] = 0;
-						mc->mc_pg[i] = mx.mc_pg[i];
+						_pCursor->mc_ki[i] = 0;
+						_pCursor->mc_pg[i] = mx.mc_pg[i];
 					}
 				}
 			}
 			/* free it */
-			fg_MidlAppend(&txn->mt_free_pgs, mc->mc_db->md_root);
+			fg_MidlAppend(&txn->mt_free_pgs, _pCursor->mc_db->md_root);
 		done:
 			if (rc)
 				txn->mt_flags |= DMdbTxnError;
@@ -1128,7 +1128,7 @@ namespace NMib::NDatabase
 		}
 		else if (rc == DMdbNotFound)
 			rc = DMdbSuccess;
-		mc->mc_flags &= ~DCInitialized;
+		_pCursor->mc_flags &= ~DCInitialized;
 		return rc;
 	}
 }

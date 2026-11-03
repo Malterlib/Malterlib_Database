@@ -40,11 +40,11 @@ namespace NMib::NDatabase
 {
 	/** Release a reader thread's slot in the reader lock table.
 	 *	This function is called automatically when a thread exits.
-	 * @param[in] ptr This points to the slot in the reader lock table.
+	 * @param[in] _pReader This points to the slot in the reader lock table.
 	 */
-	void NPrivate::fg_EnvReaderDest(void *ptr)
+	void NPrivate::fg_EnvReaderDest(void *_pReader)
 	{
-		CMdbReader *reader = (CMdbReader *)ptr;
+		CMdbReader *reader = (CMdbReader *)_pReader;
 
 #ifndef DPlatformFamily_Windows
 		if (reader->m_OwningProcessID.f_Load(NAtomic::gc_MemoryOrder_Acquire) == getpid()) // catch pthread_exit() in child process
@@ -64,10 +64,10 @@ namespace NMib::NDatabase
 
 	namespace
 	{
-		void NTAPI fg_TlsCallback(PVOID module, DWORD reason, PVOID ptr)
+		void NTAPI fg_TlsCallback(PVOID _pModule, DWORD _Reason, PVOID _pReserved)
 		{
 			int i;
-			switch (reason)
+			switch (_Reason)
 			{
 			case DLL_PROCESS_ATTACH: break;
 			case DLL_THREAD_ATTACH: break;

@@ -41,13 +41,13 @@ namespace
 		}
 
 	private:
-		static fp32 fsp_ReverseEncodeFloat(uint8 _1, uint8 _2, uint8 _3, uint8 _4)
+		static fp32 fsp_ReverseEncodeFloat(uint8 _Byte0, uint8 _Byte1, uint8 _Byte2, uint8 _Byte3)
 		{
 			TCVector<uint8> KeyData;
-			KeyData.f_Insert(_1);
-			KeyData.f_Insert(_2);
-			KeyData.f_Insert(_3);
-			KeyData.f_Insert(_4);
+			KeyData.f_Insert(_Byte0);
+			KeyData.f_Insert(_Byte1);
+			KeyData.f_Insert(_Byte2);
+			KeyData.f_Insert(_Byte3);
 
 			CDatabaseValue Value;
 			Value.m_pData = KeyData.f_GetArray();

@@ -125,19 +125,19 @@ namespace NMib::NDatabase
 		return *this;
 	}
 
-	template <typename t_CType>
-	CResultSetBuilder::CRow &CResultSetBuilder::CRow::f_Column(t_CType &&_Value)
+	template <typename tf_CType>
+	CResultSetBuilder::CRow &CResultSetBuilder::CRow::f_Column(tf_CType &&_Value)
 	{
 		using NResultSet::TCTypeToDataType;
 
-		static constexpr EResultDataType Type = TCTypeToDataType<t_CType>::mc_Type;
+		static constexpr EResultDataType Type = TCTypeToDataType<tf_CType>::mc_Type;
 
 		DMibCheck(mp_pBuilder)("Adding a column value to an invalid row.");
 		DMibCheck(mp_iCurKeyPart == mp_nKeyParts)("A column value is being specified before all key parts have been.");
 		DMibCheck(mp_iCurColumn < mp_nColumns)("Too many column values are being specified!");
 		DMibCheck(mp_pBuilder->mp_ColumnInfos[mp_iCurColumn].m_Type == Type)("Invalid type used for column value");
 
-		mp_pBuilder->mp_Columns[mp_iCurColumn].f_Get<Type>().f_Insert({mp_iRow, TCTypeToDataType<t_CType>::fs_Convert(std::forward<t_CType>(_Value))});
+		mp_pBuilder->mp_Columns[mp_iCurColumn].f_Get<Type>().f_Insert({mp_iRow, TCTypeToDataType<tf_CType>::fs_Convert(std::forward<tf_CType>(_Value))});
 
 		++mp_iCurColumn;
 
@@ -164,12 +164,12 @@ namespace NMib::NDatabase
 	// CResultSetBuilder::CColumn Public Implementation
 	//
 
-	template <typename t_CType>
-	inline CResultSetBuilder::CColumn &CResultSetBuilder::CColumn::f_AddValue(t_CType &&_Value)
+	template <typename tf_CType>
+	inline CResultSetBuilder::CColumn &CResultSetBuilder::CColumn::f_AddValue(tf_CType &&_Value)
 	{
 		using NResultSet::TCTypeToDataType;
 
-		static constexpr EResultDataType Type = TCTypeToDataType<t_CType>::mc_Type;
+		static constexpr EResultDataType Type = TCTypeToDataType<tf_CType>::mc_Type;
 
 		DMibCheck(mp_pBuilder)("Adding a key part value to an invalid column.");
 		DMibCheck(mp_iColumn < mp_pBuilder->mp_ColumnInfos.f_GetLen())("Invalid column");
@@ -181,14 +181,14 @@ namespace NMib::NDatabase
 
 		DMibCheck(mp_iCurRow < mp_pBuilder->mp_nRows)("Attempting to add a column value for a row that has no key parts specified.");
 
-		lArray.f_Insert({mp_iCurRow, TCTypeToDataType<t_CType>::fs_Convert(std::forward<t_CType>(_Value))});
+		lArray.f_Insert({mp_iCurRow, TCTypeToDataType<tf_CType>::fs_Convert(std::forward<tf_CType>(_Value))});
 
 		++mp_iCurRow;
 
 		return *this;
 	}
 
-	inline CResultSetBuilder::CColumn &CResultSetBuilder::CColumn::f_AddValue(std::nullptr_t)
+	inline CResultSetBuilder::CColumn &CResultSetBuilder::CColumn::f_AddValue(std::nullptr_t _pNull)
 	{
 		if (mp_iCurRow == 0)
 		{
@@ -239,36 +239,36 @@ namespace NMib::NDatabase
 	// CResultSetBuilder Public Implementation
 	//
 
-	template <typename t_CType>
-	umint CResultSetBuilder::f_AddKeyPartValue(uint32 _iKeyPart, t_CType &&_Value)
+	template <typename tf_CType>
+	umint CResultSetBuilder::f_AddKeyPartValue(uint32 _iKeyPart, tf_CType &&_Value)
 	{
 		using NResultSet::TCTypeToDataType;
 
-		static constexpr EResultDataType Type = TCTypeToDataType<t_CType>::mc_Type;
+		static constexpr EResultDataType Type = TCTypeToDataType<tf_CType>::mc_Type;
 
 		DMibCheck(_iKeyPart < mp_KeyPartInfos.f_GetLen())("Values for too many key parts are being specified!");
 		DMibCheck(mp_KeyPartInfos[_iKeyPart].m_Type == Type)("Invalid type used for key part values");
 
 		auto &lKeyPartValues = mp_KeyPartValues[_iKeyPart].f_Get<Type>();
 
-		lKeyPartValues.f_Insert(TCTypeToDataType<t_CType>::fs_Convert(std::forward<t_CType>(_Value)));
+		lKeyPartValues.f_Insert(TCTypeToDataType<tf_CType>::fs_Convert(std::forward<tf_CType>(_Value)));
 
 		return lKeyPartValues.f_GetLen();
 	}
 
-	template <typename t_CType>
-	umint CResultSetBuilder::f_SetKeyPartValues(uint32 _iKeyPart, NContainer::TCVector<t_CType> &&_lValues)
+	template <typename tf_CType>
+	umint CResultSetBuilder::f_SetKeyPartValues(uint32 _iKeyPart, NContainer::TCVector<tf_CType> &&_Values)
 	{
 		using NResultSet::TCTypeToDataType;
 
-		static constexpr EResultDataType Type = TCTypeToDataType<t_CType>::mc_Type;
+		static constexpr EResultDataType Type = TCTypeToDataType<tf_CType>::mc_Type;
 
 		DMibCheck(_iKeyPart < mp_KeyPartInfos.f_GetLen())("Values for too many key parts are being specified!");
 		DMibCheck(mp_KeyPartInfos[_iKeyPart].m_Type == Type)("Invalid type used for key part values");
 
 		auto &lKeyPartValues = mp_KeyPartValues[_iKeyPart].f_Get<Type>();
 
-		lKeyPartValues = fg_Move(_lValues);
+		lKeyPartValues = fg_Move(_Values);
 
 		return 0;
 	}

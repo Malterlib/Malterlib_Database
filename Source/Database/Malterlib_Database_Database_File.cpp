@@ -43,19 +43,19 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 namespace NMib::NDatabase::NPrivate
 {
-	CDatabaseOffset DMibDatabaseInfrequentSection fg_FSize(HANDLE fd)
+	CDatabaseOffset DMibDatabaseInfrequentSection fg_FSize(HANDLE _FileHandle)
 	{
 #ifdef DPlatformFamily_Windows
 		LARGE_INTEGER fsize;
 
-		if (!GetFileSizeEx(fd, &fsize))
+		if (!GetFileSizeEx(_FileHandle, &fsize))
 			DMibError(NStr::fg_Format("Error getting file size: {}", DErrCode()));
 
 		return fsize.QuadPart;
 #else
 		struct stat st;
 
-		if (fstat(fd, &st))
+		if (fstat(_FileHandle, &st))
 			DMibError(NStr::fg_Format("Error getting file size: {}", DErrCode()));
 
 		return st.st_size;

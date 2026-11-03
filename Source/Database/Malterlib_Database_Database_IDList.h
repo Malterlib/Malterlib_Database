@@ -67,76 +67,76 @@ namespace NMib::NDatabase::NPrivate
 #define DMdbIdlAlloclen( d_Ids )	( (d_Ids)[-1] )
 
 	/** Append ID to IDL. The IDL must be big enough. */
-	inline_always void fg_MidlXAppend(CMdbIdl idl, CMdbId id)
+	inline_always void fg_MidlXAppend(CMdbIdl _pIDs, CMdbId _ID)
 	{
-		CMdbId *xidl = idl;
+		CMdbId *xidl = _pIDs;
 		CMdbId xlen = ++xidl[0];
-		xidl[xlen] = id;
+		xidl[xlen] = _ID;
 	}
 
 	/** Search for an ID in an IDL.
-	 * @param[in] ids	The IDL to search.
-	 * @param[in] id	The ID to search for.
-	 * @return	The index of the first ID greater than or equal to \b id.
+	 * @param[in] _pIDs	The IDL to search.
+	 * @param[in] _ID	The ID to search for.
+	 * @return	The index of the first ID greater than or equal to \b _ID.
 	 */
-	unsigned fg_MidlSearch(CMdbIdl ids, CMdbId id);
+	unsigned fg_MidlSearch(CMdbIdl _pIDs, CMdbId _ID);
 
 	/** Allocate an IDL.
 	 * Allocates memory for an IDL of the given size.
 	 * @return	IDL on success, nullptr on failure.
 	 */
-	CMdbIdl fg_MidlAlloc(int num);
+	CMdbIdl fg_MidlAlloc(int _nIDs);
 
 	/** Free an IDL.
-	 * @param[in] ids	The IDL to free.
+	 * @param[in] _pIDs	The IDL to free.
 	 */
-	void fg_MidlFree(CMdbIdl ids);
+	void fg_MidlFree(CMdbIdl _pIDs);
 
 	/** Shrink an IDL.
 	 * Return the IDL to the default size if it has grown larger.
-	 * @param[in,out] idp	Address of the IDL to shrink.
+	 * @param[in,out] _pIDList	Address of the IDL to shrink.
 	 */
-	void fg_MidlShrink(CMdbIdl *idp);
+	void fg_MidlShrink(CMdbIdl *_pIDList);
 
-	/** Make room for num additional elements in an IDL.
-	 * @param[in,out] idp	Address of the IDL.
-	 * @param[in] num	Number of elements to make room for.
+	/** Make room for _nIDs additional elements in an IDL.
+	 * @param[in,out] _pIDList	Address of the IDL.
+	 * @param[in] _nIDs	Number of elements to make room for.
 	 * @return	0 on success, ENOMEM on failure.
 	 */
-	void fg_MidlNeed(CMdbIdl *idp, unsigned num);
+	void fg_MidlNeed(CMdbIdl *_pIDList, unsigned _nIDs);
 
 	/** Append an ID onto an IDL.
-	 * @param[in,out] idp	Address of the IDL to append to.
-	 * @param[in] id	The ID to append.
+	 * @param[in,out] _pIDList	Address of the IDL to append to.
+	 * @param[in] _ID	The ID to append.
 	 * @return	0 on success, ENOMEM if the IDL is too large.
 	 */
-	void fg_MidlAppend(CMdbIdl *idp, CMdbId id);
+	void fg_MidlAppend(CMdbIdl *_pIDList, CMdbId _ID);
 
 	/** Append an IDL onto an IDL.
-	 * @param[in,out] idp	Address of the IDL to append to.
-	 * @param[in] app	The IDL to append.
+	 * @param[in,out] _pIDList	Address of the IDL to append to.
+	 * @param[in] _pAppendIDs	The IDL to append.
 	 * @return	0 on success, ENOMEM if the IDL is too large.
 	 */
-	void fg_MidlAppendList(CMdbIdl *idp, CMdbIdl app);
+	void fg_MidlAppendList(CMdbIdl *_pIDList, CMdbIdl _pAppendIDs);
 
 	/** Append an ID range onto an IDL.
-	 * @param[in,out] idp	Address of the IDL to append to.
-	 * @param[in] id	The lowest ID to append.
-	 * @param[in] n		Number of IDs to append.
+	 * @param[in,out] _pIDList	Address of the IDL to append to.
+	 * @param[in] _ID	The lowest ID to append.
+	 * @param[in] _nIDs		Number of IDs to append.
 	 * @return	0 on success, ENOMEM if the IDL is too large.
 	 */
-	void fg_MidlAppendRange(CMdbIdl *idp, CMdbId id, unsigned n);
+	void fg_MidlAppendRange(CMdbIdl *_pIDList, CMdbId _ID, unsigned _nIDs);
 
 	/** Merge an IDL onto an IDL. The destination IDL must be big enough.
-	 * @param[in] idl	The IDL to merge into.
-	 * @param[in] merge	The IDL to merge.
+	 * @param[in] _pIDs	The IDL to merge into.
+	 * @param[in] _pMergeIDs	The IDL to merge.
 	 */
-	void fg_MidlXMerge(CMdbIdl idl, CMdbIdl merge);
+	void fg_MidlXMerge(CMdbIdl _pIDs, CMdbIdl _pMergeIDs);
 
 	/** Sort an IDL.
-	 * @param[in,out] ids	The IDL to sort.
+	 * @param[in,out] _pIDs	The IDL to sort.
 	 */
-	void fg_MidlSort(CMdbIdl ids);
+	void fg_MidlSort(CMdbIdl _pIDs);
 
 	/** An ID2 is an ID/pointer pair.
 	 */
@@ -154,25 +154,25 @@ namespace NMib::NDatabase::NPrivate
 	typedef CMdbId2 *CMdbId2L;
 
 	/** Search for an ID in an ID2L.
-	 * @param[in] ids	The ID2L to search.
-	 * @param[in] id	The ID to search for.
-	 * @return	The index of the first ID2 whose \b mid member is greater than or equal to \b id.
+	 * @param[in] _pIDs	The ID2L to search.
+	 * @param[in] _ID	The ID to search for.
+	 * @return	The index of the first ID2 whose \b mid member is greater than or equal to \b _ID.
 	 */
-	unsigned fg_Mid2lSearch(CMdbId2L ids, CMdbId id);
+	unsigned fg_Mid2lSearch(CMdbId2L _pIDs, CMdbId _ID);
 
 	/** Insert an ID2 into a ID2L.
-	 * @param[in,out] ids	The ID2L to insert into.
-	 * @param[in] id	The ID2 to insert.
+	 * @param[in,out] _pIDs	The ID2L to insert into.
+	 * @param[in] _pID	The ID2 to insert.
 	 * @return	0 on success, -1 if the ID was already present in the ID2L.
 	 */
-	int fg_Mid2lInsert(CMdbId2L ids, CMdbId2 *id);
+	int fg_Mid2lInsert(CMdbId2L _pIDs, CMdbId2 *_pID);
 
 	/** Append an ID2 into a ID2L.
-	 * @param[in,out] ids	The ID2L to append into.
-	 * @param[in] id	The ID2 to append.
+	 * @param[in,out] _pIDs	The ID2L to append into.
+	 * @param[in] _pID	The ID2 to append.
 	 * @return	0 on success, -2 if the ID2L is too big.
 	 */
-	int fg_Mid2lAppend(CMdbId2L ids, CMdbId2 *id);
+	int fg_Mid2lAppend(CMdbId2L _pIDs, CMdbId2 *_pID);
 
 #ifdef DMibDatabase_Always64BitSupport
 	struct MDB_ID3
