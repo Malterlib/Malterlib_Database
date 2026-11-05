@@ -13,8 +13,8 @@ namespace NMib::NDatabase
 	enum EResultDataType
 	{
 		EResultDataType_CStr
-		, EResultDataType_fp64   // NOLINT(malterlib-type-naming): the check doesn't take a built-in type as the value of an enumerator
-		, EResultDataType_uint64 // NOLINT(malterlib-type-naming): the check doesn't take a built-in type as the value of an enumerator
+		, EResultDataType_fp64
+		, EResultDataType_uint64
 		, EResultDataType_Binary
 		/* Deprecated:
 		, EResultDataType_int32
