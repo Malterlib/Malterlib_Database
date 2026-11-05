@@ -107,10 +107,9 @@ namespace NMib::NDatabase
 			explicit operator bool () const;
 
 		private:
-			CKeyPartIterator(CResultSet const &_ResultSet, umint _iRow, umint _iKeyPart = 0);
-
-		private:
 			friend struct CResultSet;
+
+			CKeyPartIterator(CResultSet const &_ResultSet, umint _iRow, umint _iKeyPart = 0);
 
 			CResultSet const *mp_pResultSet;
 			umint mp_iRow;
@@ -139,10 +138,9 @@ namespace NMib::NDatabase
 			explicit operator bool () const;
 
 		private:
-			CColumnValueIterator(CResultSet const &_ResultSet, umint _iRow, NContainer::TCVector<umint> const &_ColumnValueIterators, umint _iCol = 0);
-
-		private:
 			friend struct CResultSet;
+
+			CColumnValueIterator(CResultSet const &_ResultSet, umint _iRow, NContainer::TCVector<umint> const &_ColumnValueIterators, umint _iCol = 0);
 
 			CResultSet const *mp_pResultSet;
 			NContainer::TCVector<umint> mp_ColumnValueIterators;
@@ -202,12 +200,6 @@ namespace NMib::NDatabase
 			NContainer::TCVector<umint> mp_ColumnValueIterators; // The position in each of the column sparse data vectors we are currently at.
 		};
 
-	private:
-		friend struct CColumnValueIterator;
-		friend struct CRowIterator;
-		friend struct CResultSetBuilder;
-
-	public:
 		CResultSet();
 		CResultSet(CResultSet &&_ToMove);
 		~CResultSet();
@@ -244,8 +236,11 @@ namespace NMib::NDatabase
 		template <typename tf_CStream>
 		void f_Consume(tf_CStream &_Stream);
 
-	private:
 	protected:
+		friend struct CColumnValueIterator;
+		friend struct CRowIterator;
+		friend struct CResultSetBuilder;
+
 		//
 		// Structure:
 		//

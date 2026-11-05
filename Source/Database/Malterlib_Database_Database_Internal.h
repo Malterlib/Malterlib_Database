@@ -1425,6 +1425,10 @@ namespace NMib::NDatabase
 
 	struct CDatabaseCursorCommon::CInternal
 	{
+		void f_Put(CDatabaseValue *_pKey, CDatabaseValue *_pData, EDatabaseWriteFlag _WriteFlags);
+		void f_Delete(EDatabaseWriteFlag _WriteFlags);
+		CDatabaseOffset f_CountDuplicates();
+
 		/** Next cursor on this DB in this txn */
 		CInternal *m_pNext;
 		/** Backup of the original cursor if this cursor is a shadow */
@@ -1471,9 +1475,6 @@ namespace NMib::NDatabase
 #	define DMcOvpg(d_Mc)			((CMdbPage *)0)
 #	define DMcSetOvpg(d_Mc, d_Pg)	((void)0)
 #endif
-		void f_Put(CDatabaseValue *_pKey, CDatabaseValue *_pData, EDatabaseWriteFlag _WriteFlags);
-		void f_Delete(EDatabaseWriteFlag _WriteFlags);
-		CDatabaseOffset f_CountDuplicates();
 	};
 
 	namespace NPrivate
@@ -1578,6 +1579,44 @@ namespace NMib::NDatabase
 	/** The database environment. */
 	struct CDatabaseEnvironment_Internal
 	{
+		// Publics
+		NDatabase::CDatabaseTransactionCommon f_TxnBegin(NPrivate::CMdbTxn *_pParent, uint32 _Flags);
+		void f_DbiClose(CDatabaseSubID _DatabaseID);
+		void f_TxnFree(NPrivate::CMdbTxn *_pTransaction);
+
+		// Privates
+		void f_CopyCompact(HANDLE _FileHandle); // NOLINT(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
+		void f_Copy(HANDLE _FileHandle); // NOLINT(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
+		CDatabaseStatistics f_DatabaseStatistics(NPrivate::CMdbDb *_pDatabase);
+		CDatabaseSizeStatistics f_SizeStatistics(NPrivate::CMdbDb *_pDatabase);
+		CDatabaseEnvironmentInfo f_EnvironmentInfo();
+		bool f_ReadHeader(int _bPrevious, NPrivate::CMdbMeta *_pMeta);
+		NPrivate::CMdbMeta *f_PickMeta() const;
+		void f_Close0(int _Exclusive);
+		umint f_LeafSize(CDatabaseValue *_pKey, CDatabaseValue *_pData);
+		umint f_BranchSize(CDatabaseValue *_pKey);
+#ifdef DMdbRobustSupported
+		void f_ReaderCheck0(bool _bReadLock, umint *_pDead);
+#endif
+		void f_PageFree(NPrivate::CMdbPage *_pPage);
+		void f_DPageFree(NPrivate::CMdbPage *_pPage);
+		void f_DPageFreeMemory(NPrivate::CMdbPage *_pPage);
+		int f_ReaderPid(NPrivate::EPidLockOp _Operation, CProcessID _ProcessID);
+		void f_Sync0(bool _bForce, NPrivate::CPgno _nPages);
+		void f_InitMeta0(NPrivate::CMdbMeta *_pMeta);
+		void f_InitMeta(NPrivate::CMdbMeta *_pMeta);
+		int f_Map(void *_pAddress);
+		void f_Open2(int _bPrevious, uint32 _PageSize);
+		int f_ShareLocks(int *_pExclusive);
+		int f_ExclLock(int *_pExclusive);
+		void f_SetupLocks(NStr::CStr const &_LockPath, int _Mode, int *_pExclusive);
+#ifdef DMdbRobustSupported
+		int f_MutexFailed(NPrivate::CMdbMutexRef _pMutex, int _Result);
+#endif
+		int f_FOpen(NStr::CStr const &_FileName, NPrivate::EMdbFOpenType _FileType, NPrivate::CMdbMode _Mode, HANDLE *o_pFileHandle);
+		NStr::CStr f_GetFileName(NStr::CStr const &_FileName, NPrivate::EMdbFOpenType _FileType);
+		bool f_IsInsideMemoryMap(uint8 const *_pData);
+
 		// NOLINTNEXTLINE(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
 		HANDLE m_FileHandle; ///< The main data file
 		// NOLINTNEXTLINE(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
@@ -1658,43 +1697,6 @@ namespace NMib::NDatabase
 #endif
 		umint m_LockedThreadID = 0;
 		NAtomic::TCAtomic<umint> m_nReferences = 0;
-		// Publics
-		NDatabase::CDatabaseTransactionCommon f_TxnBegin(NPrivate::CMdbTxn *_pParent, uint32 _Flags);
-		void f_DbiClose(CDatabaseSubID _DatabaseID);
-		void f_TxnFree(NPrivate::CMdbTxn *_pTransaction);
-
-		// Privates
-		void f_CopyCompact(HANDLE _FileHandle); // NOLINT(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
-		void f_Copy(HANDLE _FileHandle); // NOLINT(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
-		CDatabaseStatistics f_DatabaseStatistics(NPrivate::CMdbDb *_pDatabase);
-		CDatabaseSizeStatistics f_SizeStatistics(NPrivate::CMdbDb *_pDatabase);
-		CDatabaseEnvironmentInfo f_EnvironmentInfo();
-		bool f_ReadHeader(int _bPrevious, NPrivate::CMdbMeta *_pMeta);
-		NPrivate::CMdbMeta *f_PickMeta() const;
-		void f_Close0(int _Exclusive);
-		umint f_LeafSize(CDatabaseValue *_pKey, CDatabaseValue *_pData);
-		umint f_BranchSize(CDatabaseValue *_pKey);
-#ifdef DMdbRobustSupported
-		void f_ReaderCheck0(bool _bReadLock, umint *_pDead);
-#endif
-		void f_PageFree(NPrivate::CMdbPage *_pPage);
-		void f_DPageFree(NPrivate::CMdbPage *_pPage);
-		void f_DPageFreeMemory(NPrivate::CMdbPage *_pPage);
-		int f_ReaderPid(NPrivate::EPidLockOp _Operation, CProcessID _ProcessID);
-		void f_Sync0(bool _bForce, NPrivate::CPgno _nPages);
-		void f_InitMeta0(NPrivate::CMdbMeta *_pMeta);
-		void f_InitMeta(NPrivate::CMdbMeta *_pMeta);
-		int f_Map(void *_pAddress);
-		void f_Open2(int _bPrevious, uint32 _PageSize);
-		int f_ShareLocks(int *_pExclusive);
-		int f_ExclLock(int *_pExclusive);
-		void f_SetupLocks(NStr::CStr const &_LockPath, int _Mode, int *_pExclusive);
-#ifdef DMdbRobustSupported
-		int f_MutexFailed(NPrivate::CMdbMutexRef _pMutex, int _Result);
-#endif
-		int f_FOpen(NStr::CStr const &_FileName, NPrivate::EMdbFOpenType _FileType, NPrivate::CMdbMode _Mode, HANDLE *o_pFileHandle);
-		NStr::CStr f_GetFileName(NStr::CStr const &_FileName, NPrivate::EMdbFOpenType _FileType);
-		bool f_IsInsideMemoryMap(uint8 const *_pData);
 	};
 
 	namespace NPrivate

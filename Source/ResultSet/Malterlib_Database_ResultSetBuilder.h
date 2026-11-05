@@ -68,52 +68,25 @@ namespace NMib::NDatabase
 			inline CAccessor &f_Column(EResultDataType _Type, NResultSet::CSubType _SubType = 0);
 
 		private:
-			CResultSetDescription &mp_Desc;
+			friend struct CResultSetDescription;
 
 			inline CAccessor(CResultSetDescription &_Desc);
 
-			friend struct CResultSetDescription;
+			CResultSetDescription &mp_Desc;
 		};
+
+		inline CAccessor f_KeyPart(EResultDataType _Type, NResultSet::CSubType _SubType = 0);
+		inline CAccessor f_Column(EResultDataType _Type, NResultSet::CSubType _SubType = 0);
 
 		NContainer::TCVector<EResultDataType> m_KeyPartTypes;
 		NContainer::TCVector<NResultSet::CSubType> m_KeyPartSubTypes;
 
 		NContainer::TCVector<EResultDataType> m_ColumnTypes;
 		NContainer::TCVector<NResultSet::CSubType> m_ColumnSubTypes;
-
-		inline CAccessor f_KeyPart(EResultDataType _Type, NResultSet::CSubType _SubType = 0);
-		inline CAccessor f_Column(EResultDataType _Type, NResultSet::CSubType _SubType = 0);
 	};
 
 	struct CResultSetBuilder
 	{
-	protected:
-		//
-		// Structure:
-		//
-
-		NContainer::TCMap<uint32, CResultMetadata> mp_Metadata;         // Lookup by uint32 m_ID
-		NContainer::TCVector<NResultSet::CElementInfo> mp_KeyPartInfos; // Index by iKeyPart
-		NContainer::TCVector<NResultSet::CElementInfo> mp_ColumnInfos;  // Index by iColumn
-
-		//
-		// Data:
-		//
-
-		NContainer::TCVector<NResultSet::CValueVector> mp_KeyPartValues; // Index by iKeyPart, then by iKeyPartValue
-
-		umint mp_nRows;                                                               // Cached for easy access, == mp_KeyParse[X].f_GetLen()
-		NContainer::TCVector<NContainer::TCVector<uint32>> mp_KeyPartRowValueIndices; // Index by iKeyPart and then by iRow to get value index.
-		NContainer::TCVector<NResultSet::CSparseValueVector> mp_Columns;              // Index by iColumn, then by iterator (as values are sparse)
-
-		//
-		// Editing
-		//
-
-		bool mp_bRowActive;         // We are adding rows
-		umint mp_nColumnWiseActive; // We are adding values by keypart/column
-
-	public:
 		struct CRow
 		{
 			CRow(CRow &&_ToMove);
@@ -132,6 +105,11 @@ namespace NMib::NDatabase
 			CRow &f_Column(std::nullptr_t _pNull);
 
 		private:
+			friend struct CResultSetBuilder;
+
+			CRow(CResultSetBuilder &_Builder, uint32 _iRow);
+			CRow(CRow const &_ToCopy) = delete;
+
 			CResultSetBuilder *mp_pBuilder;
 
 			uint32 mp_nKeyParts; // Cached from builder.
@@ -141,11 +119,6 @@ namespace NMib::NDatabase
 
 			uint32 mp_iCurKeyPart;
 			uint32 mp_iCurColumn;
-
-			CRow(CResultSetBuilder &_Builder, uint32 _iRow);
-			CRow(CRow const &_ToCopy) = delete;
-
-			friend struct CResultSetBuilder;
 		};
 
 		struct CKeyPart
@@ -159,14 +132,14 @@ namespace NMib::NDatabase
 			inline CKeyPart &f_AddValue(uint32 _iValueIndex);
 
 		private:
-			CResultSetBuilder *mp_pBuilder;
-
-			uint32 mp_iKeyPart;
+			friend struct CResultSetBuilder;
 
 			CKeyPart(CResultSetBuilder &_Builder, uint32 _iKeyPart);
 			CKeyPart(CKeyPart const &_ToCopy) = delete;
 
-			friend struct CResultSetBuilder;
+			CResultSetBuilder *mp_pBuilder;
+
+			uint32 mp_iKeyPart;
 		};
 
 		struct CColumn
@@ -180,19 +153,18 @@ namespace NMib::NDatabase
 			CColumn &f_AddValue(std::nullptr_t _pNull);
 
 		private:
+			friend struct CResultSetBuilder;
+
+			CColumn(CResultSetBuilder &_Builder, uint32 _iKeyPart);
+			CColumn(CColumn const &_ToCopy) = delete;
+
 			CResultSetBuilder *mp_pBuilder;
 
 			uint32 mp_iColumn;
 
 			uint32 mp_iCurRow;
-
-			CColumn(CResultSetBuilder &_Builder, uint32 _iKeyPart);
-			CColumn(CColumn const &_ToCopy) = delete;
-
-			friend struct CResultSetBuilder;
 		};
 
-	public:
 		CResultSetBuilder();
 		CResultSetBuilder(CResultSetBuilder &&_ToMove);
 		CResultSetBuilder
@@ -247,6 +219,32 @@ namespace NMib::NDatabase
 
 		template <typename tf_CStream>
 		void f_Consume(tf_CStream &_Stream);
+
+	protected:
+		//
+		// Structure:
+		//
+
+		NContainer::TCMap<uint32, CResultMetadata> mp_Metadata;         // Lookup by uint32 m_ID
+		NContainer::TCVector<NResultSet::CElementInfo> mp_KeyPartInfos; // Index by iKeyPart
+		NContainer::TCVector<NResultSet::CElementInfo> mp_ColumnInfos;  // Index by iColumn
+
+		//
+		// Data:
+		//
+
+		NContainer::TCVector<NResultSet::CValueVector> mp_KeyPartValues; // Index by iKeyPart, then by iKeyPartValue
+
+		umint mp_nRows;                                                               // Cached for easy access, == mp_KeyParse[X].f_GetLen()
+		NContainer::TCVector<NContainer::TCVector<uint32>> mp_KeyPartRowValueIndices; // Index by iKeyPart and then by iRow to get value index.
+		NContainer::TCVector<NResultSet::CSparseValueVector> mp_Columns;              // Index by iColumn, then by iterator (as values are sparse)
+
+		//
+		// Editing
+		//
+
+		bool mp_bRowActive;         // We are adding rows
+		umint mp_nColumnWiseActive; // We are adding values by keypart/column
 	};
 }
 

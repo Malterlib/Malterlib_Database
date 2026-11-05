@@ -40,12 +40,12 @@ namespace NMib::NDatabase
 {
 	struct CDatabaseCursorCommon
 	{
+		struct CInternal;
+
 		CDatabaseCursorCommon();
 		~CDatabaseCursorCommon();
 		CDatabaseCursorCommon(CDatabaseCursorCommon &&_iOther);
 		CDatabaseCursorCommon &operator = (CDatabaseCursorCommon &&_iOther);
-
-		struct CInternal;
 
 		operator bool () const;
 

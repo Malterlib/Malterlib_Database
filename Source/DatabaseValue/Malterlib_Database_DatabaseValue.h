@@ -93,8 +93,9 @@ namespace NMib::NDatabase
 	template <typename t_CType>
 	struct TCDescending
 	{
-		t_CType &m_Value;
 		TCDescending(t_CType &_Value);
+
+		t_CType &m_Value;
 	};
 
 	template <typename tf_CValue>

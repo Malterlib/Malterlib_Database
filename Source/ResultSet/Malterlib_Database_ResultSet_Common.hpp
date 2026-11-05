@@ -100,66 +100,78 @@ namespace NMib::NDatabase::NResultSet
 	struct TCTypeToDataType<NStr::CStr>
 	{
 		using CDataType = NStr::CStr;
-		static constexpr EResultDataType mc_Type = EResultDataType_CStr;
+
 		static NStr::CStr fs_Convert(NStr::CStr &&_Value)
 		{
 			return fg_Move(_Value);
 		}
+
+		static constexpr EResultDataType mc_Type = EResultDataType_CStr;
 	};
 
 	template <>
 	struct TCTypeToDataType<NContainer::CByteVector>
 	{
 		using CDataType = NContainer::CByteVector;
-		static constexpr EResultDataType mc_Type = EResultDataType_Binary;
+
 		static NContainer::CByteVector fs_Convert(NContainer::CByteVector &&_Value)
 		{
 			return fg_Move(_Value);
 		}
+
+		static constexpr EResultDataType mc_Type = EResultDataType_Binary;
 	};
 
 	template <>
 	struct TCTypeToDataType<NContainer::CByteVector &>
 	{
 		using CDataType = NContainer::CByteVector;
-		static constexpr EResultDataType mc_Type = EResultDataType_Binary;
+
 		static NContainer::CByteVector fs_Convert(NContainer::CByteVector const &_Value)
 		{
 			return _Value;
 		}
+
+		static constexpr EResultDataType mc_Type = EResultDataType_Binary;
 	};
 
 	template <>
 	struct TCTypeToDataType<NContainer::CByteVector const &>
 	{
 		using CDataType = NContainer::CByteVector;
-		static constexpr EResultDataType mc_Type = EResultDataType_Binary;
+
 		static NContainer::CByteVector fs_Convert(NContainer::CByteVector const &_Value)
 		{
 			return _Value;
 		}
+
+		static constexpr EResultDataType mc_Type = EResultDataType_Binary;
 	};
 
 	template <size_t t_Len>
 	struct TCTypeToDataType<char const (&)[t_Len]>
 	{
 		using CDataType = NStr::CStr;
-		static constexpr EResultDataType mc_Type = EResultDataType_CStr;
+
 		static NStr::CStr fs_Convert(char const _Value[t_Len])
 		{
 			return NStr::CStr(_Value);
 		}
+
+		static constexpr EResultDataType mc_Type = EResultDataType_CStr;
 	};
 
 	template <>
 	struct TCTypeToDataType<char const *>
 	{
 		using CDataType = NStr::CStr;
-		static constexpr EResultDataType mc_Type = EResultDataType_CStr;
+
 		static NStr::CStr fs_Convert(char const *_pValue)
 		{
 			return NStr::CStr(_pValue);
 		}
+
+		static constexpr EResultDataType mc_Type = EResultDataType_CStr;
 	};
 
 	DAODB_DefineTypeToDataType(uint32, fp64, EResultDataType_fp64);

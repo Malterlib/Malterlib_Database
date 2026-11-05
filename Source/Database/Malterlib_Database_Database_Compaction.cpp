@@ -45,25 +45,10 @@ namespace NMib::NDatabase::NPrivate
 
 	struct CCompactingCopyState
 	{
-		CCompactingCopyState(CMdbEnv *_pEnvironment, HANDLE _DestinationFile) // NOLINT(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
-			: m_pEnvironment{_pEnvironment}
-			, m_OutputFileHandle{_DestinationFile}
-			, m_BlockingActorCheckout(fg_BlockingActor())
-		{
-		}
+		CCompactingCopyState(CMdbEnv *_pEnvironment, HANDLE _DestinationFile); // NOLINT(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
+		~CCompactingCopyState();
 
-		~CCompactingCopyState()
-		{
-			if (m_WriteBuffers[0])
-				NMemory::fg_Free(m_WriteBuffers[0], gc_CopyBufferSize * 2);
-		}
-
-		void f_Init(umint _PageSize)
-		{
-			m_WriteBuffers[0] = (uint8 *)NMemory::fg_AllocAligned(gc_CopyBufferSize * 2, _PageSize);
-			NMemory::fg_MemClear(m_WriteBuffers[0], gc_CopyBufferSize * 2);
-			m_WriteBuffers[1] = m_WriteBuffers[0] + gc_CopyBufferSize;
-		}
+		void f_Init(umint _PageSize);
 
 		CBlockingActorCheckout m_BlockingActorCheckout;
 
@@ -78,6 +63,26 @@ namespace NMib::NDatabase::NPrivate
 		int m_Status = 0;
 		int m_iBuffer = 0;
 	};
+
+	CCompactingCopyState::CCompactingCopyState(CMdbEnv *_pEnvironment, HANDLE _DestinationFile) // NOLINT(malterlib-conceptual-prefix): HANDLE is a pointer on Windows and an int elsewhere
+		: m_pEnvironment{_pEnvironment}
+		, m_OutputFileHandle{_DestinationFile}
+		, m_BlockingActorCheckout(fg_BlockingActor())
+	{
+	}
+
+	CCompactingCopyState::~CCompactingCopyState()
+	{
+		if (m_WriteBuffers[0])
+			NMemory::fg_Free(m_WriteBuffers[0], gc_CopyBufferSize * 2);
+	}
+
+	void CCompactingCopyState::f_Init(umint _PageSize)
+	{
+		m_WriteBuffers[0] = (uint8 *)NMemory::fg_AllocAligned(gc_CopyBufferSize * 2, _PageSize);
+		NMemory::fg_MemClear(m_WriteBuffers[0], gc_CopyBufferSize * 2);
+		m_WriteBuffers[1] = m_WriteBuffers[0] + gc_CopyBufferSize;
+	}
 
 	/** Dedicated writer thread for compacting copy. */
 	void DMibDatabaseInfrequentSection fg_DoBufferWrite(CCompactingCopyState &_CopyState, umint _iBuffer)
