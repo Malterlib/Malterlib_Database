@@ -855,7 +855,7 @@ namespace NMib::NDatabase
 			/** The process ID of the process owning this reader txn. */
 			NAtomic::TCAtomic<CProcessID> m_OwningProcessID;
 			/** The thread ID of the thread owning this txn. */
-			NAtomic::TCAtomic<CThreadID> m_OwningThreadID; // NOLINT(malterlib-conceptual-prefix): pthread_t is a pointer on macOS and an integer on Linux
+			NAtomic::TCAtomic<CThreadID> m_OwningThreadID;
 		};
 
 		/** The header for the reader table.
@@ -1642,8 +1642,8 @@ namespace NMib::NDatabase
 		// NOLINTNEXTLINE(malterlib-macro-naming): stands in for the member that holds the mutex on the other platforms
 #	define		m_WriterMutex	m_pLocksMemoryMap->m_WriteLock /**< Shared writer lock */
 #else
-		NPrivate::CMdbMutexType m_ReaderMutex; // NOLINT(malterlib-conceptual-prefix): a HANDLE on Windows, and a pointer, an array or a macro with the other mutex setups
-		NPrivate::CMdbMutexType m_WriterMutex; // NOLINT(malterlib-conceptual-prefix): a HANDLE on Windows, and a pointer, an array or a macro with the other mutex setups
+		NPrivate::CMdbMutexType m_ReaderMutex;
+		NPrivate::CMdbMutexType m_WriterMutex;
 #	if defined(DPlatformFamily_Windows) || defined(MDB_USE_POSIX_SEM)
 		/** Half-initialized name of mutexes, to be completed by #DMutexName() */
 		char m_MutexName[sizeof(DMutexNamePrefix) + 11];
