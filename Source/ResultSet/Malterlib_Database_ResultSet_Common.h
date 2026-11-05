@@ -38,14 +38,14 @@ namespace NMib::NDatabase
 		// Used for metadata attached to the result set itself.
 		struct CMetadataEntry
 		{
-			uint32 m_ID;
-			CResultMetadata m_Data;
-
 			template <typename tf_CStream>
 			inline void f_Feed(tf_CStream &_Stream) const;
 
 			template <typename tf_CStream>
 			inline void f_Consume(tf_CStream &_Stream);
+
+			uint32 m_ID;
+			CResultMetadata m_Data;
 		};
 
 		// Represents the subtype of a key part or column
@@ -54,15 +54,15 @@ namespace NMib::NDatabase
 		// Represents information about either a key part or a column.
 		struct CElementInfo
 		{
-			EResultDataType m_Type;     // Type of key part or column
-			CSubType m_SubType;         // Subtype of key part or column
-			CResultMetadata m_Metadata; // Metadata for the key part or column
-
 			template <typename tf_CStream>
 			inline void f_Feed(tf_CStream &_Stream) const;
 
 			template <typename tf_CStream>
 			inline void f_Consume(tf_CStream &_Stream);
+
+			EResultDataType m_Type;     // Type of key part or column
+			CSubType m_SubType;         // Subtype of key part or column
+			CResultMetadata m_Metadata; // Metadata for the key part or column
 		};
 
 		// Represents a binary blob
@@ -109,19 +109,17 @@ namespace NMib::NDatabase
 		// Base class for storing a column value
 		struct CSparseDataEntryBase
 		{
-			CRowIndex m_iRow; // The row the value stored in a subclass is for.
-
 			inline CSparseDataEntryBase(CRowIndex _iRow);
 
 			inline CSparseDataEntryBase(CSparseDataEntryBase &&_ToMove);
+
+			CRowIndex m_iRow; // The row the value stored in a subclass is for.
 		};
 
 		// Represents a value of a column for a specified (by m_ID) row.
 		template <typename t_CType>
 		struct TCSparseDataEntry : public CSparseDataEntryBase
 		{
-			t_CType m_Data;
-
 			inline TCSparseDataEntry();
 			inline TCSparseDataEntry(CRowIndex _iRow, t_CType &&_Data);
 			inline TCSparseDataEntry(TCSparseDataEntry &&_ToMove);
@@ -131,6 +129,8 @@ namespace NMib::NDatabase
 
 			template <typename tf_CStream>
 			inline void f_Consume(tf_CStream &_Stream);
+
+			t_CType m_Data;
 		};
 
 		// Represents the list of values for each row of a specific column in a sparse manner.

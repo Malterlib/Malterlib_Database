@@ -64,9 +64,10 @@ namespace NMib::NDatabase
 
 	protected:
 		friend struct CDatabaseSubReadTransaction;
-		bool fp_FindLowerBoundIgnoringPrefix(CDatabaseValue const &_Key, CDatabaseValue const &_Value);
 
 		CDatabaseCursorDuplicateData(NStorage::TCUniquePointer<CInternal> &&_pInternal);
+
+		bool fp_FindLowerBoundIgnoringPrefix(CDatabaseValue const &_Key, CDatabaseValue const &_Value);
 	};
 
 	struct CDatabaseCursorDuplicateDataWrite : public CDatabaseCursorDuplicateData

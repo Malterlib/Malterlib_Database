@@ -119,26 +119,31 @@ namespace NMib::NDatabase
 		// to visit each column and advance the corresponding value iterator
 		struct CRowIteratorAdvanceVisitor
 		{
-			umint &m_ColumnValueIterator;
-			umint m_iRow;
-
-			CRowIteratorAdvanceVisitor(umint &_ColumnValueIterator, umint _iRow)
-				: m_ColumnValueIterator(_ColumnValueIterator)
-				, m_iRow(_iRow)
-			{
-			}
+			CRowIteratorAdvanceVisitor(umint &_ColumnValueIterator, umint _iRow);
 
 			template <typename tf_CVector>
-			void operator () (tf_CVector const &_Vector)
-			{
-				umint VectorLen = _Vector.f_GetLen();
-				umint Iter = m_ColumnValueIterator;
-				while (Iter < VectorLen && _Vector[Iter].m_iRow < m_iRow)
-					++Iter;
+			void operator () (tf_CVector const &_Vector);
 
-				m_ColumnValueIterator = Iter;
-			}
+			umint &m_ColumnValueIterator;
+			umint m_iRow;
 		};
+
+		CRowIteratorAdvanceVisitor::CRowIteratorAdvanceVisitor(umint &_ColumnValueIterator, umint _iRow)
+			: m_ColumnValueIterator(_ColumnValueIterator)
+			, m_iRow(_iRow)
+		{
+		}
+
+		template <typename tf_CVector>
+		void CRowIteratorAdvanceVisitor::operator () (tf_CVector const &_Vector)
+		{
+			umint VectorLen = _Vector.f_GetLen();
+			umint Iter = m_ColumnValueIterator;
+			while (Iter < VectorLen && _Vector[Iter].m_iRow < m_iRow)
+				++Iter;
+
+			m_ColumnValueIterator = Iter;
+		}
 	}
 
 	CResultSet::CRowIterator &CResultSet::CRowIterator::operator ++ ()
@@ -265,21 +270,25 @@ namespace NMib::NDatabase
 
 	struct CMetadataCompare
 	{
-		COrdering_Strong operator () (NResultSet::CMetadataEntry const &_Left, NResultSet::CMetadataEntry const &_Right) const
-		{
-			return _Left.m_ID <=> _Right.m_ID;
-		}
-
-		COrdering_Strong operator () (NResultSet::CMetadataEntry const &_Left, uint32 _Right) const
-		{
-			return _Left.m_ID <=> _Right;
-		}
-
-		COrdering_Strong operator () (uint32 _Left, NResultSet::CMetadataEntry const &_Right) const
-		{
-			return _Left <=> _Right.m_ID;
-		}
+		COrdering_Strong operator () (NResultSet::CMetadataEntry const &_Left, NResultSet::CMetadataEntry const &_Right) const;
+		COrdering_Strong operator () (NResultSet::CMetadataEntry const &_Left, uint32 _Right) const;
+		COrdering_Strong operator () (uint32 _Left, NResultSet::CMetadataEntry const &_Right) const;
 	};
+
+	COrdering_Strong CMetadataCompare::operator () (NResultSet::CMetadataEntry const &_Left, NResultSet::CMetadataEntry const &_Right) const
+	{
+		return _Left.m_ID <=> _Right.m_ID;
+	}
+
+	COrdering_Strong CMetadataCompare::operator () (NResultSet::CMetadataEntry const &_Left, uint32 _Right) const
+	{
+		return _Left.m_ID <=> _Right;
+	}
+
+	COrdering_Strong CMetadataCompare::operator () (uint32 _Left, NResultSet::CMetadataEntry const &_Right) const
+	{
+		return _Left <=> _Right.m_ID;
+	}
 
 	CResultMetadata const *CResultSet::f_GetMetadata(uint32 _ID) const
 	{

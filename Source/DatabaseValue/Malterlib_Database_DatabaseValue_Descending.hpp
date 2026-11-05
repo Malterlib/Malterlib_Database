@@ -31,7 +31,6 @@ namespace NMib::NDatabase
 	template <typename t_CValue>
 	struct TCGetDescending
 	{
-		static constexpr bool mc_bDescending = false;
 		using CType = NTraits::TCRemoveQualifiers<t_CValue>;
 
 		template <typename tf_CType>
@@ -39,12 +38,13 @@ namespace NMib::NDatabase
 		{
 			return fg_Forward<tf_CType>(_Value);
 		}
+
+		static constexpr bool mc_bDescending = false;
 	};
 
 	template <typename t_CValue>
 	struct TCGetDescending<TCDescending<t_CValue>>
 	{
-		static constexpr bool mc_bDescending = true;
 		using CType = NTraits::TCRemoveQualifiers<t_CValue>;
 
 		template <typename tf_CType>
@@ -52,6 +52,8 @@ namespace NMib::NDatabase
 		{
 			return _Value.m_Value;
 		}
+
+		static constexpr bool mc_bDescending = true;
 	};
 
 	template <typename t_CType>

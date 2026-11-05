@@ -16,19 +16,24 @@ namespace NMib::NDatabase
 		// Utilities to get the length of a vector contained in a variant.
 		struct CVectorVariantSizeVisitor
 		{
-			umint m_Length;
-
-			CVectorVariantSizeVisitor()
-				: m_Length(0)
-			{
-			}
+			CVectorVariantSizeVisitor();
 
 			template <typename tf_CVector>
-			void operator () (tf_CVector const &_Vector)
-			{
-				m_Length = _Vector.f_GetLen();
-			}
+			void operator () (tf_CVector const &_Vector);
+
+			umint m_Length;
 		};
+
+		CVectorVariantSizeVisitor::CVectorVariantSizeVisitor()
+			: m_Length(0)
+		{
+		}
+
+		template <typename tf_CVector>
+		void CVectorVariantSizeVisitor::operator () (tf_CVector const &_Vector)
+		{
+			m_Length = _Vector.f_GetLen();
+		}
 
 		template <typename tf_CVectorVariant>
 		umint fg_GetVectorVariantLength(tf_CVectorVariant const &_VecVar)
