@@ -1699,21 +1699,21 @@ namespace NMib::NDatabase
 
 	namespace NPrivate
 	{
-			/** max number of pages to commit in one writev() call */
+		// The maximum number of pages to commit in one writev() call.
 #define DMdbCommitPages	 64
 #if defined(IOV_MAX) && IOV_MAX < DMdbCommitPages
 #	undef DMdbCommitPages
 #	define DMdbCommitPages	IOV_MAX
 #endif
 
-			/** max bytes to write in one call */
+		// The maximum number of bytes to write in one call.
 #define DMaxWrite		(0x40000000U >> int(sizeof(smint) == 4))
 
-			/** Check \b txn and \b dbi arguments to a function */
+		// Checks the txn and dbi arguments of a function.
 #define DTxnDbiExist(d_Txn, d_Dbi, d_Validity) \
 	((d_Txn) && (d_Dbi)<(d_Txn)->m_nDatabases && ((d_Txn)->m_pDatabaseFlags[d_Dbi] & (d_Validity)))
 
-			/** Check for misused \b dbi handles */
+		// Checks for misused dbi handles.
 #define DTxnDbiChanged(d_Txn, d_Dbi) \
 	((d_Txn)->m_pDatabaseSequences[d_Dbi] != (d_Txn)->m_pEnvironment->m_pDatabaseSequences[d_Dbi])
 
