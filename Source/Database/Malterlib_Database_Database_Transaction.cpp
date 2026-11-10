@@ -1108,7 +1108,6 @@ namespace NMib::NDatabase
 	 */
 	int NPrivate::fg_FreelistSave(CMdbTxn *_pTransaction)
 	{
-#ifndef DMibClangAnalyzerWorkaround
 		/* env->m_PageState.m_pReclaimedPages[] can grow and shrink during this call.
 		 * env->m_PageState.m_LastRecordID and _pTransaction->m_pFreePages[] can only grow.
 		 * Page numbers cannot disappear from _pTransaction->m_pFreePages[].
@@ -1354,8 +1353,5 @@ namespace NMib::NDatabase
 			}
 		}
 		return Result;
-#else
-		return 0;
-#endif
 	}
 }
