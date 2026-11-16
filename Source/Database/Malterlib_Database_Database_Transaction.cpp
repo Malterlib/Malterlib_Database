@@ -1239,14 +1239,14 @@ namespace NMib::NDatabase
 				while (nFree < pFreePages[0]);
 				fg_MidlSort(pFreePages);
 				memcpy((ch8 *)Data.m_pData, pFreePages, Data.m_Size);
-#	if (DMibDatabaseDebug) > 1
+#if (DMibDatabaseDebug) > 1
 				{
 					uint32 iPage = pFreePages[0];
 					DMibDatabaseTrace("IDL write txn {} root {} num {}", _pTransaction->m_TransactionID, _pTransaction->m_pDatabases[DFreeDbi].m_RootPage, iPage);
 					for (; iPage; iPage--)
 						DMibDatabaseTrace("IDL {}", pFreePages[iPage]);
 				}
-#	endif
+#endif
 				continue;
 			}
 
